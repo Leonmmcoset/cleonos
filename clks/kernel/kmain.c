@@ -2,6 +2,7 @@
 #include <clks/cpu.h>
 #include <clks/framebuffer.h>
 #include <clks/heap.h>
+#include <clks/interrupts.h>
 #include <clks/kernel.h>
 #include <clks/log.h>
 #include <clks/pmm.h>
@@ -30,7 +31,7 @@ void clks_kernel_main(void) {
         clks_tty_init();
     }
 
-    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS STAGE2 START");
+    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS STAGE3 START");
 
     if (boot_fb == CLKS_NULL) {
         clks_log(CLKS_LOG_WARN, "VIDEO", "NO FRAMEBUFFER FROM LIMINE");
@@ -76,6 +77,9 @@ void clks_kernel_main(void) {
         clks_log(CLKS_LOG_INFO, "HEAP", "KMALLOC SELFTEST OK");
         clks_kfree(heap_probe);
     }
+
+    clks_interrupts_init();
+    clks_log(CLKS_LOG_INFO, "INT", "IDT + PIC INITIALIZED");
 
     clks_log(CLKS_LOG_INFO, "TTY", "VIRTUAL TTY0 READY");
     clks_log(CLKS_LOG_DEBUG, "KERNEL", "IDLE LOOP ENTER");

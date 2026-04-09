@@ -63,22 +63,29 @@ define log_step
 @printf '%b\n' "$(COLOR_STEP)[STEP]$(COLOR_RESET) $(1)"
 endef
 
-SOURCES := \
+C_SOURCES := \
     clks/kernel/kmain.c \
     clks/kernel/log.c \
     clks/kernel/limine_requests.c \
     clks/kernel/tty.c \
     clks/kernel/pmm.c \
     clks/kernel/heap.c \
+    clks/kernel/interrupts.c \
     clks/lib/string.c \
     clks/drivers/serial/serial.c \
     clks/drivers/video/framebuffer.c \
     clks/drivers/video/font8x8.c \
     clks/arch/x86_64/boot.c
 
-OBJECTS := $(patsubst %.c,$(OBJ_ROOT)/%.o,$(SOURCES))
+ASM_SOURCES := \
+    clks/arch/x86_64/interrupt_stubs.S
+
+C_OBJECTS := $(patsubst %.c,$(OBJ_ROOT)/%.o,$(C_SOURCES))
+ASM_OBJECTS := $(patsubst %.S,$(OBJ_ROOT)/%.o,$(ASM_SOURCES))
+OBJECTS := $(C_OBJECTS) $(ASM_OBJECTS)
 
 CFLAGS_COMMON := -std=c11 -ffreestanding -fno-stack-protector -fno-builtin -Wall -Wextra -Werror -Iclks/include
+ASFLAGS_COMMON := -ffreestanding -Iclks/include
 LDFLAGS_COMMON := -nostdlib -z max-page-size=0x1000
 
 .PHONY: all setup setup-tools setup-limine kernel ramdisk iso run debug clean clean-all help
@@ -164,6 +171,12 @@ $(OBJ_ROOT)/%.o: %.c Makefile
 > $(call log_step,compiling $<)
 > @mkdir -p $(dir $@)
 > @$(CC) $(CFLAGS_COMMON) $(ARCH_CFLAGS) -c $< -o $@
+
+$(OBJ_ROOT)/%.o: %.S Makefile
+> $(call log_step,assembling $<)
+> @mkdir -p $(dir $@)
+> @$(CC) $(ASFLAGS_COMMON) $(ARCH_CFLAGS) -c $< -o $@
+
 
 $(RAMDISK_IMAGE):
 > $(call log_step,packing ramdisk -> $(RAMDISK_IMAGE))

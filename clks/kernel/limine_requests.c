@@ -1,0 +1,36 @@
+#include <clks/boot.h>
+#include <clks/compiler.h>
+
+CLKS_USED static volatile u64 limine_requests_start[]
+    __attribute__((section(".limine_requests_start"))) = LIMINE_REQUESTS_START_MARKER;
+
+CLKS_USED static volatile u64 limine_base_revision[]
+    __attribute__((section(".limine_requests"))) = LIMINE_BASE_REVISION(3);
+
+CLKS_USED static volatile struct limine_framebuffer_request limine_framebuffer_request
+    __attribute__((section(".limine_requests"))) = {
+        .id = LIMINE_FRAMEBUFFER_REQUEST,
+        .revision = 0,
+        .response = CLKS_NULL,
+    };
+
+CLKS_USED static volatile u64 limine_requests_end[]
+    __attribute__((section(".limine_requests_end"))) = LIMINE_REQUESTS_END_MARKER;
+
+clks_bool clks_boot_base_revision_supported(void) {
+    return (limine_base_revision[2] == 0) ? CLKS_TRUE : CLKS_FALSE;
+}
+
+const struct limine_framebuffer *clks_boot_get_framebuffer(void) {
+    volatile struct limine_framebuffer_request *request = &limine_framebuffer_request;
+
+    if (request->response == CLKS_NULL) {
+        return CLKS_NULL;
+    }
+
+    if (request->response->framebuffer_count < 1) {
+        return CLKS_NULL;
+    }
+
+    return request->response->framebuffers[0];
+}

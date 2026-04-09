@@ -6,6 +6,7 @@
 #include <clks/kernel.h>
 #include <clks/log.h>
 #include <clks/pmm.h>
+#include <clks/scheduler.h>
 #include <clks/serial.h>
 #include <clks/tty.h>
 #include <clks/types.h>
@@ -15,6 +16,7 @@ void clks_kernel_main(void) {
     const struct limine_memmap_response *boot_memmap;
     struct clks_pmm_stats pmm_stats;
     struct clks_heap_stats heap_stats;
+    struct clks_scheduler_stats sched_stats;
     void *heap_probe = CLKS_NULL;
 
     clks_serial_init();
@@ -31,7 +33,7 @@ void clks_kernel_main(void) {
         clks_tty_init();
     }
 
-    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS STAGE3 START");
+    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS STAGE4 START");
 
     if (boot_fb == CLKS_NULL) {
         clks_log(CLKS_LOG_WARN, "VIDEO", "NO FRAMEBUFFER FROM LIMINE");
@@ -77,6 +79,19 @@ void clks_kernel_main(void) {
         clks_log(CLKS_LOG_INFO, "HEAP", "KMALLOC SELFTEST OK");
         clks_kfree(heap_probe);
     }
+
+    clks_scheduler_init();
+
+    if (clks_scheduler_add_kernel_task("klogd", 4U) == CLKS_FALSE) {
+        clks_log(CLKS_LOG_WARN, "SCHED", "FAILED TO ADD KLOGD TASK");
+    }
+
+    if (clks_scheduler_add_kernel_task("kworker", 3U) == CLKS_FALSE) {
+        clks_log(CLKS_LOG_WARN, "SCHED", "FAILED TO ADD KWORKER TASK");
+    }
+
+    sched_stats = clks_scheduler_get_stats();
+    clks_log_hex(CLKS_LOG_INFO, "SCHED", "TASK_COUNT", sched_stats.task_count);
 
     clks_interrupts_init();
     clks_log(CLKS_LOG_INFO, "INT", "IDT + PIC INITIALIZED");

@@ -71,6 +71,7 @@ C_SOURCES := \
     clks/kernel/pmm.c \
     clks/kernel/heap.c \
     clks/kernel/interrupts.c \
+    clks/kernel/scheduler.c \
     clks/lib/string.c \
     clks/drivers/serial/serial.c \
     clks/drivers/video/framebuffer.c \

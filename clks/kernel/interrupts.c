@@ -2,6 +2,7 @@
 #include <clks/cpu.h>
 #include <clks/interrupts.h>
 #include <clks/log.h>
+#include <clks/scheduler.h>
 #include <clks/types.h>
 
 #define CLKS_IDT_ENTRY_COUNT 256U

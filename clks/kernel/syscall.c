@@ -8,6 +8,7 @@
 #include <clks/string.h>
 #include <clks/syscall.h>
 #include <clks/types.h>
+#include <clks/userland.h>
 
 #define CLKS_SYSCALL_LOG_MAX_LEN  191U
 #define CLKS_SYSCALL_PATH_MAX     192U
@@ -209,6 +210,16 @@ u64 clks_syscall_dispatch(void *frame_ptr) {
             return clks_exec_request_count();
         case CLKS_SYSCALL_EXEC_SUCCESS:
             return clks_exec_success_count();
+        case CLKS_SYSCALL_USER_SHELL_READY:
+            return (clks_userland_shell_ready() == CLKS_TRUE) ? 1ULL : 0ULL;
+        case CLKS_SYSCALL_USER_EXEC_REQUESTED:
+            return (clks_userland_shell_exec_requested() == CLKS_TRUE) ? 1ULL : 0ULL;
+        case CLKS_SYSCALL_USER_LAUNCH_TRIES:
+            return clks_userland_launch_attempts();
+        case CLKS_SYSCALL_USER_LAUNCH_OK:
+            return clks_userland_launch_success();
+        case CLKS_SYSCALL_USER_LAUNCH_FAIL:
+            return clks_userland_launch_failures();
         default:
             return (u64)-1;
     }

@@ -7,6 +7,7 @@
 #include <clks/service.h>
 #include <clks/string.h>
 #include <clks/types.h>
+#include <clks/userland.h>
 
 #define CLKS_SERVICE_MAX 8U
 
@@ -84,6 +85,9 @@ void clks_service_init(void) {
     clks_service_register(CLKS_SERVICE_KELF,
                           "kelf",
                           (clks_kelf_count() > 0ULL) ? CLKS_SERVICE_STATE_READY : CLKS_SERVICE_STATE_DEGRADED);
+    clks_service_register(CLKS_SERVICE_USER,
+                          "userland",
+                          (clks_userland_shell_ready() == CLKS_TRUE) ? CLKS_SERVICE_STATE_READY : CLKS_SERVICE_STATE_DEGRADED);
 
     clks_log(CLKS_LOG_INFO, "SRV", "KERNEL SERVICES ONLINE");
     clks_log_hex(CLKS_LOG_INFO, "SRV", "COUNT", clks_service_count());

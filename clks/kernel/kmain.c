@@ -58,7 +58,12 @@ static void clks_task_kelfd(u64 tick) {
     clks_kelf_tick(tick);
 }
 
-static void clks_stage11_syscall_probe(void) {
+static void clks_task_usrd(u64 tick) {
+    clks_service_heartbeat(CLKS_SERVICE_USER, tick);
+    clks_userland_tick(tick);
+}
+
+static void clks_stage12_syscall_probe(void) {
     char child_name[96];
     char read_buf[160];
     u64 root_children;
@@ -109,6 +114,27 @@ static void clks_stage11_syscall_probe(void) {
                  "EXEC",
                  "SUCCESS",
                  clks_syscall_invoke_kernel(CLKS_SYSCALL_EXEC_SUCCESS, 0ULL, 0ULL, 0ULL));
+
+    clks_log_hex(CLKS_LOG_INFO,
+                 "USER",
+                 "SHELL_READY",
+                 clks_syscall_invoke_kernel(CLKS_SYSCALL_USER_SHELL_READY, 0ULL, 0ULL, 0ULL));
+    clks_log_hex(CLKS_LOG_INFO,
+                 "USER",
+                 "EXEC_REQUESTED",
+                 clks_syscall_invoke_kernel(CLKS_SYSCALL_USER_EXEC_REQUESTED, 0ULL, 0ULL, 0ULL));
+    clks_log_hex(CLKS_LOG_INFO,
+                 "USER",
+                 "LAUNCH_TRIES",
+                 clks_syscall_invoke_kernel(CLKS_SYSCALL_USER_LAUNCH_TRIES, 0ULL, 0ULL, 0ULL));
+    clks_log_hex(CLKS_LOG_INFO,
+                 "USER",
+                 "LAUNCH_OK",
+                 clks_syscall_invoke_kernel(CLKS_SYSCALL_USER_LAUNCH_OK, 0ULL, 0ULL, 0ULL));
+    clks_log_hex(CLKS_LOG_INFO,
+                 "USER",
+                 "LAUNCH_FAIL",
+                 clks_syscall_invoke_kernel(CLKS_SYSCALL_USER_LAUNCH_FAIL, 0ULL, 0ULL, 0ULL));
 }
 
 void clks_kernel_main(void) {
@@ -136,7 +162,7 @@ void clks_kernel_main(void) {
         clks_tty_init();
     }
 
-    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS STAGE11 START");
+    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS STAGE12 START");
 
     if (boot_fb == CLKS_NULL) {
         clks_log(CLKS_LOG_WARN, "VIDEO", "NO FRAMEBUFFER FROM LIMINE");
@@ -198,6 +224,8 @@ void clks_kernel_main(void) {
         clks_cpu_halt_forever();
     }
 
+    clks_exec_init();
+
     if (clks_userland_init() == CLKS_FALSE) {
         clks_log(CLKS_LOG_ERROR, "USER", "USERLAND INIT FAILED");
         clks_cpu_halt_forever();
@@ -205,7 +233,6 @@ void clks_kernel_main(void) {
 
     clks_driver_init();
     clks_kelf_init();
-    clks_exec_init();
 
     clks_scheduler_init();
 
@@ -219,6 +246,10 @@ void clks_kernel_main(void) {
 
     if (clks_scheduler_add_kernel_task_ex("kelfd", 5U, clks_task_kelfd) == CLKS_FALSE) {
         clks_log(CLKS_LOG_WARN, "SCHED", "FAILED TO ADD KELFD TASK");
+    }
+
+    if (clks_scheduler_add_kernel_task_ex("usrd", 2U, clks_task_usrd) == CLKS_FALSE) {
+        clks_log(CLKS_LOG_WARN, "SCHED", "FAILED TO ADD USRD TASK");
     }
 
     sched_stats = clks_scheduler_get_stats();
@@ -240,10 +271,11 @@ void clks_kernel_main(void) {
     syscall_ticks = clks_syscall_invoke_kernel(CLKS_SYSCALL_TIMER_TICKS, 0ULL, 0ULL, 0ULL);
     clks_log_hex(CLKS_LOG_INFO, "SYSCALL", "TICKS", syscall_ticks);
 
-    clks_stage11_syscall_probe();
+    clks_stage12_syscall_probe();
 
     clks_log(CLKS_LOG_INFO, "TTY", "VIRTUAL TTY0 READY");
     clks_log(CLKS_LOG_DEBUG, "KERNEL", "IDLE LOOP ENTER");
 
     clks_cpu_halt_forever();
 }
+

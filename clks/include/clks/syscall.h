@@ -19,6 +19,11 @@
 #define CLKS_SYSCALL_EXEC_PATH           13ULL
 #define CLKS_SYSCALL_EXEC_REQUESTS       14ULL
 #define CLKS_SYSCALL_EXEC_SUCCESS        15ULL
+#define CLKS_SYSCALL_USER_SHELL_READY    16ULL
+#define CLKS_SYSCALL_USER_EXEC_REQUESTED 17ULL
+#define CLKS_SYSCALL_USER_LAUNCH_TRIES   18ULL
+#define CLKS_SYSCALL_USER_LAUNCH_OK      19ULL
+#define CLKS_SYSCALL_USER_LAUNCH_FAIL    20ULL
 
 void clks_syscall_init(void);
 u64 clks_syscall_dispatch(void *frame_ptr);

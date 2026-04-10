@@ -22,6 +22,11 @@ typedef unsigned long long usize;
 #define CLEONOS_SYSCALL_EXEC_PATH           13ULL
 #define CLEONOS_SYSCALL_EXEC_REQUESTS       14ULL
 #define CLEONOS_SYSCALL_EXEC_SUCCESS        15ULL
+#define CLEONOS_SYSCALL_USER_SHELL_READY    16ULL
+#define CLEONOS_SYSCALL_USER_EXEC_REQUESTED 17ULL
+#define CLEONOS_SYSCALL_USER_LAUNCH_TRIES   18ULL
+#define CLEONOS_SYSCALL_USER_LAUNCH_OK      19ULL
+#define CLEONOS_SYSCALL_USER_LAUNCH_FAIL    20ULL
 
 u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 u64 cleonos_sys_log_write(const char *message, u64 length);
@@ -34,5 +39,10 @@ u64 cleonos_sys_fs_read(const char *path, char *out_buffer, u64 buffer_size);
 u64 cleonos_sys_exec_path(const char *path);
 u64 cleonos_sys_exec_request_count(void);
 u64 cleonos_sys_exec_success_count(void);
+u64 cleonos_sys_user_shell_ready(void);
+u64 cleonos_sys_user_exec_requested(void);
+u64 cleonos_sys_user_launch_tries(void);
+u64 cleonos_sys_user_launch_ok(void);
+u64 cleonos_sys_user_launch_fail(void);
 
 #endif

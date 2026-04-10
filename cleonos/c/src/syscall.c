@@ -52,3 +52,23 @@ u64 cleonos_sys_exec_request_count(void) {
 u64 cleonos_sys_exec_success_count(void) {
     return cleonos_syscall(CLEONOS_SYSCALL_EXEC_SUCCESS, 0ULL, 0ULL, 0ULL);
 }
+
+u64 cleonos_sys_user_shell_ready(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_USER_SHELL_READY, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_user_exec_requested(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_USER_EXEC_REQUESTED, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_user_launch_tries(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_USER_LAUNCH_TRIES, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_user_launch_ok(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_USER_LAUNCH_OK, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_user_launch_fail(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_USER_LAUNCH_FAIL, 0ULL, 0ULL, 0ULL);
+}

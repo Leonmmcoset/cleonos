@@ -6,6 +6,7 @@
 #include <clks/fs.h>
 #include <clks/heap.h>
 #include <clks/interrupts.h>
+#include <clks/kelf.h>
 #include <clks/kernel.h>
 #include <clks/log.h>
 #include <clks/pmm.h>
@@ -51,6 +52,11 @@ static void clks_task_kworker(u64 tick) {
     phase = (phase + 1U) & 3U;
 }
 
+static void clks_task_kelfd(u64 tick) {
+    clks_service_heartbeat(CLKS_SERVICE_KELF, tick);
+    clks_kelf_tick(tick);
+}
+
 void clks_kernel_main(void) {
     const struct limine_framebuffer *boot_fb;
     const struct limine_memmap_response *boot_memmap;
@@ -76,7 +82,7 @@ void clks_kernel_main(void) {
         clks_tty_init();
     }
 
-    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS STAGE9 START");
+    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS STAGE10 START");
 
     if (boot_fb == CLKS_NULL) {
         clks_log(CLKS_LOG_WARN, "VIDEO", "NO FRAMEBUFFER FROM LIMINE");
@@ -144,6 +150,7 @@ void clks_kernel_main(void) {
     }
 
     clks_driver_init();
+    clks_kelf_init();
 
     clks_scheduler_init();
 
@@ -153,6 +160,10 @@ void clks_kernel_main(void) {
 
     if (clks_scheduler_add_kernel_task_ex("kworker", 3U, clks_task_kworker) == CLKS_FALSE) {
         clks_log(CLKS_LOG_WARN, "SCHED", "FAILED TO ADD KWORKER TASK");
+    }
+
+    if (clks_scheduler_add_kernel_task_ex("kelfd", 5U, clks_task_kelfd) == CLKS_FALSE) {
+        clks_log(CLKS_LOG_WARN, "SCHED", "FAILED TO ADD KELFD TASK");
     }
 
     sched_stats = clks_scheduler_get_stats();

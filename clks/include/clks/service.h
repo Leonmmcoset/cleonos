@@ -11,6 +11,7 @@ enum clks_service_id {
     CLKS_SERVICE_FS = 3,
     CLKS_SERVICE_DRIVER = 4,
     CLKS_SERVICE_SCHED = 5,
+    CLKS_SERVICE_KELF = 6,
 };
 
 enum clks_service_state {

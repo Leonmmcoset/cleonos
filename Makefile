@@ -43,8 +43,10 @@ USER_CC ?= cc
 USER_LD ?= ld
 RUSTC ?= rustc
 USER_LINKER_SCRIPT := cleonos/c/user.ld
+KELF_LINKER_SCRIPT := cleonos/c/kelf.ld
 USER_CFLAGS := -std=c11 -ffreestanding -fno-stack-protector -fno-builtin -Wall -Wextra -Werror -Icleonos/c/include
 USER_LDFLAGS := -nostdlib -z max-page-size=0x1000 -T $(USER_LINKER_SCRIPT)
+KELF_LDFLAGS := -nostdlib -z max-page-size=0x1000 -T $(KELF_LINKER_SCRIPT)
 
 ifeq ($(NO_COLOR),1)
 COLOR_RESET :=
@@ -93,6 +95,7 @@ C_SOURCES := \
     clks/kernel/userland.c \
     clks/kernel/driver.c \
     clks/kernel/service.c \
+    clks/kernel/kelf.c \
     clks/lib/string.c \
     clks/drivers/serial/serial.c \
     clks/drivers/video/framebuffer.c \
@@ -112,11 +115,16 @@ USER_COMMON_SOURCES := \
 
 USER_COMMON_OBJECTS := $(patsubst %.c,$(USER_OBJ_ROOT)/%.o,$(USER_COMMON_SOURCES))
 USER_SHELL_OBJECT := $(USER_OBJ_ROOT)/cleonos/c/apps/shell_main.o
-USER_ELFRUNNER_OBJECT := $(USER_OBJ_ROOT)/cleonos/c/apps/elfrunner_main.o
-USER_MEMC_OBJECT := $(USER_OBJ_ROOT)/cleonos/c/apps/memc_main.o
 USER_TTYDRV_OBJECT := $(USER_OBJ_ROOT)/cleonos/c/apps/ttydrv_main.o
+USER_ELFRUNNER_KOBJ := $(USER_OBJ_ROOT)/cleonos/c/apps/elfrunner_kmain.o
+USER_MEMC_KOBJ := $(USER_OBJ_ROOT)/cleonos/c/apps/memc_kmain.o
 USER_RUST_LIB := $(USER_LIB_DIR)/libcleonos_user_rust.a
-USER_APPS := $(USER_APP_DIR)/shell.elf $(USER_APP_DIR)/elfrunner.elf $(USER_APP_DIR)/memc.elf $(USER_APP_DIR)/ttydrv.elf
+
+APP_SHELL := $(USER_APP_DIR)/shell.elf
+APP_TTYDRV := $(USER_APP_DIR)/ttydrv.elf
+APP_ELFRUNNER := $(USER_APP_DIR)/elfrunner.elf
+APP_MEMC := $(USER_APP_DIR)/memc.elf
+USER_APPS := $(APP_SHELL) $(APP_TTYDRV) $(APP_ELFRUNNER) $(APP_MEMC)
 
 CFLAGS_COMMON := -std=c11 -ffreestanding -fno-stack-protector -fno-builtin -Wall -Wextra -Werror -Iclks/include
 ASFLAGS_COMMON := -ffreestanding -Iclks/include
@@ -206,10 +214,10 @@ ramdisk-root: userapps
 > @mkdir -p $(RAMDISK_ROOT)
 > @cp -a ramdisk/. $(RAMDISK_ROOT)/
 > @mkdir -p $(RAMDISK_ROOT)/system $(RAMDISK_ROOT)/shell $(RAMDISK_ROOT)/driver
-> @cp $(USER_APP_DIR)/shell.elf $(RAMDISK_ROOT)/shell/shell.elf
-> @cp $(USER_APP_DIR)/elfrunner.elf $(RAMDISK_ROOT)/system/elfrunner.elf
-> @cp $(USER_APP_DIR)/memc.elf $(RAMDISK_ROOT)/system/memc.elf
-> @cp $(USER_APP_DIR)/ttydrv.elf $(RAMDISK_ROOT)/driver/ttydrv.elf
+> @cp $(APP_SHELL) $(RAMDISK_ROOT)/shell/shell.elf
+> @cp $(APP_ELFRUNNER) $(RAMDISK_ROOT)/system/elfrunner.elf
+> @cp $(APP_MEMC) $(RAMDISK_ROOT)/system/memc.elf
+> @cp $(APP_TTYDRV) $(RAMDISK_ROOT)/driver/ttydrv.elf
 
 ramdisk: $(RAMDISK_IMAGE)
 
@@ -238,25 +246,25 @@ $(USER_RUST_LIB): cleonos/rust/src/lib.rs Makefile
 > @mkdir -p $(dir $@)
 > @$(RUSTC) --crate-type staticlib -C panic=abort -O $< -o $@
 
-$(USER_APP_DIR)/shell.elf: $(USER_COMMON_OBJECTS) $(USER_SHELL_OBJECT) $(USER_RUST_LIB) $(USER_LINKER_SCRIPT)
+$(APP_SHELL): $(USER_COMMON_OBJECTS) $(USER_SHELL_OBJECT) $(USER_RUST_LIB) $(USER_LINKER_SCRIPT)
 > $(call log_step,linking user shell.elf)
 > @mkdir -p $(dir $@)
 > @$(USER_LD) $(USER_LDFLAGS) -o $@ $(USER_COMMON_OBJECTS) $(USER_SHELL_OBJECT) $(USER_RUST_LIB)
 
-$(USER_APP_DIR)/elfrunner.elf: $(USER_COMMON_OBJECTS) $(USER_ELFRUNNER_OBJECT) $(USER_LINKER_SCRIPT)
-> $(call log_step,linking user elfrunner.elf)
-> @mkdir -p $(dir $@)
-> @$(USER_LD) $(USER_LDFLAGS) -o $@ $(USER_COMMON_OBJECTS) $(USER_ELFRUNNER_OBJECT)
-
-$(USER_APP_DIR)/memc.elf: $(USER_COMMON_OBJECTS) $(USER_MEMC_OBJECT) $(USER_LINKER_SCRIPT)
-> $(call log_step,linking user memc.elf)
-> @mkdir -p $(dir $@)
-> @$(USER_LD) $(USER_LDFLAGS) -o $@ $(USER_COMMON_OBJECTS) $(USER_MEMC_OBJECT)
-
-$(USER_APP_DIR)/ttydrv.elf: $(USER_COMMON_OBJECTS) $(USER_TTYDRV_OBJECT) $(USER_LINKER_SCRIPT)
+$(APP_TTYDRV): $(USER_COMMON_OBJECTS) $(USER_TTYDRV_OBJECT) $(USER_LINKER_SCRIPT)
 > $(call log_step,linking user ttydrv.elf)
 > @mkdir -p $(dir $@)
 > @$(USER_LD) $(USER_LDFLAGS) -o $@ $(USER_COMMON_OBJECTS) $(USER_TTYDRV_OBJECT)
+
+$(APP_ELFRUNNER): $(USER_ELFRUNNER_KOBJ) $(KELF_LINKER_SCRIPT)
+> $(call log_step,linking kernel-elf elfrunner.elf)
+> @mkdir -p $(dir $@)
+> @$(USER_LD) $(KELF_LDFLAGS) -o $@ $(USER_ELFRUNNER_KOBJ)
+
+$(APP_MEMC): $(USER_MEMC_KOBJ) $(KELF_LINKER_SCRIPT)
+> $(call log_step,linking kernel-elf memc.elf)
+> @mkdir -p $(dir $@)
+> @$(USER_LD) $(KELF_LDFLAGS) -o $@ $(USER_MEMC_KOBJ)
 
 $(RAMDISK_IMAGE): ramdisk-root Makefile
 > $(call log_step,packing ramdisk -> $(RAMDISK_IMAGE))

@@ -1,6 +1,7 @@
 #include <clks/driver.h>
 #include <clks/fs.h>
 #include <clks/heap.h>
+#include <clks/kelf.h>
 #include <clks/log.h>
 #include <clks/scheduler.h>
 #include <clks/service.h>
@@ -80,6 +81,9 @@ void clks_service_init(void) {
     clks_service_register(CLKS_SERVICE_SCHED,
                           "scheduler",
                           CLKS_SERVICE_STATE_READY);
+    clks_service_register(CLKS_SERVICE_KELF,
+                          "kelf",
+                          (clks_kelf_count() > 0ULL) ? CLKS_SERVICE_STATE_READY : CLKS_SERVICE_STATE_DEGRADED);
 
     clks_log(CLKS_LOG_INFO, "SRV", "KERNEL SERVICES ONLINE");
     clks_log_hex(CLKS_LOG_INFO, "SRV", "COUNT", clks_service_count());

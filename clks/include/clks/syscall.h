@@ -10,6 +10,8 @@
 #define CLKS_SYSCALL_SERVICE_COUNT       4ULL
 #define CLKS_SYSCALL_SERVICE_READY_COUNT 5ULL
 #define CLKS_SYSCALL_CONTEXT_SWITCHES    6ULL
+#define CLKS_SYSCALL_KELF_COUNT          7ULL
+#define CLKS_SYSCALL_KELF_RUNS           8ULL
 
 void clks_syscall_init(void);
 u64 clks_syscall_dispatch(void *frame_ptr);

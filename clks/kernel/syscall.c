@@ -1,4 +1,5 @@
 #include <clks/interrupts.h>
+#include <clks/kelf.h>
 #include <clks/log.h>
 #include <clks/scheduler.h>
 #include <clks/service.h>
@@ -92,6 +93,10 @@ u64 clks_syscall_dispatch(void *frame_ptr) {
             struct clks_scheduler_stats stats = clks_scheduler_get_stats();
             return stats.context_switch_count;
         }
+        case CLKS_SYSCALL_KELF_COUNT:
+            return clks_kelf_count();
+        case CLKS_SYSCALL_KELF_RUNS:
+            return clks_kelf_total_runs();
         default:
             return (u64)-1;
     }

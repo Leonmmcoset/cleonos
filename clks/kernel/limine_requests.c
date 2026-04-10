@@ -28,6 +28,13 @@ CLKS_USED static volatile struct limine_executable_file_request limine_executabl
         .response = CLKS_NULL,
     };
 
+CLKS_USED static volatile struct limine_module_request limine_module_request
+    __attribute__((section(".limine_requests"))) = {
+        .id = LIMINE_MODULE_REQUEST,
+        .revision = 0,
+        .response = CLKS_NULL,
+    };
+
 CLKS_USED static volatile u64 limine_requests_end[]
     __attribute__((section(".limine_requests_end"))) = LIMINE_REQUESTS_END_MARKER;
 
@@ -67,4 +74,28 @@ const struct limine_file *clks_boot_get_executable_file(void) {
     }
 
     return request->response->executable_file;
+}
+
+u64 clks_boot_get_module_count(void) {
+    volatile struct limine_module_request *request = &limine_module_request;
+
+    if (request->response == CLKS_NULL) {
+        return 0ULL;
+    }
+
+    return request->response->module_count;
+}
+
+const struct limine_file *clks_boot_get_module(u64 index) {
+    volatile struct limine_module_request *request = &limine_module_request;
+
+    if (request->response == CLKS_NULL) {
+        return CLKS_NULL;
+    }
+
+    if (index >= request->response->module_count) {
+        return CLKS_NULL;
+    }
+
+    return request->response->modules[index];
 }

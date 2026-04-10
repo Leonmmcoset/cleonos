@@ -75,6 +75,8 @@ C_SOURCES := \
     clks/kernel/elf64.c \
     clks/kernel/elfrunner.c \
     clks/kernel/syscall.c \
+    clks/kernel/ramdisk.c \
+    clks/kernel/fs.c \
     clks/lib/string.c \
     clks/drivers/serial/serial.c \
     clks/drivers/video/framebuffer.c \
@@ -243,3 +245,4 @@ help:
 > @echo "  make run"
 > @echo "  make debug"
 > @echo "  make NO_COLOR=1 <target>"
+

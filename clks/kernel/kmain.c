@@ -2,6 +2,7 @@
 #include <clks/cpu.h>
 #include <clks/elfrunner.h>
 #include <clks/framebuffer.h>
+#include <clks/fs.h>
 #include <clks/heap.h>
 #include <clks/interrupts.h>
 #include <clks/kernel.h>
@@ -19,8 +20,10 @@ void clks_kernel_main(void) {
     struct clks_pmm_stats pmm_stats;
     struct clks_heap_stats heap_stats;
     struct clks_scheduler_stats sched_stats;
+    struct clks_fs_node_info fs_system_dir = {0};
     void *heap_probe = CLKS_NULL;
     u64 syscall_ticks;
+    u64 fs_root_children;
 
     clks_serial_init();
 
@@ -36,7 +39,7 @@ void clks_kernel_main(void) {
         clks_tty_init();
     }
 
-    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS STAGE5 START");
+    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS STAGE6 START");
 
     if (boot_fb == CLKS_NULL) {
         clks_log(CLKS_LOG_WARN, "VIDEO", "NO FRAMEBUFFER FROM LIMINE");
@@ -83,6 +86,21 @@ void clks_kernel_main(void) {
         clks_kfree(heap_probe);
     }
 
+    clks_fs_init();
+
+    if (clks_fs_is_ready() == CLKS_FALSE) {
+        clks_log(CLKS_LOG_ERROR, "FS", "RAMDISK FS INIT FAILED");
+        clks_cpu_halt_forever();
+    }
+
+    fs_root_children = clks_fs_count_children("/");
+    clks_log_hex(CLKS_LOG_INFO, "FS", "ROOT_CHILDREN", fs_root_children);
+
+    if (clks_fs_stat("/system", &fs_system_dir) == CLKS_FALSE || fs_system_dir.type != CLKS_FS_NODE_DIR) {
+        clks_log(CLKS_LOG_ERROR, "FS", "/SYSTEM DIRECTORY CHECK FAILED");
+        clks_cpu_halt_forever();
+    }
+
     clks_scheduler_init();
 
     if (clks_scheduler_add_kernel_task("klogd", 4U) == CLKS_FALSE) {
@@ -115,3 +133,4 @@ void clks_kernel_main(void) {
 
     clks_cpu_halt_forever();
 }
+

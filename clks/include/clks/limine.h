@@ -39,6 +39,14 @@
         0x31eb5d1c5ff23b69ULL \
     }
 
+#define LIMINE_MODULE_REQUEST \
+    { \
+        LIMINE_COMMON_MAGIC, \
+        LIMINE_REQUEST_MAGIC, \
+        0x3e7e279702be32afULL, \
+        0xca1c4f3bd1280ceeULL \
+    }
+
 #define LIMINE_MEMMAP_USABLE                 0ULL
 #define LIMINE_MEMMAP_RESERVED               1ULL
 #define LIMINE_MEMMAP_ACPI_RECLAIMABLE       2ULL
@@ -130,6 +138,18 @@ struct limine_executable_file_request {
     u64 id[4];
     u64 revision;
     struct limine_executable_file_response *response;
+};
+
+struct limine_module_response {
+    u64 revision;
+    u64 module_count;
+    struct limine_file **modules;
+};
+
+struct limine_module_request {
+    u64 id[4];
+    u64 revision;
+    struct limine_module_response *response;
 };
 
 #endif

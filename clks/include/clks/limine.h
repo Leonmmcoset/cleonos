@@ -31,6 +31,14 @@
         0xe304acdfc50c3c62ULL \
     }
 
+#define LIMINE_EXECUTABLE_FILE_REQUEST \
+    { \
+        LIMINE_COMMON_MAGIC, \
+        LIMINE_REQUEST_MAGIC, \
+        0xad97e90e83f1ed67ULL, \
+        0x31eb5d1c5ff23b69ULL \
+    }
+
 #define LIMINE_MEMMAP_USABLE                 0ULL
 #define LIMINE_MEMMAP_RESERVED               1ULL
 #define LIMINE_MEMMAP_ACPI_RECLAIMABLE       2ULL
@@ -40,6 +48,30 @@
 #define LIMINE_MEMMAP_EXECUTABLE_AND_MODULES 6ULL
 #define LIMINE_MEMMAP_FRAMEBUFFER            7ULL
 #define LIMINE_MEMMAP_RESERVED_MAPPED        8ULL
+
+struct limine_uuid {
+    u32 a;
+    u16 b;
+    u16 c;
+    u8 d[8];
+};
+
+struct limine_file {
+    u64 revision;
+    void *address;
+    u64 size;
+    char *path;
+    char *string;
+    u32 media_type;
+    u32 unused;
+    u32 tftp_ip;
+    u32 tftp_port;
+    u32 partition_index;
+    u32 mbr_disk_id;
+    struct limine_uuid gpt_disk_uuid;
+    struct limine_uuid gpt_part_uuid;
+    struct limine_uuid part_uuid;
+};
 
 struct limine_framebuffer {
     void *address;
@@ -87,6 +119,17 @@ struct limine_memmap_request {
     u64 id[4];
     u64 revision;
     struct limine_memmap_response *response;
+};
+
+struct limine_executable_file_response {
+    u64 revision;
+    struct limine_file *executable_file;
+};
+
+struct limine_executable_file_request {
+    u64 id[4];
+    u64 revision;
+    struct limine_executable_file_response *response;
 };
 
 #endif

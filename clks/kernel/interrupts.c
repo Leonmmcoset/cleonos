@@ -3,10 +3,12 @@
 #include <clks/interrupts.h>
 #include <clks/log.h>
 #include <clks/scheduler.h>
+#include <clks/syscall.h>
 #include <clks/types.h>
 
 #define CLKS_IDT_ENTRY_COUNT 256U
 #define CLKS_INTERRUPT_GATE  0x8EU
+#define CLKS_USER_INT_GATE   0xEEU
 
 #define CLKS_PIC1_CMD   0x20U
 #define CLKS_PIC1_DATA  0x21U
@@ -17,6 +19,7 @@
 #define CLKS_IRQ_BASE   32U
 #define CLKS_IRQ_TIMER  32U
 #define CLKS_IRQ_LAST   47U
+#define CLKS_SYSCALL_VECTOR 128U
 
 struct clks_idt_entry {
     u16 offset_low;
@@ -107,6 +110,7 @@ extern void clks_isr_stub_44(void);
 extern void clks_isr_stub_45(void);
 extern void clks_isr_stub_46(void);
 extern void clks_isr_stub_47(void);
+extern void clks_isr_stub_128(void);
 
 static struct clks_idt_entry clks_idt[CLKS_IDT_ENTRY_COUNT];
 static u16 clks_idt_code_selector = 0x08U;
@@ -228,6 +232,11 @@ static void clks_enable_interrupts(void) {
 void clks_interrupt_dispatch(struct clks_interrupt_frame *frame) {
     u64 vector = frame->vector;
 
+    if (vector == CLKS_SYSCALL_VECTOR) {
+        frame->rax = clks_syscall_dispatch((void *)frame);
+        return;
+    }
+
     if (vector < 32U) {
         clks_log(CLKS_LOG_ERROR, "EXC", clks_exception_names[vector]);
         clks_log_hex(CLKS_LOG_ERROR, "EXC", "VECTOR", vector);
@@ -238,6 +247,7 @@ void clks_interrupt_dispatch(struct clks_interrupt_frame *frame) {
 
     if (vector == CLKS_IRQ_TIMER) {
         clks_timer_ticks++;
+        clks_scheduler_on_timer_tick(clks_timer_ticks);
     }
 
     if (vector >= CLKS_IRQ_BASE && vector <= CLKS_IRQ_LAST) {
@@ -303,6 +313,8 @@ void clks_interrupts_init(void) {
     clks_idt_set_gate(45, clks_isr_stub_45, CLKS_INTERRUPT_GATE);
     clks_idt_set_gate(46, clks_isr_stub_46, CLKS_INTERRUPT_GATE);
     clks_idt_set_gate(47, clks_isr_stub_47, CLKS_INTERRUPT_GATE);
+
+    clks_idt_set_gate(CLKS_SYSCALL_VECTOR, clks_isr_stub_128, CLKS_USER_INT_GATE);
 
     clks_pic_remap_and_mask();
     clks_load_idt();

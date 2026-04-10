@@ -21,6 +21,13 @@ CLKS_USED static volatile struct limine_memmap_request limine_memmap_request
         .response = CLKS_NULL,
     };
 
+CLKS_USED static volatile struct limine_executable_file_request limine_executable_file_request
+    __attribute__((section(".limine_requests"))) = {
+        .id = LIMINE_EXECUTABLE_FILE_REQUEST,
+        .revision = 0,
+        .response = CLKS_NULL,
+    };
+
 CLKS_USED static volatile u64 limine_requests_end[]
     __attribute__((section(".limine_requests_end"))) = LIMINE_REQUESTS_END_MARKER;
 
@@ -50,4 +57,14 @@ const struct limine_memmap_response *clks_boot_get_memmap(void) {
     }
 
     return request->response;
+}
+
+const struct limine_file *clks_boot_get_executable_file(void) {
+    volatile struct limine_executable_file_request *request = &limine_executable_file_request;
+
+    if (request->response == CLKS_NULL) {
+        return CLKS_NULL;
+    }
+
+    return request->response->executable_file;
 }

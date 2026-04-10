@@ -1,5 +1,6 @@
 #include <clks/boot.h>
 #include <clks/cpu.h>
+#include <clks/elfrunner.h>
 #include <clks/framebuffer.h>
 #include <clks/heap.h>
 #include <clks/interrupts.h>
@@ -8,6 +9,7 @@
 #include <clks/pmm.h>
 #include <clks/scheduler.h>
 #include <clks/serial.h>
+#include <clks/syscall.h>
 #include <clks/tty.h>
 #include <clks/types.h>
 
@@ -18,6 +20,7 @@ void clks_kernel_main(void) {
     struct clks_heap_stats heap_stats;
     struct clks_scheduler_stats sched_stats;
     void *heap_probe = CLKS_NULL;
+    u64 syscall_ticks;
 
     clks_serial_init();
 
@@ -33,7 +36,7 @@ void clks_kernel_main(void) {
         clks_tty_init();
     }
 
-    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS STAGE4 START");
+    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS STAGE5 START");
 
     if (boot_fb == CLKS_NULL) {
         clks_log(CLKS_LOG_WARN, "VIDEO", "NO FRAMEBUFFER FROM LIMINE");
@@ -93,8 +96,19 @@ void clks_kernel_main(void) {
     sched_stats = clks_scheduler_get_stats();
     clks_log_hex(CLKS_LOG_INFO, "SCHED", "TASK_COUNT", sched_stats.task_count);
 
+    clks_elfrunner_init();
+
+    if (clks_elfrunner_probe_kernel_executable() == CLKS_FALSE) {
+        clks_log(CLKS_LOG_ERROR, "ELF", "KERNEL ELF PROBE FAILED");
+    }
+
+    clks_syscall_init();
+
     clks_interrupts_init();
     clks_log(CLKS_LOG_INFO, "INT", "IDT + PIC INITIALIZED");
+
+    syscall_ticks = clks_syscall_invoke_kernel(CLKS_SYSCALL_TIMER_TICKS, 0ULL, 0ULL, 0ULL);
+    clks_log_hex(CLKS_LOG_INFO, "SYSCALL", "TICKS", syscall_ticks);
 
     clks_log(CLKS_LOG_INFO, "TTY", "VIRTUAL TTY0 READY");
     clks_log(CLKS_LOG_DEBUG, "KERNEL", "IDLE LOOP ENTER");

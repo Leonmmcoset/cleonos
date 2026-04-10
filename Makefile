@@ -72,6 +72,9 @@ C_SOURCES := \
     clks/kernel/heap.c \
     clks/kernel/interrupts.c \
     clks/kernel/scheduler.c \
+    clks/kernel/elf64.c \
+    clks/kernel/elfrunner.c \
+    clks/kernel/syscall.c \
     clks/lib/string.c \
     clks/drivers/serial/serial.c \
     clks/drivers/video/framebuffer.c \

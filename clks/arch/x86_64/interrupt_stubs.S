@@ -116,3 +116,4 @@ clks_isr_common:
 
     add rsp, 16
     iretq
+.section .note.GNU-stack,"",@progbits

@@ -5,9 +5,15 @@ NO_COLOR ?= 0
 BUILD_ROOT := build/x86_64
 OBJ_ROOT := $(BUILD_ROOT)/obj
 ISO_ROOT := $(BUILD_ROOT)/iso_root
+RAMDISK_ROOT := $(BUILD_ROOT)/ramdisk_root
 KERNEL_ELF := $(BUILD_ROOT)/clks_kernel.elf
 RAMDISK_IMAGE := $(BUILD_ROOT)/cleonos_ramdisk.tar
 ISO_IMAGE := build/CLeonOS-x86_64.iso
+
+USER_BUILD_ROOT := $(BUILD_ROOT)/user
+USER_OBJ_ROOT := $(USER_BUILD_ROOT)/obj
+USER_APP_DIR := $(USER_BUILD_ROOT)/apps
+USER_LIB_DIR := $(USER_BUILD_ROOT)/lib
 
 LIMINE_DIR ?= limine
 LIMINE_REPO ?= https://gh-proxy.com/https://github.com/limine-bootloader/limine.git
@@ -32,6 +38,13 @@ ARCH_CFLAGS := -DCLKS_ARCH_X86_64=1 -m64 -mno-red-zone -mcmodel=kernel -fno-pic 
 LINKER_SCRIPT := clks/arch/x86_64/linker.ld
 RUN_COMMAND := $(QEMU_X86_64) -M q35 -m 1024M -cdrom $(ISO_IMAGE) -serial stdio
 DEBUG_COMMAND := $(QEMU_X86_64) -M q35 -m 1024M -cdrom $(ISO_IMAGE) -serial stdio -s -S
+
+USER_CC ?= cc
+USER_LD ?= ld
+RUSTC ?= rustc
+USER_LINKER_SCRIPT := cleonos/c/user.ld
+USER_CFLAGS := -std=c11 -ffreestanding -fno-stack-protector -fno-builtin -Wall -Wextra -Werror -Icleonos/c/include
+USER_LDFLAGS := -nostdlib -z max-page-size=0x1000 -T $(USER_LINKER_SCRIPT)
 
 ifeq ($(NO_COLOR),1)
 COLOR_RESET :=
@@ -77,6 +90,7 @@ C_SOURCES := \
     clks/kernel/syscall.c \
     clks/kernel/ramdisk.c \
     clks/kernel/fs.c \
+    clks/kernel/userland.c \
     clks/lib/string.c \
     clks/drivers/serial/serial.c \
     clks/drivers/video/framebuffer.c \
@@ -90,11 +104,22 @@ C_OBJECTS := $(patsubst %.c,$(OBJ_ROOT)/%.o,$(C_SOURCES))
 ASM_OBJECTS := $(patsubst %.S,$(OBJ_ROOT)/%.o,$(ASM_SOURCES))
 OBJECTS := $(C_OBJECTS) $(ASM_OBJECTS)
 
+USER_COMMON_SOURCES := \
+    cleonos/c/src/runtime.c \
+    cleonos/c/src/syscall.c
+
+USER_COMMON_OBJECTS := $(patsubst %.c,$(USER_OBJ_ROOT)/%.o,$(USER_COMMON_SOURCES))
+USER_SHELL_OBJECT := $(USER_OBJ_ROOT)/cleonos/c/apps/shell_main.o
+USER_ELFRUNNER_OBJECT := $(USER_OBJ_ROOT)/cleonos/c/apps/elfrunner_main.o
+USER_MEMC_OBJECT := $(USER_OBJ_ROOT)/cleonos/c/apps/memc_main.o
+USER_RUST_LIB := $(USER_LIB_DIR)/libcleonos_user_rust.a
+USER_APPS := $(USER_APP_DIR)/shell.elf $(USER_APP_DIR)/elfrunner.elf $(USER_APP_DIR)/memc.elf
+
 CFLAGS_COMMON := -std=c11 -ffreestanding -fno-stack-protector -fno-builtin -Wall -Wextra -Werror -Iclks/include
 ASFLAGS_COMMON := -ffreestanding -Iclks/include
 LDFLAGS_COMMON := -nostdlib -z max-page-size=0x1000
 
-.PHONY: all setup setup-tools setup-limine kernel ramdisk iso run debug clean clean-all help
+.PHONY: all setup setup-tools setup-limine kernel userapps ramdisk-root ramdisk iso run debug clean clean-all help
 
 all: iso
 
@@ -111,6 +136,9 @@ setup-tools:
 > @command -v $(OBJCOPY_FOR_TARGET) >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: $(OBJCOPY_FOR_TARGET)" && exit 1)
 > @command -v $(OBJDUMP_FOR_TARGET) >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: $(OBJDUMP_FOR_TARGET)" && exit 1)
 > @command -v $(READELF_FOR_TARGET) >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: $(READELF_FOR_TARGET)" && exit 1)
+> @command -v $(USER_CC) >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: $(USER_CC)" && exit 1)
+> @command -v $(USER_LD) >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: $(USER_LD)" && exit 1)
+> @command -v $(RUSTC) >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: $(RUSTC)" && exit 1)
 > $(call log_info,required tools are available)
 
 setup-limine:
@@ -166,6 +194,19 @@ setup-limine:
 
 kernel: $(KERNEL_ELF)
 
+userapps: $(USER_APPS)
+> $(call log_info,user elf apps ready)
+
+ramdisk-root: userapps
+> $(call log_step,staging ramdisk root -> $(RAMDISK_ROOT))
+> @rm -rf $(RAMDISK_ROOT)
+> @mkdir -p $(RAMDISK_ROOT)
+> @cp -a ramdisk/. $(RAMDISK_ROOT)/
+> @mkdir -p $(RAMDISK_ROOT)/system $(RAMDISK_ROOT)/shell
+> @cp $(USER_APP_DIR)/shell.elf $(RAMDISK_ROOT)/shell/shell.elf
+> @cp $(USER_APP_DIR)/elfrunner.elf $(RAMDISK_ROOT)/system/elfrunner.elf
+> @cp $(USER_APP_DIR)/memc.elf $(RAMDISK_ROOT)/system/memc.elf
+
 ramdisk: $(RAMDISK_IMAGE)
 
 $(KERNEL_ELF): $(OBJECTS) $(LINKER_SCRIPT) Makefile
@@ -183,11 +224,35 @@ $(OBJ_ROOT)/%.o: %.S Makefile
 > @mkdir -p $(dir $@)
 > @$(CC) $(ASFLAGS_COMMON) $(ARCH_CFLAGS) -c $< -o $@
 
+$(USER_OBJ_ROOT)/%.o: %.c Makefile
+> $(call log_step,compiling user $<)
+> @mkdir -p $(dir $@)
+> @$(USER_CC) $(USER_CFLAGS) -c $< -o $@
 
-$(RAMDISK_IMAGE):
+$(USER_RUST_LIB): cleonos/rust/src/lib.rs Makefile
+> $(call log_step,building rust user lib)
+> @mkdir -p $(dir $@)
+> @$(RUSTC) --crate-type staticlib -C panic=abort -O $< -o $@
+
+$(USER_APP_DIR)/shell.elf: $(USER_COMMON_OBJECTS) $(USER_SHELL_OBJECT) $(USER_RUST_LIB) $(USER_LINKER_SCRIPT)
+> $(call log_step,linking user shell.elf)
+> @mkdir -p $(dir $@)
+> @$(USER_LD) $(USER_LDFLAGS) -o $@ $(USER_COMMON_OBJECTS) $(USER_SHELL_OBJECT) $(USER_RUST_LIB)
+
+$(USER_APP_DIR)/elfrunner.elf: $(USER_COMMON_OBJECTS) $(USER_ELFRUNNER_OBJECT) $(USER_LINKER_SCRIPT)
+> $(call log_step,linking user elfrunner.elf)
+> @mkdir -p $(dir $@)
+> @$(USER_LD) $(USER_LDFLAGS) -o $@ $(USER_COMMON_OBJECTS) $(USER_ELFRUNNER_OBJECT)
+
+$(USER_APP_DIR)/memc.elf: $(USER_COMMON_OBJECTS) $(USER_MEMC_OBJECT) $(USER_LINKER_SCRIPT)
+> $(call log_step,linking user memc.elf)
+> @mkdir -p $(dir $@)
+> @$(USER_LD) $(USER_LDFLAGS) -o $@ $(USER_COMMON_OBJECTS) $(USER_MEMC_OBJECT)
+
+$(RAMDISK_IMAGE): ramdisk-root Makefile
 > $(call log_step,packing ramdisk -> $(RAMDISK_IMAGE))
 > @mkdir -p $(dir $@)
-> @$(TAR) -C ramdisk -cf $@ .
+> @$(TAR) -C $(RAMDISK_ROOT) -cf $@ .
 
 iso: setup-tools setup-limine $(KERNEL_ELF) $(RAMDISK_IMAGE) configs/limine.conf
 > $(call log_step,assembling iso root)
@@ -241,8 +306,8 @@ help:
 > @echo "  make setup LIMINE_SKIP_CONFIGURE=1"
 > @echo "  make setup LIMINE_CONFIGURE_FLAGS='--enable-bios-cd --enable-uefi-cd --enable-uefi-x86-64'"
 > @echo "  make setup OBJCOPY_FOR_TARGET=llvm-objcopy OBJDUMP_FOR_TARGET=llvm-objdump READELF_FOR_TARGET=llvm-readelf"
+> @echo "  make userapps"
 > @echo "  make iso"
 > @echo "  make run"
 > @echo "  make debug"
 > @echo "  make NO_COLOR=1 <target>"
-

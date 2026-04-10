@@ -1,6 +1,6 @@
 /*
- * CLeonOS user-space C toolchain stub.
- * Stage1 only defines build skeleton. Real shell/user ELF apps start in later stages.
+ * CLeonOS user-space bootstrap placeholder kept for compatibility.
+ * Stage7 introduces real user ELF apps under cleonos/c/apps.
  */
 
 int cleonos_c_stub(void) {

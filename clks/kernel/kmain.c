@@ -13,6 +13,7 @@
 #include <clks/syscall.h>
 #include <clks/tty.h>
 #include <clks/types.h>
+#include <clks/userland.h>
 
 void clks_kernel_main(void) {
     const struct limine_framebuffer *boot_fb;
@@ -39,7 +40,7 @@ void clks_kernel_main(void) {
         clks_tty_init();
     }
 
-    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS STAGE6 START");
+    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS STAGE7 START");
 
     if (boot_fb == CLKS_NULL) {
         clks_log(CLKS_LOG_WARN, "VIDEO", "NO FRAMEBUFFER FROM LIMINE");
@@ -101,6 +102,11 @@ void clks_kernel_main(void) {
         clks_cpu_halt_forever();
     }
 
+    if (clks_userland_init() == CLKS_FALSE) {
+        clks_log(CLKS_LOG_ERROR, "USER", "USERLAND INIT FAILED");
+        clks_cpu_halt_forever();
+    }
+
     clks_scheduler_init();
 
     if (clks_scheduler_add_kernel_task("klogd", 4U) == CLKS_FALSE) {
@@ -133,4 +139,3 @@ void clks_kernel_main(void) {
 
     clks_cpu_halt_forever();
 }
-

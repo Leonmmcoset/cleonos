@@ -194,7 +194,7 @@ void clks_kernel_main(void) {
         clks_log(CLKS_LOG_WARN, "SCHED", "FAILED TO ADD KELFD TASK");
     }
 
-    if (clks_scheduler_add_kernel_task_ex("usrd", 2U, clks_task_usrd) == CLKS_FALSE) {
+    if (clks_scheduler_add_kernel_task_ex("usrd", 4U, clks_task_usrd) == CLKS_FALSE) {
         clks_log(CLKS_LOG_WARN, "SCHED", "FAILED TO ADD USRD TASK");
     }
 

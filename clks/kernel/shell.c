@@ -13,7 +13,7 @@
 #define CLKS_SHELL_NAME_MAX       96U
 #define CLKS_SHELL_PATH_MAX      192U
 #define CLKS_SHELL_CAT_LIMIT     512U
-#define CLKS_SHELL_INPUT_BUDGET   32U
+#define CLKS_SHELL_INPUT_BUDGET  128U
 #define CLKS_SHELL_CLEAR_LINES    56U
 
 static clks_bool clks_shell_ready = CLKS_FALSE;
@@ -420,17 +420,15 @@ void clks_shell_init(void) {
     clks_log(CLKS_LOG_INFO, "SHELL", "INTERACTIVE LOOP ONLINE");
 }
 
-void clks_shell_tick(u64 tick) {
+static void clks_shell_drain_input(u32 budget_limit) {
     u32 budget = 0U;
     char ch;
 
-    (void)tick;
-
-    if (clks_shell_ready == CLKS_FALSE) {
+    if (budget_limit == 0U || clks_shell_ready == CLKS_FALSE) {
         return;
     }
 
-    while (budget < CLKS_SHELL_INPUT_BUDGET) {
+    while (budget < budget_limit) {
         if (clks_keyboard_pop_char(&ch) == CLKS_FALSE) {
             break;
         }
@@ -438,4 +436,13 @@ void clks_shell_tick(u64 tick) {
         clks_shell_handle_char(ch);
         budget++;
     }
+}
+
+void clks_shell_pump_input(u32 max_chars) {
+    clks_shell_drain_input(max_chars);
+}
+
+void clks_shell_tick(u64 tick) {
+    (void)tick;
+    clks_shell_drain_input(CLKS_SHELL_INPUT_BUDGET);
 }

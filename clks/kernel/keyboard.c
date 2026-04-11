@@ -1,5 +1,6 @@
 #include <clks/keyboard.h>
 #include <clks/log.h>
+#include <clks/shell.h>
 #include <clks/tty.h>
 #include <clks/types.h>
 
@@ -145,7 +146,9 @@ void clks_keyboard_handle_scancode(u8 scancode) {
         char translated = clks_keyboard_translate_scancode(code);
 
         if (translated != '\0') {
-            (void)clks_keyboard_queue_push(translated);
+            if (clks_keyboard_queue_push(translated) == CLKS_TRUE) {
+                clks_shell_pump_input(1U);
+            }
         }
     }
 }

@@ -3,6 +3,7 @@
 #include <clks/heap.h>
 #include <clks/keyboard.h>
 #include <clks/log.h>
+#include <clks/panic.h>
 #include <clks/pmm.h>
 #include <clks/scheduler.h>
 #include <clks/shell.h>
@@ -696,6 +697,7 @@ static clks_bool clks_shell_cmd_help(void) {
     clks_shell_writeln("  dmesg [n]");
     clks_shell_writeln("  shstat");
     clks_shell_writeln("  rusttest");
+    clks_shell_writeln("  panic");
     clks_shell_writeln("  exec <path|name>");
     clks_shell_writeln("  clear");
     clks_shell_writeln("  kbdstat");
@@ -1209,6 +1211,11 @@ static clks_bool clks_shell_cmd_rusttest(void) {
     return CLKS_TRUE;
 }
 
+static clks_bool clks_shell_cmd_panic(void) {
+    clks_panic("MANUAL PANIC FROM KERNEL SHELL");
+    return CLKS_FALSE;
+}
+
 static void clks_shell_execute_line(const char *line) {
     char line_buf[CLKS_SHELL_LINE_MAX];
     char cmd[CLKS_SHELL_CMD_MAX];
@@ -1271,6 +1278,8 @@ static void clks_shell_execute_line(const char *line) {
         success = clks_shell_cmd_shstat();
     } else if (clks_shell_streq(cmd, "rusttest") == CLKS_TRUE) {
         success = clks_shell_cmd_rusttest();
+    } else if (clks_shell_streq(cmd, "panic") == CLKS_TRUE) {
+        success = clks_shell_cmd_panic();
     } else if (clks_shell_streq(cmd, "exec") == CLKS_TRUE || clks_shell_streq(cmd, "run") == CLKS_TRUE) {
         success = clks_shell_cmd_exec(arg);
     } else if (clks_shell_streq(cmd, "clear") == CLKS_TRUE) {

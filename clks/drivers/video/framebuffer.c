@@ -19,7 +19,7 @@ static struct clks_fb_state clks_fb = {
     .address = CLKS_NULL,
     .info = {0, 0, 0, 0},
     .font = CLKS_NULL,
-    .external_font = {0, 0, 0, 0, CLKS_NULL},
+    .external_font = {0, 0, 0, 0, 0, CLKS_NULL},
     .external_font_active = CLKS_FALSE,
     .glyph_width = 8U,
     .glyph_height = 8U,
@@ -149,6 +149,7 @@ void clks_fb_draw_char(u32 x, u32 y, char ch, u32 fg_rgb, u32 bg_rgb) {
     u32 col;
     u32 cols;
     u32 rows;
+    u32 row_stride;
 
     if (clks_fb.ready == CLKS_FALSE || clks_fb.font == CLKS_NULL) {
         return;
@@ -167,15 +168,26 @@ void clks_fb_draw_char(u32 x, u32 y, char ch, u32 fg_rgb, u32 bg_rgb) {
         rows = 8U;
     }
 
-    if (cols > 8U) {
-        cols = 8U;
+    row_stride = clks_fb.font->bytes_per_row;
+
+    if (row_stride == 0U) {
+        row_stride = (cols + 7U) / 8U;
+    }
+
+    if (row_stride == 0U) {
+        return;
+    }
+
+    if (((usize)row_stride * (usize)rows) > (usize)clks_fb.font->bytes_per_glyph) {
+        return;
     }
 
     for (row = 0U; row < rows; row++) {
-        u8 bits = glyph[row];
+        const u8 *row_bits = glyph + ((usize)row * (usize)row_stride);
 
         for (col = 0U; col < cols; col++) {
-            u8 mask = (u8)(1U << (7U - col));
+            u8 bits = row_bits[col >> 3U];
+            u8 mask = (u8)(0x80U >> (col & 7U));
             u32 color = (bits & mask) != 0U ? fg_rgb : bg_rgb;
             clks_fb_put_pixel(x + col, y + row, color);
         }
@@ -183,7 +195,7 @@ void clks_fb_draw_char(u32 x, u32 y, char ch, u32 fg_rgb, u32 bg_rgb) {
 }
 
 clks_bool clks_fb_load_psf_font(const void *blob, u64 blob_size) {
-    struct clks_psf_font parsed = {0, 0, 0, 0, CLKS_NULL};
+    struct clks_psf_font parsed = {0, 0, 0, 0, 0, CLKS_NULL};
 
     if (clks_psf_parse_font(blob, blob_size, &parsed) == CLKS_FALSE) {
         return CLKS_FALSE;

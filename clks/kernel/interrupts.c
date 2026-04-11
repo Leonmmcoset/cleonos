@@ -3,6 +3,7 @@
 #include <clks/interrupts.h>
 #include <clks/log.h>
 #include <clks/keyboard.h>
+#include <clks/panic.h>
 #include <clks/scheduler.h>
 #include <clks/syscall.h>
 #include <clks/types.h>
@@ -247,11 +248,7 @@ void clks_interrupt_dispatch(struct clks_interrupt_frame *frame) {
     }
 
     if (vector < 32U) {
-        clks_log(CLKS_LOG_ERROR, "EXC", clks_exception_names[vector]);
-        clks_log_hex(CLKS_LOG_ERROR, "EXC", "VECTOR", vector);
-        clks_log_hex(CLKS_LOG_ERROR, "EXC", "ERROR", frame->error_code);
-        clks_log_hex(CLKS_LOG_ERROR, "EXC", "RIP", frame->rip);
-        clks_cpu_halt_forever();
+        clks_panic_exception(clks_exception_names[vector], vector, frame->error_code, frame->rip);
     }
 
     if (vector == CLKS_IRQ_TIMER) {

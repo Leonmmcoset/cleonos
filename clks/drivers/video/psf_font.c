@@ -10,10 +10,24 @@
 #define CLKS_PSF1_GLYPH_BYTES 8U
 #define CLKS_PSF1_BLOB_SIZE (CLKS_PSF1_HEADER_SIZE + (CLKS_PSF1_GLYPH_COUNT * CLKS_PSF1_GLYPH_BYTES))
 
+#define CLKS_PSF2_MAGIC 0x864AB572U
+#define CLKS_PSF2_HEADER_MIN_SIZE 32U
+
 struct clks_psf1_header {
     u8 magic[2];
     u8 mode;
     u8 charsize;
+};
+
+struct clks_psf2_header {
+    u32 magic;
+    u32 version;
+    u32 headersize;
+    u32 flags;
+    u32 length;
+    u32 charsize;
+    u32 height;
+    u32 width;
 };
 
 struct clks_psf_seed_glyph {
@@ -74,7 +88,7 @@ static const struct clks_psf_seed_glyph clks_psf_seed_table[] = {
 };
 
 static u8 clks_psf_default_blob[CLKS_PSF1_BLOB_SIZE];
-static struct clks_psf_font clks_psf_default = {8U, 8U, 0U, 0U, CLKS_NULL};
+static struct clks_psf_font clks_psf_default = {8U, 8U, 0U, 0U, 1U, CLKS_NULL};
 static clks_bool clks_psf_default_ready = CLKS_FALSE;
 
 static clks_bool clks_psf_parse_psf1(const u8 *blob, usize blob_size, struct clks_psf_font *out_font) {
@@ -114,7 +128,67 @@ static clks_bool clks_psf_parse_psf1(const u8 *blob, usize blob_size, struct clk
     out_font->height = glyph_bytes;
     out_font->glyph_count = glyph_count;
     out_font->bytes_per_glyph = glyph_bytes;
+    out_font->bytes_per_row = 1U;
     out_font->glyphs = blob + CLKS_PSF1_HEADER_SIZE;
+    return CLKS_TRUE;
+}
+
+static clks_bool clks_psf_parse_psf2(const u8 *blob, usize blob_size, struct clks_psf_font *out_font) {
+    const struct clks_psf2_header *hdr;
+    u32 bytes_per_row;
+    usize min_bytes_per_glyph;
+    usize payload_size;
+
+    if (blob == CLKS_NULL || out_font == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    if (blob_size < CLKS_PSF2_HEADER_MIN_SIZE) {
+        return CLKS_FALSE;
+    }
+
+    hdr = (const struct clks_psf2_header *)blob;
+
+    if (hdr->magic != CLKS_PSF2_MAGIC) {
+        return CLKS_FALSE;
+    }
+
+    if (hdr->headersize < CLKS_PSF2_HEADER_MIN_SIZE || hdr->headersize > blob_size) {
+        return CLKS_FALSE;
+    }
+
+    if (hdr->width == 0U || hdr->height == 0U || hdr->length == 0U || hdr->charsize == 0U) {
+        return CLKS_FALSE;
+    }
+
+    bytes_per_row = (hdr->width + 7U) / 8U;
+
+    if (bytes_per_row == 0U) {
+        return CLKS_FALSE;
+    }
+
+    min_bytes_per_glyph = (usize)bytes_per_row * (usize)hdr->height;
+
+    if (min_bytes_per_glyph > hdr->charsize) {
+        return CLKS_FALSE;
+    }
+
+    if ((usize)hdr->length > (((usize)-1) / (usize)hdr->charsize)) {
+        return CLKS_FALSE;
+    }
+
+    payload_size = (usize)hdr->length * (usize)hdr->charsize;
+
+    if (payload_size > (blob_size - (usize)hdr->headersize)) {
+        return CLKS_FALSE;
+    }
+
+    out_font->width = hdr->width;
+    out_font->height = hdr->height;
+    out_font->glyph_count = hdr->length;
+    out_font->bytes_per_glyph = hdr->charsize;
+    out_font->bytes_per_row = bytes_per_row;
+    out_font->glyphs = blob + hdr->headersize;
     return CLKS_TRUE;
 }
 
@@ -157,6 +231,7 @@ const struct clks_psf_font *clks_psf_default_font(void) {
             clks_psf_default.height = 8U;
             clks_psf_default.glyph_count = 1U;
             clks_psf_default.bytes_per_glyph = CLKS_PSF1_GLYPH_BYTES;
+            clks_psf_default.bytes_per_row = 1U;
             clks_psf_default.glyphs = clks_psf_unknown;
         }
 
@@ -185,9 +260,26 @@ const u8 *clks_psf_glyph(const struct clks_psf_font *font, u32 codepoint) {
 }
 
 clks_bool clks_psf_parse_font(const void *blob, u64 blob_size, struct clks_psf_font *out_font) {
-    if (blob_size == 0ULL) {
+    const u8 *bytes;
+    u32 magic32;
+
+    if (blob == CLKS_NULL || out_font == CLKS_NULL || blob_size == 0ULL) {
         return CLKS_FALSE;
     }
 
-    return clks_psf_parse_psf1((const u8 *)blob, (usize)blob_size, out_font);
+    bytes = (const u8 *)blob;
+
+    if (blob_size >= 4ULL) {
+        magic32 =
+            ((u32)bytes[0]) |
+            (((u32)bytes[1]) << 8U) |
+            (((u32)bytes[2]) << 16U) |
+            (((u32)bytes[3]) << 24U);
+
+        if (magic32 == CLKS_PSF2_MAGIC) {
+            return clks_psf_parse_psf2(bytes, (usize)blob_size, out_font);
+        }
+    }
+
+    return clks_psf_parse_psf1(bytes, (usize)blob_size, out_font);
 }

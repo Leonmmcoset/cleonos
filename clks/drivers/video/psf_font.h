@@ -8,6 +8,7 @@ struct clks_psf_font {
     u32 height;
     u32 glyph_count;
     u32 bytes_per_glyph;
+    u32 bytes_per_row;
     const u8 *glyphs;
 };
 

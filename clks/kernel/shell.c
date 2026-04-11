@@ -42,6 +42,8 @@ static u64 clks_shell_cmd_ok = 0ULL;
 static u64 clks_shell_cmd_fail = 0ULL;
 static u64 clks_shell_cmd_unknown = 0ULL;
 
+extern void clks_rusttest_hello(void);
+
 static clks_bool clks_shell_is_space(char ch) {
     return (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') ? CLKS_TRUE : CLKS_FALSE;
 }
@@ -693,6 +695,7 @@ static clks_bool clks_shell_cmd_help(void) {
     clks_shell_writeln("  memstat / fsstat / taskstat");
     clks_shell_writeln("  dmesg [n]");
     clks_shell_writeln("  shstat");
+    clks_shell_writeln("  rusttest");
     clks_shell_writeln("  exec <path|name>");
     clks_shell_writeln("  clear");
     clks_shell_writeln("  kbdstat");
@@ -1201,6 +1204,11 @@ static clks_bool clks_shell_cmd_shstat(void) {
     return CLKS_TRUE;
 }
 
+static clks_bool clks_shell_cmd_rusttest(void) {
+    clks_rusttest_hello();
+    return CLKS_TRUE;
+}
+
 static void clks_shell_execute_line(const char *line) {
     char line_buf[CLKS_SHELL_LINE_MAX];
     char cmd[CLKS_SHELL_CMD_MAX];
@@ -1261,6 +1269,8 @@ static void clks_shell_execute_line(const char *line) {
         success = clks_shell_cmd_dmesg(arg);
     } else if (clks_shell_streq(cmd, "shstat") == CLKS_TRUE) {
         success = clks_shell_cmd_shstat();
+    } else if (clks_shell_streq(cmd, "rusttest") == CLKS_TRUE) {
+        success = clks_shell_cmd_rusttest();
     } else if (clks_shell_streq(cmd, "exec") == CLKS_TRUE || clks_shell_streq(cmd, "run") == CLKS_TRUE) {
         success = clks_shell_cmd_exec(arg);
     } else if (clks_shell_streq(cmd, "clear") == CLKS_TRUE) {

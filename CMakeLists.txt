@@ -93,6 +93,7 @@ set(USER_OBJ_ROOT "${USER_BUILD_ROOT}/obj")
 set(USER_APP_DIR "${USER_BUILD_ROOT}/apps")
 set(USER_LIB_DIR "${USER_BUILD_ROOT}/lib")
 set(USER_RUST_LIB "${USER_LIB_DIR}/libcleonos_user_rust.a")
+set(KERNEL_RUST_LIB "${BUILD_ROOT}/libclks_kernel_rust.a")
 
 resolve_tool_with_fallback(CC gcc cc clang)
 resolve_tool_with_fallback(LD ld.lld ld)
@@ -300,10 +301,18 @@ foreach(SRC IN LISTS ASM_SOURCES)
 endforeach()
 
 add_custom_command(
+    OUTPUT "${KERNEL_RUST_LIB}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${BUILD_ROOT}"
+    COMMAND ${RUSTC} --crate-type staticlib -C panic=abort -O "${CMAKE_SOURCE_DIR}/clks/rust/src/lib.rs" -o "${KERNEL_RUST_LIB}"
+    DEPENDS "${CMAKE_SOURCE_DIR}/clks/rust/src/lib.rs"
+    VERBATIM
+)
+
+add_custom_command(
     OUTPUT "${KERNEL_ELF}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${BUILD_ROOT}"
-    COMMAND ${LD} ${LDFLAGS_COMMON} -T "${LINKER_SCRIPT}" -o "${KERNEL_ELF}" ${KERNEL_OBJECTS}
-    DEPENDS ${KERNEL_OBJECTS} "${LINKER_SCRIPT}"
+    COMMAND ${LD} ${LDFLAGS_COMMON} -T "${LINKER_SCRIPT}" -o "${KERNEL_ELF}" ${KERNEL_OBJECTS} "${KERNEL_RUST_LIB}"
+    DEPENDS ${KERNEL_OBJECTS} "${LINKER_SCRIPT}" "${KERNEL_RUST_LIB}" "${CMAKE_SOURCE_DIR}/clks/rust/src/lib.rs"
     VERBATIM
 )
 

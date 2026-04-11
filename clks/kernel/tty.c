@@ -17,6 +17,8 @@ static u32 clks_tty_cursor_col[CLKS_TTY_COUNT];
 static u32 clks_tty_rows = 0;
 static u32 clks_tty_cols = 0;
 static u32 clks_tty_active_index = 0;
+static u32 clks_tty_cell_width = 8U;
+static u32 clks_tty_cell_height = 8U;
 static clks_bool clks_tty_is_ready = CLKS_FALSE;
 
 static void clks_tty_fill_row(u32 tty_index, u32 row, char ch) {
@@ -28,7 +30,7 @@ static void clks_tty_fill_row(u32 tty_index, u32 row, char ch) {
 }
 
 static void clks_tty_draw_cell(u32 row, u32 col, char ch) {
-    clks_fb_draw_char(col * 8U, row * 8U, ch, CLKS_TTY_FG, CLKS_TTY_BG);
+    clks_fb_draw_char(col * clks_tty_cell_width, row * clks_tty_cell_height, ch, CLKS_TTY_FG, CLKS_TTY_BG);
 }
 
 static void clks_tty_redraw_active(void) {
@@ -81,8 +83,19 @@ void clks_tty_init(void) {
     }
 
     info = clks_fb_info();
-    clks_tty_rows = info.height / 8U;
-    clks_tty_cols = info.width / 8U;
+    clks_tty_cell_width = clks_fb_cell_width();
+    clks_tty_cell_height = clks_fb_cell_height();
+
+    if (clks_tty_cell_width == 0U) {
+        clks_tty_cell_width = 8U;
+    }
+
+    if (clks_tty_cell_height == 0U) {
+        clks_tty_cell_height = 8U;
+    }
+
+    clks_tty_rows = info.height / clks_tty_cell_height;
+    clks_tty_cols = info.width / clks_tty_cell_width;
 
     if (clks_tty_rows > CLKS_TTY_MAX_ROWS) {
         clks_tty_rows = CLKS_TTY_MAX_ROWS;
@@ -92,7 +105,7 @@ void clks_tty_init(void) {
         clks_tty_cols = CLKS_TTY_MAX_COLS;
     }
 
-    if (clks_tty_rows == 0 || clks_tty_cols == 0) {
+    if (clks_tty_rows == 0U || clks_tty_cols == 0U) {
         clks_tty_is_ready = CLKS_FALSE;
         return;
     }
@@ -217,4 +230,3 @@ u32 clks_tty_count(void) {
 clks_bool clks_tty_ready(void) {
     return clks_tty_is_ready;
 }
-

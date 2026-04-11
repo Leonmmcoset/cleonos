@@ -16,5 +16,8 @@ clks_bool clks_fb_ready(void);
 struct clks_framebuffer_info clks_fb_info(void);
 void clks_fb_clear(u32 rgb);
 void clks_fb_draw_char(u32 x, u32 y, char ch, u32 fg_rgb, u32 bg_rgb);
+clks_bool clks_fb_load_psf_font(const void *blob, u64 blob_size);
+u32 clks_fb_cell_width(void);
+u32 clks_fb_cell_height(void);
 
 #endif

@@ -4,11 +4,7 @@ project(CLeonOS NONE)
 # User-configurable toolchain and tool variables (Makefile-compatible defaults).
 set(NO_COLOR 0 CACHE STRING "Disable colored log output when set to 1")
 include("${CMAKE_SOURCE_DIR}/cmake/log.cmake")
-if(NO_COLOR)
-    set(BUILD_LOG_COLOR_OPT --no-color)
-else()
-    set(BUILD_LOG_COLOR_OPT)
-endif()
+set(CL_LOG_EMIT_SCRIPT "${CMAKE_SOURCE_DIR}/cmake/log_emit.cmake")
 
 set(CC "x86_64-elf-gcc" CACHE STRING "Kernel C compiler")
 set(LD "x86_64-elf-ld" CACHE STRING "Kernel linker")
@@ -48,12 +44,12 @@ function(resolve_tool_with_fallback VAR_NAME)
     set(_requested "${${VAR_NAME}}")
 
     if("${_requested}" STREQUAL "")
-        message(FATAL_ERROR "[ERROR] empty tool variable: ${VAR_NAME}")
+        cl_log_error("empty tool variable: ${VAR_NAME}")
     endif()
 
     if(IS_ABSOLUTE "${_requested}")
         if(NOT EXISTS "${_requested}")
-            message(FATAL_ERROR "[ERROR] ${VAR_NAME} not found: ${_requested}")
+            cl_log_error("${VAR_NAME} not found: ${_requested}")
         endif()
         set(_resolved "${_requested}")
     else()
@@ -71,7 +67,7 @@ function(resolve_tool_with_fallback VAR_NAME)
                 endif()
             endforeach()
             if("${_resolved}" STREQUAL "")
-                message(FATAL_ERROR "[ERROR] ${VAR_NAME} tool not found: '${_requested}', fallbacks='${_fallbacks}'")
+                cl_log_error("${VAR_NAME} tool not found: '${_requested}', fallbacks='${_fallbacks}'")
             endif()
         endif()
     endif()
@@ -175,7 +171,7 @@ set(KELF_LDFLAGS
 )
 
 if(NOT CLKS_ARCH STREQUAL "x86_64")
-    message(FATAL_ERROR "[ERROR] CLKS_ARCH=${CLKS_ARCH} is not supported by this CMake build yet; use x86_64")
+    cl_log_error("CLKS_ARCH=${CLKS_ARCH} is not supported by this CMake build yet; use x86_64")
 endif()
 
 set(KERNEL_SOURCE_DIRS
@@ -207,10 +203,10 @@ list(SORT C_SOURCES)
 list(SORT ASM_SOURCES)
 
 if(NOT C_SOURCES)
-    message(FATAL_ERROR "[ERROR] no kernel C sources found in clks/")
+    cl_log_error("no kernel C sources found in clks/")
 endif()
 if(NOT EXISTS "${LINKER_SCRIPT}")
-    message(FATAL_ERROR "[ERROR] missing linker script: ${LINKER_SCRIPT}")
+    cl_log_error("missing linker script: ${LINKER_SCRIPT}")
 endif()
 
 file(GLOB_RECURSE USER_COMMON_SOURCES_ABS CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/cleonos/c/src/*.c")
@@ -238,13 +234,13 @@ list(SORT USER_APP_MAIN_SOURCES)
 list(SORT USER_APP_KMAIN_SOURCES)
 
 if(NOT USER_COMMON_SOURCES)
-    message(FATAL_ERROR "[ERROR] no user common sources found in cleonos/c/src/")
+    cl_log_error("no user common sources found in cleonos/c/src/")
 endif()
 if(NOT USER_APP_MAIN_SOURCES)
-    message(FATAL_ERROR "[ERROR] no user app *_main.c found in cleonos/c/apps/")
+    cl_log_error("no user app *_main.c found in cleonos/c/apps/")
 endif()
 if(NOT USER_APP_KMAIN_SOURCES)
-    message(FATAL_ERROR "[ERROR] no kernel app *_kmain.c found in cleonos/c/apps/")
+    cl_log_error("no kernel app *_kmain.c found in cleonos/c/apps/")
 endif()
 
 function(add_kernel_c_object SRC OUTPUT_LIST_VAR)
@@ -353,7 +349,7 @@ foreach(SRC IN LISTS USER_APP_MAIN_SOURCES)
 
     list(FIND USER_APP_NAMES "${_app_name}" _dup_name_idx)
     if(NOT _dup_name_idx EQUAL -1)
-        message(FATAL_ERROR "[ERROR] duplicate user app name: ${_app_name}")
+        cl_log_error("duplicate user app name: ${_app_name}")
     endif()
     list(APPEND USER_APP_NAMES "${_app_name}")
 
@@ -381,7 +377,7 @@ foreach(SRC IN LISTS USER_APP_KMAIN_SOURCES)
 
     list(FIND USER_APP_NAMES "${_app_name}" _dup_name_idx)
     if(NOT _dup_name_idx EQUAL -1)
-        message(FATAL_ERROR "[ERROR] duplicate user app name: ${_app_name}")
+        cl_log_error("duplicate user app name: ${_app_name}")
     endif()
     list(APPEND USER_APP_NAMES "${_app_name}")
 
@@ -400,7 +396,7 @@ foreach(SRC IN LISTS USER_APP_KMAIN_SOURCES)
 endforeach()
 
 if(NOT USER_APP_OUTPUTS)
-    message(FATAL_ERROR "[ERROR] no user ELF apps were discovered")
+    cl_log_error("no user ELF apps were discovered")
 endif()
 
 add_custom_target(userapps DEPENDS ${USER_APP_OUTPUTS})
@@ -408,7 +404,11 @@ add_custom_target(userapps DEPENDS ${USER_APP_OUTPUTS})
 add_custom_command(
     TARGET userapps
     POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --cyan "[INFO] user elf apps ready"
+    COMMAND ${CMAKE_COMMAND}
+        "-DNO_COLOR=${NO_COLOR}"
+        "-DLOG_LEVEL=INFO"
+        "-DLOG_TEXT=user elf apps ready"
+        -P "${CL_LOG_EMIT_SCRIPT}"
 )
 
 file(GLOB_RECURSE RAMDISK_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/ramdisk/*")
@@ -493,7 +493,15 @@ add_custom_target(setup-limine
 add_dependencies(setup-limine setup-tools)
 
 add_custom_target(setup DEPENDS setup-tools setup-limine)
-add_custom_command(TARGET setup POST_BUILD COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --cyan "[INFO] environment ready")
+add_custom_command(
+    TARGET setup
+    POST_BUILD
+    COMMAND ${CMAKE_COMMAND}
+        "-DNO_COLOR=${NO_COLOR}"
+        "-DLOG_LEVEL=INFO"
+        "-DLOG_TEXT=environment ready"
+        -P "${CL_LOG_EMIT_SCRIPT}"
+)
 
 add_custom_command(
     OUTPUT "${ISO_IMAGE}"
@@ -506,7 +514,11 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E copy "${LIMINE_BIN_DIR_ABS}/limine-bios-cd.bin" "${ISO_ROOT}/boot/limine/limine-bios-cd.bin"
     COMMAND ${CMAKE_COMMAND} -E copy "${LIMINE_BIN_DIR_ABS}/limine-uefi-cd.bin" "${ISO_ROOT}/boot/limine/limine-uefi-cd.bin"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_SOURCE_DIR}/build"
-    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --magenta "[STEP] building iso -> ${ISO_IMAGE}"
+    COMMAND ${CMAKE_COMMAND}
+        "-DNO_COLOR=${NO_COLOR}"
+        "-DLOG_LEVEL=STEP"
+        "-DLOG_TEXT=building iso -> ${ISO_IMAGE}"
+        -P "${CL_LOG_EMIT_SCRIPT}"
     COMMAND ${XORRISO} -as mkisofs
         -b boot/limine/limine-bios-cd.bin
         -no-emul-boot
@@ -518,9 +530,17 @@ add_custom_command(
         --protective-msdos-label
         "${ISO_ROOT}"
         -o "${ISO_IMAGE}"
-    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --magenta "[STEP] installing limine boot sectors"
+    COMMAND ${CMAKE_COMMAND}
+        "-DNO_COLOR=${NO_COLOR}"
+        "-DLOG_LEVEL=STEP"
+        "-DLOG_TEXT=installing limine boot sectors"
+        -P "${CL_LOG_EMIT_SCRIPT}"
     COMMAND "${LIMINE_BIN_DIR_ABS}/limine" bios-install "${ISO_IMAGE}"
-    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --cyan "[INFO] iso ready: ${ISO_IMAGE}"
+    COMMAND ${CMAKE_COMMAND}
+        "-DNO_COLOR=${NO_COLOR}"
+        "-DLOG_LEVEL=INFO"
+        "-DLOG_TEXT=iso ready: ${ISO_IMAGE}"
+        -P "${CL_LOG_EMIT_SCRIPT}"
     DEPENDS "${KERNEL_ELF}" "${RAMDISK_IMAGE}" "${CMAKE_SOURCE_DIR}/configs/limine.conf"
     VERBATIM
 )
@@ -529,29 +549,53 @@ add_custom_target(iso ALL DEPENDS "${ISO_IMAGE}")
 add_dependencies(iso setup-tools setup-limine kernel ramdisk)
 
 add_custom_target(run
-    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --magenta "[STEP] launching qemu run"
+    COMMAND ${CMAKE_COMMAND}
+        "-DNO_COLOR=${NO_COLOR}"
+        "-DLOG_LEVEL=STEP"
+        "-DLOG_TEXT=launching qemu run"
+        -P "${CL_LOG_EMIT_SCRIPT}"
     COMMAND ${QEMU_X86_64} -M q35 -m 1024M -cdrom "${ISO_IMAGE}" -serial stdio
     DEPENDS iso
     USES_TERMINAL
 )
 
 add_custom_target(debug
-    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --magenta "[STEP] launching qemu debug (-s -S)"
+    COMMAND ${CMAKE_COMMAND}
+        "-DNO_COLOR=${NO_COLOR}"
+        "-DLOG_LEVEL=STEP"
+        "-DLOG_TEXT=launching qemu debug (-s -S)"
+        -P "${CL_LOG_EMIT_SCRIPT}"
     COMMAND ${QEMU_X86_64} -M q35 -m 1024M -cdrom "${ISO_IMAGE}" -serial stdio -s -S
     DEPENDS iso
     USES_TERMINAL
 )
 
 add_custom_target(clean-x86
-    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --magenta "[STEP] cleaning ${BUILD_ROOT}"
+    COMMAND ${CMAKE_COMMAND}
+        "-DNO_COLOR=${NO_COLOR}"
+        "-DLOG_LEVEL=STEP"
+        "-DLOG_TEXT=cleaning ${BUILD_ROOT}"
+        -P "${CL_LOG_EMIT_SCRIPT}"
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${BUILD_ROOT}"
-    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --cyan "[INFO] clean done"
+    COMMAND ${CMAKE_COMMAND}
+        "-DNO_COLOR=${NO_COLOR}"
+        "-DLOG_LEVEL=INFO"
+        "-DLOG_TEXT=clean done"
+        -P "${CL_LOG_EMIT_SCRIPT}"
 )
 
 add_custom_target(clean-all
-    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --magenta "[STEP] cleaning build"
+    COMMAND ${CMAKE_COMMAND}
+        "-DNO_COLOR=${NO_COLOR}"
+        "-DLOG_LEVEL=STEP"
+        "-DLOG_TEXT=cleaning build"
+        -P "${CL_LOG_EMIT_SCRIPT}"
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_SOURCE_DIR}/build"
-    COMMAND ${CMAKE_COMMAND} -E cmake_echo_color ${BUILD_LOG_COLOR_OPT} --cyan "[INFO] clean-all done"
+    COMMAND ${CMAKE_COMMAND}
+        "-DNO_COLOR=${NO_COLOR}"
+        "-DLOG_LEVEL=INFO"
+        "-DLOG_TEXT=clean-all done"
+        -P "${CL_LOG_EMIT_SCRIPT}"
 )
 
 add_custom_target(cleonos-help

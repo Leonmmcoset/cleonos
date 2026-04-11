@@ -1,3 +1,5 @@
+// Kernel main function
+
 #include <clks/boot.h>
 #include <clks/cpu.h>
 #include <clks/driver.h>
@@ -76,6 +78,8 @@ void clks_kernel_main(void) {
     void *heap_probe = CLKS_NULL;
     u64 syscall_ticks;
     u64 fs_root_children;
+    const void *tty_psf_blob = CLKS_NULL;
+    u64 tty_psf_size = 0ULL;
 
     clks_serial_init();
 
@@ -151,6 +155,18 @@ void clks_kernel_main(void) {
     if (clks_fs_stat("/system", &fs_system_dir) == CLKS_FALSE || fs_system_dir.type != CLKS_FS_NODE_DIR) {
         clks_log(CLKS_LOG_ERROR, "FS", "/SYSTEM DIRECTORY CHECK FAILED");
         clks_cpu_halt_forever();
+    }
+
+    if (boot_fb != CLKS_NULL) {
+        tty_psf_blob = clks_fs_read_all("/system/tty.psf", &tty_psf_size);
+
+        if (tty_psf_blob != CLKS_NULL && clks_fb_load_psf_font(tty_psf_blob, tty_psf_size) == CLKS_TRUE) {
+            clks_tty_init();
+            clks_log(CLKS_LOG_INFO, "TTY", "EXTERNAL PSF LOADED /SYSTEM/TTY.PSF");
+            clks_log_hex(CLKS_LOG_INFO, "TTY", "PSF_SIZE", tty_psf_size);
+        } else {
+            clks_log(CLKS_LOG_WARN, "TTY", "EXTERNAL PSF LOAD FAILED, USING BUILTIN");
+        }
     }
 
     clks_exec_init();

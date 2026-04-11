@@ -1,0 +1,193 @@
+#include "psf_font.h"
+
+#include <clks/string.h>
+#include <clks/types.h>
+
+#define CLKS_PSF1_MAGIC0 0x36U
+#define CLKS_PSF1_MAGIC1 0x04U
+#define CLKS_PSF1_HEADER_SIZE 4U
+#define CLKS_PSF1_GLYPH_COUNT 256U
+#define CLKS_PSF1_GLYPH_BYTES 8U
+#define CLKS_PSF1_BLOB_SIZE (CLKS_PSF1_HEADER_SIZE + (CLKS_PSF1_GLYPH_COUNT * CLKS_PSF1_GLYPH_BYTES))
+
+struct clks_psf1_header {
+    u8 magic[2];
+    u8 mode;
+    u8 charsize;
+};
+
+struct clks_psf_seed_glyph {
+    u8 code;
+    u8 rows[CLKS_PSF1_GLYPH_BYTES];
+};
+
+static const u8 clks_psf_unknown[CLKS_PSF1_GLYPH_BYTES] = {
+    0x3C, 0x42, 0x02, 0x0C, 0x10, 0x00, 0x10, 0x00
+};
+
+static const struct clks_psf_seed_glyph clks_psf_seed_table[] = {
+    {' ', {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+    {'[', {0x1E, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1E, 0x00}},
+    {']', {0x78, 0x08, 0x08, 0x08, 0x08, 0x08, 0x78, 0x00}},
+    {':', {0x00, 0x18, 0x18, 0x00, 0x18, 0x18, 0x00, 0x00}},
+    {'.', {0x00, 0x00, 0x00, 0x00, 0x00, 0x18, 0x18, 0x00}},
+    {'-', {0x00, 0x00, 0x00, 0x7E, 0x00, 0x00, 0x00, 0x00}},
+    {'/', {0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x00, 0x00}},
+    {'_', {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x7E, 0x00}},
+    {'?', {0x3C, 0x42, 0x02, 0x0C, 0x10, 0x00, 0x10, 0x00}},
+    {'0', {0x3C, 0x42, 0x46, 0x4A, 0x52, 0x62, 0x3C, 0x00}},
+    {'1', {0x18, 0x28, 0x08, 0x08, 0x08, 0x08, 0x3E, 0x00}},
+    {'2', {0x3C, 0x42, 0x02, 0x0C, 0x30, 0x40, 0x7E, 0x00}},
+    {'3', {0x3C, 0x42, 0x02, 0x1C, 0x02, 0x42, 0x3C, 0x00}},
+    {'4', {0x0C, 0x14, 0x24, 0x44, 0x7E, 0x04, 0x04, 0x00}},
+    {'5', {0x7E, 0x40, 0x7C, 0x02, 0x02, 0x42, 0x3C, 0x00}},
+    {'6', {0x1C, 0x20, 0x40, 0x7C, 0x42, 0x42, 0x3C, 0x00}},
+    {'7', {0x7E, 0x02, 0x04, 0x08, 0x10, 0x20, 0x20, 0x00}},
+    {'8', {0x3C, 0x42, 0x42, 0x3C, 0x42, 0x42, 0x3C, 0x00}},
+    {'9', {0x3C, 0x42, 0x42, 0x3E, 0x02, 0x04, 0x38, 0x00}},
+    {'A', {0x18, 0x24, 0x42, 0x7E, 0x42, 0x42, 0x42, 0x00}},
+    {'B', {0x7C, 0x42, 0x42, 0x7C, 0x42, 0x42, 0x7C, 0x00}},
+    {'C', {0x3C, 0x42, 0x40, 0x40, 0x40, 0x42, 0x3C, 0x00}},
+    {'D', {0x78, 0x44, 0x42, 0x42, 0x42, 0x44, 0x78, 0x00}},
+    {'E', {0x7E, 0x40, 0x40, 0x7C, 0x40, 0x40, 0x7E, 0x00}},
+    {'F', {0x7E, 0x40, 0x40, 0x7C, 0x40, 0x40, 0x40, 0x00}},
+    {'G', {0x3C, 0x42, 0x40, 0x4E, 0x42, 0x42, 0x3C, 0x00}},
+    {'H', {0x42, 0x42, 0x42, 0x7E, 0x42, 0x42, 0x42, 0x00}},
+    {'I', {0x3E, 0x08, 0x08, 0x08, 0x08, 0x08, 0x3E, 0x00}},
+    {'J', {0x1E, 0x04, 0x04, 0x04, 0x44, 0x44, 0x38, 0x00}},
+    {'K', {0x42, 0x44, 0x48, 0x70, 0x48, 0x44, 0x42, 0x00}},
+    {'L', {0x40, 0x40, 0x40, 0x40, 0x40, 0x40, 0x7E, 0x00}},
+    {'M', {0x42, 0x66, 0x5A, 0x5A, 0x42, 0x42, 0x42, 0x00}},
+    {'N', {0x42, 0x62, 0x52, 0x4A, 0x46, 0x42, 0x42, 0x00}},
+    {'O', {0x3C, 0x42, 0x42, 0x42, 0x42, 0x42, 0x3C, 0x00}},
+    {'P', {0x7C, 0x42, 0x42, 0x7C, 0x40, 0x40, 0x40, 0x00}},
+    {'Q', {0x3C, 0x42, 0x42, 0x42, 0x4A, 0x44, 0x3A, 0x00}},
+    {'R', {0x7C, 0x42, 0x42, 0x7C, 0x48, 0x44, 0x42, 0x00}},
+    {'S', {0x3C, 0x42, 0x40, 0x3C, 0x02, 0x42, 0x3C, 0x00}},
+    {'T', {0x7F, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x00}},
+    {'U', {0x42, 0x42, 0x42, 0x42, 0x42, 0x42, 0x3C, 0x00}},
+    {'V', {0x42, 0x42, 0x42, 0x42, 0x42, 0x24, 0x18, 0x00}},
+    {'W', {0x42, 0x42, 0x42, 0x5A, 0x5A, 0x66, 0x42, 0x00}},
+    {'X', {0x42, 0x42, 0x24, 0x18, 0x24, 0x42, 0x42, 0x00}},
+    {'Y', {0x42, 0x42, 0x24, 0x18, 0x08, 0x08, 0x08, 0x00}},
+    {'Z', {0x7E, 0x02, 0x04, 0x18, 0x20, 0x40, 0x7E, 0x00}},
+};
+
+static u8 clks_psf_default_blob[CLKS_PSF1_BLOB_SIZE];
+static struct clks_psf_font clks_psf_default = {8U, 8U, 0U, 0U, CLKS_NULL};
+static clks_bool clks_psf_default_ready = CLKS_FALSE;
+
+static clks_bool clks_psf_parse_psf1(const u8 *blob, usize blob_size, struct clks_psf_font *out_font) {
+    const struct clks_psf1_header *hdr;
+    u32 glyph_count;
+    u32 glyph_bytes;
+    usize payload_size;
+
+    if (blob == CLKS_NULL || out_font == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    if (blob_size < CLKS_PSF1_HEADER_SIZE) {
+        return CLKS_FALSE;
+    }
+
+    hdr = (const struct clks_psf1_header *)blob;
+
+    if (hdr->magic[0] != CLKS_PSF1_MAGIC0 || hdr->magic[1] != CLKS_PSF1_MAGIC1) {
+        return CLKS_FALSE;
+    }
+
+    glyph_count = (hdr->mode & 0x01U) != 0U ? 512U : 256U;
+    glyph_bytes = (u32)hdr->charsize;
+
+    if (glyph_bytes == 0U) {
+        return CLKS_FALSE;
+    }
+
+    payload_size = (usize)glyph_count * (usize)glyph_bytes;
+
+    if (blob_size < (usize)CLKS_PSF1_HEADER_SIZE + payload_size) {
+        return CLKS_FALSE;
+    }
+
+    out_font->width = 8U;
+    out_font->height = glyph_bytes;
+    out_font->glyph_count = glyph_count;
+    out_font->bytes_per_glyph = glyph_bytes;
+    out_font->glyphs = blob + CLKS_PSF1_HEADER_SIZE;
+    return CLKS_TRUE;
+}
+
+static void clks_psf_seed_default_blob(void) {
+    struct clks_psf1_header *hdr;
+    u32 i;
+
+    clks_memset(clks_psf_default_blob, 0, sizeof(clks_psf_default_blob));
+
+    hdr = (struct clks_psf1_header *)clks_psf_default_blob;
+    hdr->magic[0] = CLKS_PSF1_MAGIC0;
+    hdr->magic[1] = CLKS_PSF1_MAGIC1;
+    hdr->mode = 0x00U;
+    hdr->charsize = (u8)CLKS_PSF1_GLYPH_BYTES;
+
+    for (i = 0U; i < CLKS_PSF1_GLYPH_COUNT; i++) {
+        u8 *dst = clks_psf_default_blob + CLKS_PSF1_HEADER_SIZE + ((usize)i * CLKS_PSF1_GLYPH_BYTES);
+        clks_memcpy(dst, clks_psf_unknown, CLKS_PSF1_GLYPH_BYTES);
+    }
+
+    for (i = 0U; i < (u32)(sizeof(clks_psf_seed_table) / sizeof(clks_psf_seed_table[0])); i++) {
+        const struct clks_psf_seed_glyph *seed = &clks_psf_seed_table[i];
+        u8 *dst = clks_psf_default_blob + CLKS_PSF1_HEADER_SIZE + ((usize)seed->code * CLKS_PSF1_GLYPH_BYTES);
+        clks_memcpy(dst, seed->rows, CLKS_PSF1_GLYPH_BYTES);
+    }
+
+    for (i = (u32)'A'; i <= (u32)'Z'; i++) {
+        const u8 *upper = clks_psf_default_blob + CLKS_PSF1_HEADER_SIZE + ((usize)i * CLKS_PSF1_GLYPH_BYTES);
+        u8 *lower = clks_psf_default_blob + CLKS_PSF1_HEADER_SIZE + ((usize)(i + ('a' - 'A')) * CLKS_PSF1_GLYPH_BYTES);
+        clks_memcpy(lower, upper, CLKS_PSF1_GLYPH_BYTES);
+    }
+}
+
+const struct clks_psf_font *clks_psf_default_font(void) {
+    if (clks_psf_default_ready == CLKS_FALSE) {
+        clks_psf_seed_default_blob();
+
+        if (clks_psf_parse_psf1(clks_psf_default_blob, sizeof(clks_psf_default_blob), &clks_psf_default) == CLKS_FALSE) {
+            clks_psf_default.width = 8U;
+            clks_psf_default.height = 8U;
+            clks_psf_default.glyph_count = 1U;
+            clks_psf_default.bytes_per_glyph = CLKS_PSF1_GLYPH_BYTES;
+            clks_psf_default.glyphs = clks_psf_unknown;
+        }
+
+        clks_psf_default_ready = CLKS_TRUE;
+    }
+
+    return &clks_psf_default;
+}
+
+const u8 *clks_psf_glyph(const struct clks_psf_font *font, u32 codepoint) {
+    u32 index = codepoint;
+
+    if (font == CLKS_NULL || font->glyphs == CLKS_NULL || font->bytes_per_glyph == 0U) {
+        return clks_psf_unknown;
+    }
+
+    if (index >= font->glyph_count) {
+        index = (u32)'?';
+
+        if (index >= font->glyph_count) {
+            index = 0U;
+        }
+    }
+
+    return font->glyphs + ((usize)index * (usize)font->bytes_per_glyph);
+}
+
+clks_bool clks_psf_parse_font(const void *blob, u64 blob_size, struct clks_psf_font *out_font) {
+    if (blob_size == 0ULL) {
+        return CLKS_FALSE;
+    }
+
+    return clks_psf_parse_psf1((const u8 *)blob, (usize)blob_size, out_font);
+}

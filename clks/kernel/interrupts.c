@@ -2,6 +2,7 @@
 #include <clks/cpu.h>
 #include <clks/interrupts.h>
 #include <clks/log.h>
+#include <clks/keyboard.h>
 #include <clks/scheduler.h>
 #include <clks/syscall.h>
 #include <clks/types.h>
@@ -18,8 +19,12 @@
 
 #define CLKS_IRQ_BASE   32U
 #define CLKS_IRQ_TIMER  32U
+#define CLKS_IRQ_KEYBOARD 33U
 #define CLKS_IRQ_LAST   47U
 #define CLKS_SYSCALL_VECTOR 128U
+
+#define CLKS_PS2_DATA_PORT  0x60U
+#define CLKS_PS2_STATUS_PORT 0x64U
 
 struct clks_idt_entry {
     u16 offset_low;
@@ -192,7 +197,7 @@ static void clks_pic_remap_and_mask(void) {
     (void)master_mask;
     (void)slave_mask;
 
-    clks_outb(CLKS_PIC1_DATA, 0xFEU);
+    clks_outb(CLKS_PIC1_DATA, 0xFCU);
     clks_outb(CLKS_PIC2_DATA, 0xFFU);
 }
 
@@ -225,6 +230,10 @@ static void clks_load_idt(void) {
     __asm__ volatile("lidt %0" : : "m"(idtr));
 }
 
+
+static clks_bool clks_ps2_has_output(void) {
+    return (clks_inb(CLKS_PS2_STATUS_PORT) & 0x01U) != 0U ? CLKS_TRUE : CLKS_FALSE;
+}
 static void clks_enable_interrupts(void) {
     __asm__ volatile("sti");
 }
@@ -248,6 +257,11 @@ void clks_interrupt_dispatch(struct clks_interrupt_frame *frame) {
     if (vector == CLKS_IRQ_TIMER) {
         clks_timer_ticks++;
         clks_scheduler_on_timer_tick(clks_timer_ticks);
+    } else if (vector == CLKS_IRQ_KEYBOARD) {
+        if (clks_ps2_has_output() == CLKS_TRUE) {
+            u8 scancode = clks_inb(CLKS_PS2_DATA_PORT);
+            clks_keyboard_handle_scancode(scancode);
+        }
     }
 
     if (vector >= CLKS_IRQ_BASE && vector <= CLKS_IRQ_LAST) {

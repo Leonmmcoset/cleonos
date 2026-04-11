@@ -85,6 +85,7 @@ C_SOURCES := \
     clks/kernel/tty.c \
     clks/kernel/pmm.c \
     clks/kernel/heap.c \
+    clks/kernel/keyboard.c \
     clks/kernel/interrupts.c \
     clks/kernel/scheduler.c \
     clks/kernel/elf64.c \

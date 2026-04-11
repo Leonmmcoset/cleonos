@@ -1,0 +1,38 @@
+cmake_minimum_required(VERSION 3.20)
+include("${CMAKE_CURRENT_LIST_DIR}/log.cmake")
+
+function(require_tool TOOL_VALUE)
+    if("${TOOL_VALUE}" STREQUAL "")
+        cl_log_error("missing tool name")
+    endif()
+
+    if(IS_ABSOLUTE "${TOOL_VALUE}")
+        if(NOT EXISTS "${TOOL_VALUE}")
+            cl_log_error("missing tool: ${TOOL_VALUE}")
+        endif()
+        return()
+    endif()
+
+    find_program(_tool_path NAMES "${TOOL_VALUE}")
+    if(NOT _tool_path)
+        cl_log_error("missing tool: ${TOOL_VALUE}")
+    endif()
+endfunction()
+
+cl_log_step("checking host tools")
+
+require_tool("${GIT_TOOL}")
+require_tool("${TAR_TOOL}")
+require_tool("${XORRISO_TOOL}")
+require_tool("${CC_TOOL}")
+require_tool("${LD_TOOL}")
+require_tool("${OBJCOPY_TOOL}")
+require_tool("${OBJDUMP_TOOL}")
+require_tool("${READELF_TOOL}")
+require_tool("${USER_CC_TOOL}")
+require_tool("${USER_LD_TOOL}")
+require_tool("${RUSTC_TOOL}")
+require_tool("${MAKE_TOOL}")
+require_tool("${SH_TOOL}")
+
+cl_log_info("required tools are available")

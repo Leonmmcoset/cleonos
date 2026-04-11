@@ -1,4 +1,14 @@
 build/
+build-cmake*/
 *.iso
 *.tar
 limine/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+.cmake/

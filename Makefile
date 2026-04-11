@@ -1,332 +1,121 @@
 .RECIPEPREFIX := >
+MAKEFLAGS += --no-print-directory
 
+CMAKE ?= cmake
+CMAKE_BUILD_DIR ?= build-cmake
+CMAKE_BUILD_TYPE ?= Release
+CMAKE_GENERATOR ?=
+CMAKE_EXTRA_ARGS ?=
 NO_COLOR ?= 0
-
-BUILD_ROOT := build/x86_64
-OBJ_ROOT := $(BUILD_ROOT)/obj
-ISO_ROOT := $(BUILD_ROOT)/iso_root
-RAMDISK_ROOT := $(BUILD_ROOT)/ramdisk_root
-KERNEL_ELF := $(BUILD_ROOT)/clks_kernel.elf
-RAMDISK_IMAGE := $(BUILD_ROOT)/cleonos_ramdisk.tar
-ISO_IMAGE := build/CLeonOS-x86_64.iso
-
-USER_BUILD_ROOT := $(BUILD_ROOT)/user
-USER_OBJ_ROOT := $(USER_BUILD_ROOT)/obj
-USER_APP_DIR := $(USER_BUILD_ROOT)/apps
-USER_LIB_DIR := $(USER_BUILD_ROOT)/lib
-
-LIMINE_DIR ?= limine
-LIMINE_REPO ?= https://gh-proxy.com/https://github.com/limine-bootloader/limine.git
+LIMINE_SKIP_CONFIGURE ?=
 LIMINE_REF ?=
-LIMINE_BIN_DIR ?= $(LIMINE_DIR)/bin
-LIMINE_SETUP_STAMP := $(LIMINE_DIR)/.cleonos-limine-setup.stamp
-LIMINE_BUILD_STAMP := $(LIMINE_DIR)/.cleonos-limine-build.stamp
-LIMINE_CONFIGURE_FLAGS ?= --enable-bios-cd --enable-uefi-cd --enable-uefi-x86-64
-LIMINE_SKIP_CONFIGURE ?= 0
-OBJCOPY_FOR_TARGET ?= llvm-objcopy
-OBJDUMP_FOR_TARGET ?= llvm-objdump
-READELF_FOR_TARGET ?= llvm-readelf
+LIMINE_REPO ?=
+LIMINE_DIR ?=
+LIMINE_BIN_DIR ?=
+OBJCOPY_FOR_TARGET ?=
+OBJDUMP_FOR_TARGET ?=
+READELF_FOR_TARGET ?=
 
-XORRISO ?= xorriso
-TAR ?= tar
-
-QEMU_X86_64 ?= qemu-system-x86_64
-
-CC ?= x86_64-elf-gcc
-LD ?= x86_64-elf-ld
-ARCH_CFLAGS := -DCLKS_ARCH_X86_64=1 -m64 -mno-red-zone -mcmodel=kernel -fno-pic -fno-pie
-LINKER_SCRIPT := clks/arch/x86_64/linker.ld
-RUN_COMMAND := $(QEMU_X86_64) -M q35 -m 1024M -cdrom $(ISO_IMAGE) -serial stdio
-DEBUG_COMMAND := $(QEMU_X86_64) -M q35 -m 1024M -cdrom $(ISO_IMAGE) -serial stdio -s -S
-
-USER_CC ?= cc
-USER_LD ?= ld
-RUSTC ?= rustc
-USER_LINKER_SCRIPT := cleonos/c/user.ld
-KELF_LINKER_SCRIPT := cleonos/c/kelf.ld
-USER_CFLAGS := -std=c11 -ffreestanding -fno-stack-protector -fno-builtin -Wall -Wextra -Werror -Icleonos/c/include
-USER_LDFLAGS := -nostdlib -z max-page-size=0x1000 -T $(USER_LINKER_SCRIPT)
-KELF_LDFLAGS := -nostdlib -z max-page-size=0x1000 -T $(KELF_LINKER_SCRIPT)
-
-ifeq ($(NO_COLOR),1)
-COLOR_RESET :=
-COLOR_INFO :=
-COLOR_WARN :=
-COLOR_ERROR :=
-COLOR_STEP :=
+ifeq ($(strip $(CMAKE_GENERATOR)),)
+GEN_ARG :=
 else
-COLOR_RESET := \033[0m
-COLOR_INFO := \033[1;36m
-COLOR_WARN := \033[1;33m
-COLOR_ERROR := \033[1;31m
-COLOR_STEP := \033[1;35m
+GEN_ARG := -G "$(CMAKE_GENERATOR)"
 endif
 
-define log_info
-@printf '%b\n' "$(COLOR_INFO)[INFO]$(COLOR_RESET) $(1)"
-endef
+CMAKE_PASSTHROUGH_ARGS :=
 
-define log_warn
-@printf '%b\n' "$(COLOR_WARN)[WARN]$(COLOR_RESET) $(1)"
-endef
+ifneq ($(strip $(LIMINE_SKIP_CONFIGURE)),)
+CMAKE_PASSTHROUGH_ARGS += -DLIMINE_SKIP_CONFIGURE=$(LIMINE_SKIP_CONFIGURE)
+endif
+ifneq ($(strip $(LIMINE_REF)),)
+CMAKE_PASSTHROUGH_ARGS += -DLIMINE_REF=$(LIMINE_REF)
+endif
+ifneq ($(strip $(LIMINE_REPO)),)
+CMAKE_PASSTHROUGH_ARGS += -DLIMINE_REPO=$(LIMINE_REPO)
+endif
+ifneq ($(strip $(LIMINE_DIR)),)
+CMAKE_PASSTHROUGH_ARGS += -DLIMINE_DIR=$(LIMINE_DIR)
+endif
+ifneq ($(strip $(LIMINE_BIN_DIR)),)
+CMAKE_PASSTHROUGH_ARGS += -DLIMINE_BIN_DIR=$(LIMINE_BIN_DIR)
+endif
+ifneq ($(strip $(OBJCOPY_FOR_TARGET)),)
+CMAKE_PASSTHROUGH_ARGS += -DOBJCOPY_FOR_TARGET=$(OBJCOPY_FOR_TARGET)
+endif
+ifneq ($(strip $(OBJDUMP_FOR_TARGET)),)
+CMAKE_PASSTHROUGH_ARGS += -DOBJDUMP_FOR_TARGET=$(OBJDUMP_FOR_TARGET)
+endif
+ifneq ($(strip $(READELF_FOR_TARGET)),)
+CMAKE_PASSTHROUGH_ARGS += -DREADELF_FOR_TARGET=$(READELF_FOR_TARGET)
+endif
 
-define log_error
-@printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) $(1)"
-endef
-
-define log_step
-@printf '%b\n' "$(COLOR_STEP)[STEP]$(COLOR_RESET) $(1)"
-endef
-
-C_SOURCES := \
-    clks/kernel/kmain.c \
-    clks/kernel/log.c \
-    clks/kernel/limine_requests.c \
-    clks/kernel/tty.c \
-    clks/kernel/pmm.c \
-    clks/kernel/heap.c \
-    clks/kernel/keyboard.c \
-    clks/kernel/interrupts.c \
-    clks/kernel/scheduler.c \
-    clks/kernel/elf64.c \
-    clks/kernel/elfrunner.c \
-    clks/kernel/syscall.c \
-    clks/kernel/ramdisk.c \
-    clks/kernel/fs.c \
-    clks/kernel/userland.c \
-    clks/kernel/driver.c \
-    clks/kernel/service.c \
-    clks/kernel/kelf.c \
-    clks/kernel/exec.c \
-    clks/lib/string.c \
-    clks/drivers/serial/serial.c \
-    clks/drivers/video/framebuffer.c \
-    clks/drivers/video/font8x8.c \
-    clks/arch/x86_64/boot.c
-
-ASM_SOURCES := \
-    clks/arch/x86_64/interrupt_stubs.S
-
-C_OBJECTS := $(patsubst %.c,$(OBJ_ROOT)/%.o,$(C_SOURCES))
-ASM_OBJECTS := $(patsubst %.S,$(OBJ_ROOT)/%.o,$(ASM_SOURCES))
-OBJECTS := $(C_OBJECTS) $(ASM_OBJECTS)
-
-USER_COMMON_SOURCES := \
-    cleonos/c/src/runtime.c \
-    cleonos/c/src/syscall.c
-
-USER_COMMON_OBJECTS := $(patsubst %.c,$(USER_OBJ_ROOT)/%.o,$(USER_COMMON_SOURCES))
-USER_SHELL_OBJECT := $(USER_OBJ_ROOT)/cleonos/c/apps/shell_main.o
-USER_TTYDRV_OBJECT := $(USER_OBJ_ROOT)/cleonos/c/apps/ttydrv_main.o
-USER_ELFRUNNER_KOBJ := $(USER_OBJ_ROOT)/cleonos/c/apps/elfrunner_kmain.o
-USER_MEMC_KOBJ := $(USER_OBJ_ROOT)/cleonos/c/apps/memc_kmain.o
-USER_RUST_LIB := $(USER_LIB_DIR)/libcleonos_user_rust.a
-
-APP_SHELL := $(USER_APP_DIR)/shell.elf
-APP_TTYDRV := $(USER_APP_DIR)/ttydrv.elf
-APP_ELFRUNNER := $(USER_APP_DIR)/elfrunner.elf
-APP_MEMC := $(USER_APP_DIR)/memc.elf
-USER_APPS := $(APP_SHELL) $(APP_TTYDRV) $(APP_ELFRUNNER) $(APP_MEMC)
-
-CFLAGS_COMMON := -std=c11 -ffreestanding -fno-stack-protector -fno-builtin -Wall -Wextra -Werror -Iclks/include
-ASFLAGS_COMMON := -ffreestanding -Iclks/include
-LDFLAGS_COMMON := -nostdlib -z max-page-size=0x1000
-
-.PHONY: all setup setup-tools setup-limine kernel userapps ramdisk-root ramdisk iso run debug clean clean-all help
+.PHONY: all configure reconfigure setup setup-tools setup-limine kernel userapps ramdisk-root ramdisk iso run debug clean clean-all help
 
 all: iso
 
-setup: setup-tools setup-limine
-> $(call log_info,environment ready)
+configure:
+> @$(CMAKE) -S . -B $(CMAKE_BUILD_DIR) $(GEN_ARG) -DCMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) -DNO_COLOR=$(NO_COLOR) $(CMAKE_EXTRA_ARGS) $(CMAKE_PASSTHROUGH_ARGS)
 
-setup-tools:
-> $(call log_step,checking host tools)
-> @command -v git >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: git" && exit 1)
-> @command -v $(TAR) >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: $(TAR)" && exit 1)
-> @command -v $(XORRISO) >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: $(XORRISO)" && exit 1)
-> @command -v clang >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: clang" && exit 1)
-> @command -v ld.lld >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: ld.lld" && exit 1)
-> @command -v $(OBJCOPY_FOR_TARGET) >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: $(OBJCOPY_FOR_TARGET)" && exit 1)
-> @command -v $(OBJDUMP_FOR_TARGET) >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: $(OBJDUMP_FOR_TARGET)" && exit 1)
-> @command -v $(READELF_FOR_TARGET) >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: $(READELF_FOR_TARGET)" && exit 1)
-> @command -v $(USER_CC) >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: $(USER_CC)" && exit 1)
-> @command -v $(USER_LD) >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: $(USER_LD)" && exit 1)
-> @command -v $(RUSTC) >/dev/null 2>&1 || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) missing tool: $(RUSTC)" && exit 1)
-> $(call log_info,required tools are available)
+reconfigure:
+> @rm -rf $(CMAKE_BUILD_DIR)
+> @$(MAKE) configure CMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) CMAKE_GENERATOR="$(CMAKE_GENERATOR)" CMAKE_EXTRA_ARGS="$(CMAKE_EXTRA_ARGS)" NO_COLOR="$(NO_COLOR)" LIMINE_SKIP_CONFIGURE="$(LIMINE_SKIP_CONFIGURE)" LIMINE_REF="$(LIMINE_REF)" LIMINE_REPO="$(LIMINE_REPO)" LIMINE_DIR="$(LIMINE_DIR)" LIMINE_BIN_DIR="$(LIMINE_BIN_DIR)" OBJCOPY_FOR_TARGET="$(OBJCOPY_FOR_TARGET)" OBJDUMP_FOR_TARGET="$(OBJDUMP_FOR_TARGET)" READELF_FOR_TARGET="$(READELF_FOR_TARGET)"
 
-setup-limine:
-> $(call log_step,preparing limine)
-> @if [ ! -d "$(LIMINE_DIR)" ]; then \
->     if [ -n "$(LIMINE_REF)" ]; then \
->         printf '%b\n' "$(COLOR_INFO)[INFO]$(COLOR_RESET) cloning limine ($(LIMINE_REF)) into $(LIMINE_DIR)"; \
->         git clone --branch "$(LIMINE_REF)" --depth 1 "$(LIMINE_REPO)" "$(LIMINE_DIR)"; \
->     else \
->         printf '%b\n' "$(COLOR_INFO)[INFO]$(COLOR_RESET) cloning limine (default branch) into $(LIMINE_DIR)"; \
->         git clone --depth 1 "$(LIMINE_REPO)" "$(LIMINE_DIR)"; \
->     fi; \
-> fi
-> @if [ "$(LIMINE_SKIP_CONFIGURE)" = "1" ]; then \
->     test -f "$(LIMINE_DIR)/Makefile" || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) LIMINE_SKIP_CONFIGURE=1 but $(LIMINE_DIR)/Makefile is missing" && exit 1); \
->     printf '%b\n' "$(COLOR_WARN)[WARN]$(COLOR_RESET) skipping limine Makefile generation (LIMINE_SKIP_CONFIGURE=1)"; \
-> else \
->     cfg_fingerprint="FLAGS=$(LIMINE_CONFIGURE_FLAGS);OBJCOPY=$(OBJCOPY_FOR_TARGET);OBJDUMP=$(OBJDUMP_FOR_TARGET);READELF=$(READELF_FOR_TARGET)"; \
->     need_configure=0; \
->     if [ ! -f "$(LIMINE_DIR)/Makefile" ]; then need_configure=1; fi; \
->     if [ ! -f "$(LIMINE_SETUP_STAMP)" ]; then need_configure=1; fi; \
->     if [ -f "$(LIMINE_SETUP_STAMP)" ] && ! grep -qx "$$cfg_fingerprint" "$(LIMINE_SETUP_STAMP)"; then need_configure=1; fi; \
->     if [ "$$need_configure" -eq 1 ]; then \
->         printf '%b\n' "$(COLOR_STEP)[STEP]$(COLOR_RESET) generating/reconfiguring limine Makefile"; \
->         if [ -x "$(LIMINE_DIR)/bootstrap" ]; then \
->             (cd "$(LIMINE_DIR)" && ./bootstrap); \
->         fi; \
->         test -x "$(LIMINE_DIR)/configure" || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) limine configure script missing" && exit 1); \
->         (cd "$(LIMINE_DIR)" && OBJCOPY_FOR_TARGET="$(OBJCOPY_FOR_TARGET)" OBJDUMP_FOR_TARGET="$(OBJDUMP_FOR_TARGET)" READELF_FOR_TARGET="$(READELF_FOR_TARGET)" ./configure $(LIMINE_CONFIGURE_FLAGS)); \
->         printf '%s\n' "$$cfg_fingerprint" > "$(LIMINE_SETUP_STAMP)"; \
->         rm -f "$(LIMINE_BUILD_STAMP)"; \
->     else \
->         printf '%b\n' "$(COLOR_INFO)[INFO]$(COLOR_RESET) limine configure state unchanged"; \
->     fi; \
-> fi
-> @need_build=0; \
-> if [ ! -f "$(LIMINE_BUILD_STAMP)" ]; then need_build=1; fi; \
-> for f in limine limine-bios.sys limine-bios-cd.bin limine-uefi-cd.bin; do \
->     if [ ! -f "$(LIMINE_BIN_DIR)/$$f" ]; then need_build=1; fi; \
-> done; \
-> if [ "$$need_build" -eq 1 ]; then \
->     printf '%b\n' "$(COLOR_INFO)[INFO]$(COLOR_RESET) building limine"; \
->     $(MAKE) -C "$(LIMINE_DIR)"; \
->     touch "$(LIMINE_BUILD_STAMP)"; \
-> else \
->     printf '%b\n' "$(COLOR_INFO)[INFO]$(COLOR_RESET) limine already built, skipping compile"; \
-> fi
-> @test -f "$(LIMINE_BIN_DIR)/limine" || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) limine build failed" && exit 1)
-> @test -f "$(LIMINE_BIN_DIR)/limine-bios.sys" || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) limine-bios.sys missing" && exit 1)
-> @test -f "$(LIMINE_BIN_DIR)/limine-bios-cd.bin" || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) limine-bios-cd.bin missing" && exit 1)
-> @test -f "$(LIMINE_BIN_DIR)/limine-uefi-cd.bin" || (printf '%b\n' "$(COLOR_ERROR)[ERROR]$(COLOR_RESET) limine-uefi-cd.bin missing" && exit 1)
-> $(call log_info,limine artifacts ready)
+setup: configure
+> @$(CMAKE) --build $(CMAKE_BUILD_DIR) --target setup
 
-kernel: $(KERNEL_ELF)
+setup-tools: configure
+> @$(CMAKE) --build $(CMAKE_BUILD_DIR) --target setup-tools
 
-userapps: $(USER_APPS)
-> $(call log_info,user elf apps ready)
+setup-limine: configure
+> @$(CMAKE) --build $(CMAKE_BUILD_DIR) --target setup-limine
 
-ramdisk-root: userapps
-> $(call log_step,staging ramdisk root -> $(RAMDISK_ROOT))
-> @rm -rf $(RAMDISK_ROOT)
-> @mkdir -p $(RAMDISK_ROOT)
-> @cp -a ramdisk/. $(RAMDISK_ROOT)/
-> @mkdir -p $(RAMDISK_ROOT)/system $(RAMDISK_ROOT)/shell $(RAMDISK_ROOT)/driver
-> @cp $(APP_SHELL) $(RAMDISK_ROOT)/shell/shell.elf
-> @cp $(APP_ELFRUNNER) $(RAMDISK_ROOT)/system/elfrunner.elf
-> @cp $(APP_MEMC) $(RAMDISK_ROOT)/system/memc.elf
-> @cp $(APP_TTYDRV) $(RAMDISK_ROOT)/driver/ttydrv.elf
+kernel: configure
+> @$(CMAKE) --build $(CMAKE_BUILD_DIR) --target kernel
 
-ramdisk: $(RAMDISK_IMAGE)
+userapps: configure
+> @$(CMAKE) --build $(CMAKE_BUILD_DIR) --target userapps
 
-$(KERNEL_ELF): $(OBJECTS) $(LINKER_SCRIPT) Makefile
-> $(call log_step,linking kernel -> $(KERNEL_ELF))
-> @mkdir -p $(dir $@)
-> @$(LD) $(LDFLAGS_COMMON) -T $(LINKER_SCRIPT) -o $@ $(OBJECTS)
+ramdisk-root: configure
+> @$(CMAKE) --build $(CMAKE_BUILD_DIR) --target ramdisk-root
 
-$(OBJ_ROOT)/%.o: %.c Makefile
-> $(call log_step,compiling $<)
-> @mkdir -p $(dir $@)
-> @$(CC) $(CFLAGS_COMMON) $(ARCH_CFLAGS) -c $< -o $@
+ramdisk: configure
+> @$(CMAKE) --build $(CMAKE_BUILD_DIR) --target ramdisk
 
-$(OBJ_ROOT)/%.o: %.S Makefile
-> $(call log_step,assembling $<)
-> @mkdir -p $(dir $@)
-> @$(CC) $(ASFLAGS_COMMON) $(ARCH_CFLAGS) -c $< -o $@
+iso: configure
+> @$(CMAKE) --build $(CMAKE_BUILD_DIR) --target iso
 
-$(USER_OBJ_ROOT)/%.o: %.c Makefile
-> $(call log_step,compiling user $<)
-> @mkdir -p $(dir $@)
-> @$(USER_CC) $(USER_CFLAGS) -c $< -o $@
+run: configure
+> @$(CMAKE) --build $(CMAKE_BUILD_DIR) --target run
 
-$(USER_RUST_LIB): cleonos/rust/src/lib.rs Makefile
-> $(call log_step,building rust user lib)
-> @mkdir -p $(dir $@)
-> @$(RUSTC) --crate-type staticlib -C panic=abort -O $< -o $@
-
-$(APP_SHELL): $(USER_COMMON_OBJECTS) $(USER_SHELL_OBJECT) $(USER_RUST_LIB) $(USER_LINKER_SCRIPT)
-> $(call log_step,linking user shell.elf)
-> @mkdir -p $(dir $@)
-> @$(USER_LD) $(USER_LDFLAGS) -o $@ $(USER_COMMON_OBJECTS) $(USER_SHELL_OBJECT) $(USER_RUST_LIB)
-
-$(APP_TTYDRV): $(USER_COMMON_OBJECTS) $(USER_TTYDRV_OBJECT) $(USER_LINKER_SCRIPT)
-> $(call log_step,linking user ttydrv.elf)
-> @mkdir -p $(dir $@)
-> @$(USER_LD) $(USER_LDFLAGS) -o $@ $(USER_COMMON_OBJECTS) $(USER_TTYDRV_OBJECT)
-
-$(APP_ELFRUNNER): $(USER_ELFRUNNER_KOBJ) $(KELF_LINKER_SCRIPT)
-> $(call log_step,linking kernel-elf elfrunner.elf)
-> @mkdir -p $(dir $@)
-> @$(USER_LD) $(KELF_LDFLAGS) -o $@ $(USER_ELFRUNNER_KOBJ)
-
-$(APP_MEMC): $(USER_MEMC_KOBJ) $(KELF_LINKER_SCRIPT)
-> $(call log_step,linking kernel-elf memc.elf)
-> @mkdir -p $(dir $@)
-> @$(USER_LD) $(KELF_LDFLAGS) -o $@ $(USER_MEMC_KOBJ)
-
-$(RAMDISK_IMAGE): ramdisk-root Makefile
-> $(call log_step,packing ramdisk -> $(RAMDISK_IMAGE))
-> @mkdir -p $(dir $@)
-> @$(TAR) -C $(RAMDISK_ROOT) -cf $@ .
-
-iso: setup-tools setup-limine $(KERNEL_ELF) $(RAMDISK_IMAGE) configs/limine.conf
-> $(call log_step,assembling iso root)
-> @rm -rf $(ISO_ROOT)
-> @mkdir -p $(ISO_ROOT)/boot/limine
-> @cp $(KERNEL_ELF) $(ISO_ROOT)/boot/clks_kernel.elf
-> @cp $(RAMDISK_IMAGE) $(ISO_ROOT)/boot/cleonos_ramdisk.tar
-> @cp configs/limine.conf $(ISO_ROOT)/boot/limine/limine.conf
-> @cp $(LIMINE_BIN_DIR)/limine-bios.sys $(ISO_ROOT)/boot/limine/
-> @cp $(LIMINE_BIN_DIR)/limine-bios-cd.bin $(ISO_ROOT)/boot/limine/
-> @cp $(LIMINE_BIN_DIR)/limine-uefi-cd.bin $(ISO_ROOT)/boot/limine/
-> @mkdir -p $(dir $(ISO_IMAGE))
-> $(call log_step,building iso -> $(ISO_IMAGE))
-> @$(XORRISO) -as mkisofs \
->     -b boot/limine/limine-bios-cd.bin \
->     -no-emul-boot \
->     -boot-load-size 4 \
->     -boot-info-table \
->     --efi-boot boot/limine/limine-uefi-cd.bin \
->     -efi-boot-part \
->     --efi-boot-image \
->     --protective-msdos-label \
->     $(ISO_ROOT) \
->     -o $(ISO_IMAGE)
-> $(call log_step,installing limine boot sectors)
-> @$(LIMINE_BIN_DIR)/limine bios-install $(ISO_IMAGE)
-> $(call log_info,iso ready: $(ISO_IMAGE))
-
-run: iso
-> $(call log_step,launching qemu run)
-> @$(RUN_COMMAND)
-
-debug: iso
-> $(call log_step,launching qemu debug (-s -S))
-> @$(DEBUG_COMMAND)
+debug: configure
+> @$(CMAKE) --build $(CMAKE_BUILD_DIR) --target debug
 
 clean:
-> $(call log_step,cleaning $(BUILD_ROOT))
-> @rm -rf $(BUILD_ROOT)
-> $(call log_info,clean done)
+> @if [ -d "$(CMAKE_BUILD_DIR)" ]; then \
+>     $(CMAKE) --build $(CMAKE_BUILD_DIR) --target clean-x86; \
+> else \
+>     rm -rf build/x86_64; \
+> fi
 
 clean-all:
-> $(call log_step,cleaning build)
-> @rm -rf build
-> $(call log_info,clean-all done)
+> @if [ -d "$(CMAKE_BUILD_DIR)" ]; then \
+>     $(CMAKE) --build $(CMAKE_BUILD_DIR) --target clean-all; \
+> else \
+>     rm -rf build build-cmake; \
+> fi
 
 help:
-> @echo "CLeonOS build system (x86_64 only)"
+> @echo "CLeonOS (CMake-backed wrapper)"
+> @echo "  make configure"
 > @echo "  make setup"
-> @echo "  make setup LIMINE_REF=<branch-or-tag>"
-> @echo "  make setup LIMINE_SKIP_CONFIGURE=1"
-> @echo "  make setup LIMINE_CONFIGURE_FLAGS='--enable-bios-cd --enable-uefi-cd --enable-uefi-x86-64'"
-> @echo "  make setup OBJCOPY_FOR_TARGET=llvm-objcopy OBJDUMP_FOR_TARGET=llvm-objdump READELF_FOR_TARGET=llvm-readelf"
 > @echo "  make userapps"
 > @echo "  make iso"
 > @echo "  make run"
 > @echo "  make debug"
-> @echo "  make NO_COLOR=1 <target>"
+> @echo "  make clean"
+> @echo "  make clean-all"
+> @echo ""
+> @echo "Pass custom CMake cache args via:"
+> @echo "  make configure CMAKE_EXTRA_ARGS='-DLIMINE_SKIP_CONFIGURE=1 -DOBJCOPY_FOR_TARGET=objcopy'"
+> @echo "Direct passthrough is also supported:"
+> @echo "  make run LIMINE_SKIP_CONFIGURE=1"

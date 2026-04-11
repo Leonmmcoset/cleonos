@@ -1,0 +1,36 @@
+cmake_minimum_required(VERSION 3.20)
+
+if(NOT DEFINED NO_COLOR)
+    set(NO_COLOR 0)
+endif()
+
+if(NO_COLOR)
+    set(CL_LOG_RESET "")
+    set(CL_LOG_INFO "")
+    set(CL_LOG_WARN "")
+    set(CL_LOG_ERROR "")
+    set(CL_LOG_STEP "")
+else()
+    string(ASCII 27 CL_LOG_ESC)
+    set(CL_LOG_RESET "${CL_LOG_ESC}[0m")
+    set(CL_LOG_INFO "${CL_LOG_ESC}[1;36m")
+    set(CL_LOG_WARN "${CL_LOG_ESC}[1;33m")
+    set(CL_LOG_ERROR "${CL_LOG_ESC}[1;31m")
+    set(CL_LOG_STEP "${CL_LOG_ESC}[1;35m")
+endif()
+
+function(cl_log_step TEXT)
+    message(NOTICE "${CL_LOG_STEP}[STEP]${CL_LOG_RESET} ${TEXT}")
+endfunction()
+
+function(cl_log_info TEXT)
+    message(NOTICE "${CL_LOG_INFO}[INFO]${CL_LOG_RESET} ${TEXT}")
+endfunction()
+
+function(cl_log_warn TEXT)
+    message(NOTICE "${CL_LOG_WARN}[WARN]${CL_LOG_RESET} ${TEXT}")
+endfunction()
+
+function(cl_log_error TEXT)
+    message(FATAL_ERROR "${CL_LOG_ERROR}[ERROR]${CL_LOG_RESET} ${TEXT}")
+endfunction()

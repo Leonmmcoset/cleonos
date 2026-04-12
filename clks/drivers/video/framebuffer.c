@@ -160,7 +160,6 @@ void clks_fb_scroll_up(u32 pixel_rows, u32 fill_rgb) {
     usize row_bytes;
     usize move_bytes;
     u32 y;
-    u32 x;
 
     if (clks_fb.ready == CLKS_FALSE) {
         return;
@@ -189,8 +188,11 @@ void clks_fb_scroll_up(u32 pixel_rows, u32 fill_rgb) {
     );
 
     for (y = clks_fb.info.height - pixel_rows; y < clks_fb.info.height; y++) {
+        volatile u32 *row_ptr = (volatile u32 *)(clks_fb.address + ((usize)y * row_bytes));
+        u32 x;
+
         for (x = 0U; x < clks_fb.info.width; x++) {
-            clks_fb_put_pixel(x, y, fill_rgb);
+            row_ptr[x] = fill_rgb;
         }
     }
 }
@@ -202,8 +204,18 @@ void clks_fb_draw_char(u32 x, u32 y, char ch, u32 fg_rgb, u32 bg_rgb) {
     u32 cols;
     u32 rows;
     u32 row_stride;
+    u32 draw_cols;
+    u32 draw_rows;
 
     if (clks_fb.ready == CLKS_FALSE || clks_fb.font == CLKS_NULL) {
+        return;
+    }
+
+    if (clks_fb.info.bpp != 32) {
+        return;
+    }
+
+    if (x >= clks_fb.info.width || y >= clks_fb.info.height) {
         return;
     }
 
@@ -234,14 +246,26 @@ void clks_fb_draw_char(u32 x, u32 y, char ch, u32 fg_rgb, u32 bg_rgb) {
         return;
     }
 
-    for (row = 0U; row < rows; row++) {
-        const u8 *row_bits = glyph + ((usize)row * (usize)row_stride);
+    draw_cols = cols;
+    if (x + draw_cols > clks_fb.info.width) {
+        draw_cols = clks_fb.info.width - x;
+    }
 
-        for (col = 0U; col < cols; col++) {
+    draw_rows = rows;
+    if (y + draw_rows > clks_fb.info.height) {
+        draw_rows = clks_fb.info.height - y;
+    }
+
+    for (row = 0U; row < draw_rows; row++) {
+        const u8 *row_bits = glyph + ((usize)row * (usize)row_stride);
+        volatile u32 *dst_row = (volatile u32 *)(
+            clks_fb.address + ((usize)(y + row) * (usize)clks_fb.info.pitch) + ((usize)x * 4U)
+        );
+
+        for (col = 0U; col < draw_cols; col++) {
             u8 bits = row_bits[col >> 3U];
             u8 mask = (u8)(0x80U >> (col & 7U));
-            u32 color = (bits & mask) != 0U ? fg_rgb : bg_rgb;
-            clks_fb_put_pixel(x + col, y + row, color);
+            dst_row[col] = (bits & mask) != 0U ? fg_rgb : bg_rgb;
         }
     }
 }
@@ -266,3 +290,4 @@ u32 clks_fb_cell_width(void) {
 u32 clks_fb_cell_height(void) {
     return clks_fb.glyph_height == 0U ? 8U : clks_fb.glyph_height;
 }
+

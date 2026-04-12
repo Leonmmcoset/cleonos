@@ -43,6 +43,8 @@ static u64 clks_shell_cmd_total = 0ULL;
 static u64 clks_shell_cmd_ok = 0ULL;
 static u64 clks_shell_cmd_fail = 0ULL;
 static u64 clks_shell_cmd_unknown = 0ULL;
+static clks_bool clks_shell_pending_command = CLKS_FALSE;
+static char clks_shell_pending_line[CLKS_SHELL_LINE_MAX];
 
 extern void clks_rusttest_hello(void);
 
@@ -1358,6 +1360,16 @@ static void clks_shell_execute_line(const char *line) {
     }
 }
 
+static void clks_shell_process_pending_command(void) {
+    if (clks_shell_ready == CLKS_FALSE || clks_shell_pending_command == CLKS_FALSE) {
+        return;
+    }
+
+    clks_shell_pending_command = CLKS_FALSE;
+    clks_shell_execute_line(clks_shell_pending_line);
+    clks_shell_pending_line[0] = '\0';
+}
+
 static void clks_shell_handle_char(char ch) {
     if (ch == '\r') {
         return;
@@ -1367,7 +1379,14 @@ static void clks_shell_handle_char(char ch) {
         clks_shell_write_char('\n');
         clks_shell_line[clks_shell_line_len] = '\0';
         clks_shell_history_push(clks_shell_line);
-        clks_shell_execute_line(clks_shell_line);
+
+        if (clks_shell_pending_command == CLKS_FALSE) {
+            clks_shell_copy_line(clks_shell_pending_line, sizeof(clks_shell_pending_line), clks_shell_line);
+            clks_shell_pending_command = CLKS_TRUE;
+        } else {
+            clks_shell_writeln("shell: command queue busy");
+        }
+
         clks_shell_reset_line();
         clks_shell_history_cancel_nav();
         clks_shell_prompt();
@@ -1496,6 +1515,8 @@ void clks_shell_init(void) {
     clks_shell_cmd_ok = 0ULL;
     clks_shell_cmd_fail = 0ULL;
     clks_shell_cmd_unknown = 0ULL;
+    clks_shell_pending_command = CLKS_FALSE;
+    clks_shell_pending_line[0] = '\0';
 
     if (clks_tty_ready() == CLKS_FALSE) {
         clks_shell_ready = CLKS_FALSE;
@@ -1539,5 +1560,6 @@ void clks_shell_pump_input(u32 max_chars) {
 void clks_shell_tick(u64 tick) {
     (void)tick;
     clks_shell_drain_input(CLKS_SHELL_INPUT_BUDGET);
+    clks_shell_process_pending_command();
 }
 

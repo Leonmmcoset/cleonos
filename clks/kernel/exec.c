@@ -15,6 +15,7 @@ extern u64 clks_exec_call_on_stack_x86_64(void *entry_ptr, void *stack_top);
 
 static u64 clks_exec_requests = 0ULL;
 static u64 clks_exec_success = 0ULL;
+static u32 clks_exec_running_depth = 0U;
 
 static clks_bool clks_exec_invoke_entry(void *entry_ptr, u64 *out_ret) {
     if (entry_ptr == CLKS_NULL || out_ret == CLKS_NULL) {
@@ -45,6 +46,7 @@ static clks_bool clks_exec_invoke_entry(void *entry_ptr, u64 *out_ret) {
 void clks_exec_init(void) {
     clks_exec_requests = 0ULL;
     clks_exec_success = 0ULL;
+    clks_exec_running_depth = 0U;
     clks_log(CLKS_LOG_INFO, "EXEC", "PATH EXEC FRAMEWORK ONLINE");
 }
 
@@ -100,11 +102,19 @@ clks_bool clks_exec_run_path(const char *path, u64 *out_status) {
     clks_log_hex(CLKS_LOG_INFO, "EXEC", "ENTRY", info.entry);
     clks_log_hex(CLKS_LOG_INFO, "EXEC", "PHNUM", (u64)info.phnum);
 
+    clks_exec_running_depth++;
     if (clks_exec_invoke_entry(entry_ptr, &run_ret) == CLKS_FALSE) {
+        if (clks_exec_running_depth > 0U) {
+            clks_exec_running_depth--;
+        }
+
         clks_log(CLKS_LOG_WARN, "EXEC", "EXEC RUN INVOKE FAILED");
         clks_log(CLKS_LOG_WARN, "EXEC", path);
         clks_elf64_unload(&loaded);
         return CLKS_FALSE;
+    }
+    if (clks_exec_running_depth > 0U) {
+        clks_exec_running_depth--;
     }
 
     clks_log(CLKS_LOG_INFO, "EXEC", "RUN RETURNED");
@@ -128,3 +138,8 @@ u64 clks_exec_request_count(void) {
 u64 clks_exec_success_count(void) {
     return clks_exec_success;
 }
+
+clks_bool clks_exec_is_running(void) {
+    return (clks_exec_running_depth > 0U) ? CLKS_TRUE : CLKS_FALSE;
+}
+

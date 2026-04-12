@@ -4,3 +4,6 @@ CLeonOS ramdisk root layout
 /shell   : user shell and command ELF apps
 /temp    : runtime temp/cache files
 /driver  : hardware and peripheral drivers
+
+Root ELF demos:
+/hello.elf     : Hello world user ELF

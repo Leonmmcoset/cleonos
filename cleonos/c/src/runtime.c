@@ -4,13 +4,9 @@ typedef int (*cleonos_entry_fn)(void);
 
 extern int cleonos_app_main(void);
 
-void _start(void) {
-    volatile int code;
+u64 _start(void) {
+    int code;
 
     code = ((cleonos_entry_fn)cleonos_app_main)();
-    (void)code;
-
-    for (;;) {
-        __asm__ volatile("pause");
-    }
+    return (u64)code;
 }

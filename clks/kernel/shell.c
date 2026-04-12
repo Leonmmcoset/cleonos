@@ -1,5 +1,6 @@
 #include <clks/exec.h>
 #include <clks/fs.h>
+#include <clks/elf64.h>
 #include <clks/heap.h>
 #include <clks/keyboard.h>
 #include <clks/log.h>
@@ -699,6 +700,7 @@ static clks_bool clks_shell_cmd_help(void) {
     clks_shell_writeln("  rusttest");
     clks_shell_writeln("  panic");
     clks_shell_writeln("  exec <path|name>");
+    clks_shell_writeln("  elfloader [path] (kernel builtin, default /hello.elf)");
     clks_shell_writeln("  clear");
     clks_shell_writeln("  kbdstat");
     clks_shell_writeln("edit keys: Left/Right, Home/End, Up/Down history");
@@ -1057,6 +1059,55 @@ static clks_bool clks_shell_cmd_rm(const char *arg) {
     return CLKS_TRUE;
 }
 
+static clks_bool clks_shell_cmd_elfloader(const char *arg) {
+    const char *target = arg;
+    char path[CLKS_SHELL_PATH_MAX];
+    const void *image;
+    u64 size = 0ULL;
+    struct clks_elf64_info info;
+    u64 status = (u64)-1;
+
+    if (target == CLKS_NULL || target[0] == '\0') {
+        target = "/hello.elf";
+    }
+
+    if (target[0] == '/') {
+        clks_shell_copy_line(path, sizeof(path), target);
+    } else if (clks_shell_resolve_path(target, path, sizeof(path)) == CLKS_FALSE) {
+        clks_shell_writeln("elfloader: invalid path");
+        return CLKS_FALSE;
+    }
+
+    image = clks_fs_read_all(path, &size);
+
+    if (image == CLKS_NULL || size == 0ULL) {
+        clks_shell_writeln("elfloader: file missing");
+        return CLKS_FALSE;
+    }
+
+    if (clks_elf64_inspect(image, size, &info) == CLKS_FALSE) {
+        clks_shell_writeln("elfloader: invalid elf64");
+        return CLKS_FALSE;
+    }
+
+    clks_shell_writeln("elfloader: kernel builtin");
+    clks_shell_write("  PATH: ");
+    clks_shell_writeln(path);
+    clks_shell_print_kv_hex("  ELF_SIZE", size);
+    clks_shell_print_kv_hex("  ENTRY", info.entry);
+    clks_shell_print_kv_hex("  PHNUM", (u64)info.phnum);
+    clks_shell_print_kv_hex("  LOAD_SEGMENTS", (u64)info.loadable_segments);
+    clks_shell_print_kv_hex("  TOTAL_MEMSZ", info.total_load_memsz);
+
+    if (clks_exec_run_path(path, &status) == CLKS_TRUE && status == 0ULL) {
+        clks_shell_writeln("elfloader: exec accepted");
+        return CLKS_TRUE;
+    }
+
+    clks_shell_writeln("elfloader: exec failed");
+    return CLKS_FALSE;
+}
+
 static clks_bool clks_shell_cmd_exec(const char *arg) {
     char path[CLKS_SHELL_PATH_MAX];
     u64 status = (u64)-1;
@@ -1280,6 +1331,8 @@ static void clks_shell_execute_line(const char *line) {
         success = clks_shell_cmd_rusttest();
     } else if (clks_shell_streq(cmd, "panic") == CLKS_TRUE) {
         success = clks_shell_cmd_panic();
+    } else if (clks_shell_streq(cmd, "elfloader") == CLKS_TRUE) {
+        success = clks_shell_cmd_elfloader(arg);
     } else if (clks_shell_streq(cmd, "exec") == CLKS_TRUE || clks_shell_streq(cmd, "run") == CLKS_TRUE) {
         success = clks_shell_cmd_exec(arg);
     } else if (clks_shell_streq(cmd, "clear") == CLKS_TRUE) {
@@ -1487,3 +1540,4 @@ void clks_shell_tick(u64 tick) {
     (void)tick;
     clks_shell_drain_input(CLKS_SHELL_INPUT_BUDGET);
 }
+

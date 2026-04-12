@@ -174,6 +174,11 @@ clks_bool clks_elf64_inspect(const void *image, u64 size, struct clks_elf64_info
 clks_bool clks_elf64_load(const void *image, u64 size, struct clks_elf64_loaded_image *out_loaded) {
     const struct clks_elf64_ehdr *eh;
     u16 i;
+    u16 load_count = 0U;
+    u64 min_vaddr = 0ULL;
+    u64 max_vaddr_end = 0ULL;
+    u64 span;
+    void *image_base;
 
     if (out_loaded == CLKS_NULL) {
         return CLKS_FALSE;
@@ -186,31 +191,83 @@ clks_bool clks_elf64_load(const void *image, u64 size, struct clks_elf64_loaded_
     }
 
     eh = (const struct clks_elf64_ehdr *)image;
-    out_loaded->entry = eh->e_entry;
 
     for (i = 0; i < eh->e_phnum; i++) {
         const struct clks_elf64_phdr *ph =
             (const struct clks_elf64_phdr *)((const u8 *)image + eh->e_phoff + ((u64)i * eh->e_phentsize));
-        void *dst;
+        u64 seg_end;
+
+        if (ph->p_type != CLKS_ELF64_PT_LOAD || ph->p_memsz == 0ULL) {
+            continue;
+        }
+
+        if (load_count == 0U || ph->p_vaddr < min_vaddr) {
+            min_vaddr = ph->p_vaddr;
+        }
+
+        seg_end = ph->p_vaddr + ph->p_memsz;
+        if (seg_end < ph->p_vaddr) {
+            return CLKS_FALSE;
+        }
+
+        if (load_count == 0U || seg_end > max_vaddr_end) {
+            max_vaddr_end = seg_end;
+        }
+
+        load_count++;
+    }
+
+    if (load_count == 0U) {
+        return CLKS_FALSE;
+    }
+
+    if (load_count > CLKS_ELF64_MAX_SEGMENTS) {
+        return CLKS_FALSE;
+    }
+
+    span = max_vaddr_end - min_vaddr;
+    if (span == 0ULL) {
+        return CLKS_FALSE;
+    }
+
+    image_base = clks_kmalloc((usize)span);
+    if (image_base == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    clks_memset(image_base, 0, (usize)span);
+
+    out_loaded->entry = eh->e_entry;
+    out_loaded->image_base = image_base;
+    out_loaded->image_size = span;
+    out_loaded->image_vaddr_base = min_vaddr;
+    out_loaded->segment_count = 0U;
+
+    for (i = 0; i < eh->e_phnum; i++) {
+        const struct clks_elf64_phdr *ph =
+            (const struct clks_elf64_phdr *)((const u8 *)image + eh->e_phoff + ((u64)i * eh->e_phentsize));
+        u64 seg_off;
+        u8 *seg_dst;
 
         if (ph->p_type != CLKS_ELF64_PT_LOAD || ph->p_memsz == 0ULL) {
             continue;
         }
 
         if (out_loaded->segment_count >= CLKS_ELF64_MAX_SEGMENTS) {
+            clks_elf64_unload(out_loaded);
             return CLKS_FALSE;
         }
 
-        dst = clks_kmalloc((usize)ph->p_memsz);
-
-        if (dst == CLKS_NULL) {
+        seg_off = ph->p_vaddr - min_vaddr;
+        if (seg_off > span || ph->p_memsz > (span - seg_off)) {
+            clks_elf64_unload(out_loaded);
             return CLKS_FALSE;
         }
 
-        clks_memset(dst, 0, (usize)ph->p_memsz);
-        clks_memcpy(dst, (const void *)((const u8 *)image + ph->p_offset), (usize)ph->p_filesz);
+        seg_dst = (u8 *)image_base + (usize)seg_off;
+        clks_memcpy(seg_dst, (const void *)((const u8 *)image + ph->p_offset), (usize)ph->p_filesz);
 
-        out_loaded->segments[out_loaded->segment_count].base = dst;
+        out_loaded->segments[out_loaded->segment_count].base = seg_dst;
         out_loaded->segments[out_loaded->segment_count].vaddr = ph->p_vaddr;
         out_loaded->segments[out_loaded->segment_count].memsz = ph->p_memsz;
         out_loaded->segments[out_loaded->segment_count].filesz = ph->p_filesz;
@@ -219,4 +276,36 @@ clks_bool clks_elf64_load(const void *image, u64 size, struct clks_elf64_loaded_
     }
 
     return CLKS_TRUE;
+}
+
+void clks_elf64_unload(struct clks_elf64_loaded_image *loaded) {
+    if (loaded == CLKS_NULL) {
+        return;
+    }
+
+    if (loaded->image_base != CLKS_NULL) {
+        clks_kfree(loaded->image_base);
+    }
+
+    clks_memset(loaded, 0, sizeof(*loaded));
+}
+
+void *clks_elf64_entry_pointer(const struct clks_elf64_loaded_image *loaded, u64 entry) {
+    u64 off;
+
+    if (loaded == CLKS_NULL || loaded->image_base == CLKS_NULL) {
+        return CLKS_NULL;
+    }
+
+    if (entry < loaded->image_vaddr_base) {
+        return CLKS_NULL;
+    }
+
+    off = entry - loaded->image_vaddr_base;
+
+    if (off >= loaded->image_size) {
+        return CLKS_NULL;
+    }
+
+    return (void *)((u8 *)loaded->image_base + (usize)off);
 }

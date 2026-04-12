@@ -21,6 +21,7 @@
 - `stage22.md`
 - `stage23.md`
 - `stage24.md`
+- `stage25.md`
 
 ## Notes
 - Stage docs use a fixed template: goal, implementation, acceptance criteria, build targets, QEMU command, and debugging notes.

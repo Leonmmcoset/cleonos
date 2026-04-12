@@ -3,6 +3,7 @@
 #include <clks/interrupts.h>
 #include <clks/log.h>
 #include <clks/keyboard.h>
+#include <clks/mouse.h>
 #include <clks/panic.h>
 #include <clks/scheduler.h>
 #include <clks/syscall.h>
@@ -21,6 +22,7 @@
 #define CLKS_IRQ_BASE   32U
 #define CLKS_IRQ_TIMER  32U
 #define CLKS_IRQ_KEYBOARD 33U
+#define CLKS_IRQ_MOUSE  44U
 #define CLKS_IRQ_LAST   47U
 #define CLKS_SYSCALL_VECTOR 128U
 
@@ -198,8 +200,8 @@ static void clks_pic_remap_and_mask(void) {
     (void)master_mask;
     (void)slave_mask;
 
-    clks_outb(CLKS_PIC1_DATA, 0xFCU);
-    clks_outb(CLKS_PIC2_DATA, 0xFFU);
+    clks_outb(CLKS_PIC1_DATA, 0xF8U);
+    clks_outb(CLKS_PIC2_DATA, 0xEFU);
 }
 
 static void clks_pic_send_eoi(u64 vector) {
@@ -258,6 +260,11 @@ void clks_interrupt_dispatch(struct clks_interrupt_frame *frame) {
         if (clks_ps2_has_output() == CLKS_TRUE) {
             u8 scancode = clks_inb(CLKS_PS2_DATA_PORT);
             clks_keyboard_handle_scancode(scancode);
+        }
+    } else if (vector == CLKS_IRQ_MOUSE) {
+        if (clks_ps2_has_output() == CLKS_TRUE) {
+            u8 data_byte = clks_inb(CLKS_PS2_DATA_PORT);
+            clks_mouse_handle_byte(data_byte);
         }
     }
 

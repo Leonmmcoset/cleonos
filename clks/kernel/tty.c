@@ -11,6 +11,7 @@
 #define CLKS_TTY_BG 0x00101010U
 #define CLKS_TTY_CURSOR_BLINK_INTERVAL_TICKS 5ULL
 #define CLKS_TTY_BLINK_TICK_UNSET 0xFFFFFFFFFFFFFFFFULL
+#define CLKS_TTY_DESKTOP_INDEX 1U
 
 static char clks_tty_cells[CLKS_TTY_COUNT][CLKS_TTY_MAX_ROWS][CLKS_TTY_MAX_COLS];
 static u32 clks_tty_cursor_row[CLKS_TTY_COUNT];
@@ -69,6 +70,11 @@ static void clks_tty_draw_cursor(void) {
     u32 col;
 
     if (clks_tty_is_ready == CLKS_FALSE) {
+        return;
+    }
+
+    if (clks_tty_active_index == CLKS_TTY_DESKTOP_INDEX) {
+        clks_tty_cursor_visible = CLKS_FALSE;
         return;
     }
 
@@ -308,6 +314,11 @@ void clks_tty_switch(u32 tty_index) {
 
 void clks_tty_tick(u64 tick) {
     if (clks_tty_is_ready == CLKS_FALSE || clks_tty_blink_enabled == CLKS_FALSE) {
+        return;
+    }
+
+    if (clks_tty_active_index == CLKS_TTY_DESKTOP_INDEX) {
+        clks_tty_cursor_visible = CLKS_FALSE;
         return;
     }
 

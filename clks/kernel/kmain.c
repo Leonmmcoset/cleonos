@@ -2,6 +2,7 @@
 
 #include <clks/boot.h>
 #include <clks/cpu.h>
+#include <clks/desktop.h>
 #include <clks/driver.h>
 #include <clks/elfrunner.h>
 #include <clks/exec.h>
@@ -13,6 +14,7 @@
 #include <clks/kelf.h>
 #include <clks/kernel.h>
 #include <clks/log.h>
+#include <clks/mouse.h>
 #include <clks/pmm.h>
 #include <clks/scheduler.h>
 #include <clks/serial.h>
@@ -65,6 +67,7 @@ static void clks_task_kelfd(u64 tick) {
 static void clks_task_usrd(u64 tick) {
     clks_service_heartbeat(CLKS_SERVICE_USER, tick);
     clks_userland_tick(tick);
+    clks_desktop_tick(tick);
     clks_tty_tick(tick);
     clks_shell_tick(tick);
 }
@@ -96,7 +99,7 @@ void clks_kernel_main(void) {
         clks_tty_init();
     }
 
-    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS Stage24 START");
+    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS Stage25 START");
 
     if (boot_fb == CLKS_NULL) {
         clks_log(CLKS_LOG_WARN, "VIDEO", "NO FRAMEBUFFER FROM LIMINE");
@@ -172,6 +175,8 @@ void clks_kernel_main(void) {
 
     clks_exec_init();
     clks_keyboard_init();
+    clks_mouse_init();
+    clks_desktop_init();
 
     if (clks_userland_init() == CLKS_FALSE) {
         clks_log(CLKS_LOG_ERROR, "USER", "USERLAND INIT FAILED");

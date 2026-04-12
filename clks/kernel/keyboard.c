@@ -101,6 +101,10 @@ static clks_bool clks_keyboard_queue_push(char ch) {
     return CLKS_TRUE;
 }
 
+static clks_bool clks_keyboard_shell_input_enabled(void) {
+    return (clks_tty_active() == 0U) ? CLKS_TRUE : CLKS_FALSE;
+}
+
 static char clks_keyboard_translate_scancode(u8 code) {
     clks_bool shift_active = (clks_kbd_lshift_down == CLKS_TRUE || clks_kbd_rshift_down == CLKS_TRUE)
                                  ? CLKS_TRUE
@@ -169,7 +173,7 @@ void clks_keyboard_handle_scancode(u8 scancode) {
         char ext = clks_keyboard_translate_ext_scancode(code);
         clks_kbd_e0_prefix = CLKS_FALSE;
 
-        if (ext != '\0') {
+        if (ext != '\0' && clks_keyboard_shell_input_enabled() == CLKS_TRUE) {
             if (clks_keyboard_queue_push(ext) == CLKS_TRUE) {
                 clks_shell_pump_input(1U);
             }
@@ -199,7 +203,7 @@ void clks_keyboard_handle_scancode(u8 scancode) {
     {
         char translated = clks_keyboard_translate_scancode(code);
 
-        if (translated != '\0') {
+        if (translated != '\0' && clks_keyboard_shell_input_enabled() == CLKS_TRUE) {
             if (clks_keyboard_queue_push(translated) == CLKS_TRUE) {
                 clks_shell_pump_input(1U);
             }

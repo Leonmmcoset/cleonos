@@ -89,19 +89,71 @@ struct clks_framebuffer_info clks_fb_info(void) {
     return clks_fb.info;
 }
 
-void clks_fb_clear(u32 rgb) {
-    u32 x;
-    u32 y;
+void clks_fb_draw_pixel(u32 x, u32 y, u32 rgb) {
+    clks_fb_put_pixel(x, y, rgb);
+}
+
+clks_bool clks_fb_read_pixel(u32 x, u32 y, u32 *out_rgb) {
+    volatile u8 *row;
+    volatile u32 *pixel;
+
+    if (out_rgb == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    if (clks_fb.ready == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    if (x >= clks_fb.info.width || y >= clks_fb.info.height) {
+        return CLKS_FALSE;
+    }
+
+    if (clks_fb.info.bpp != 32) {
+        return CLKS_FALSE;
+    }
+
+    row = clks_fb.address + ((usize)y * (usize)clks_fb.info.pitch);
+    pixel = (volatile u32 *)(row + ((usize)x * 4U));
+    *out_rgb = *pixel;
+    return CLKS_TRUE;
+}
+
+void clks_fb_fill_rect(u32 x, u32 y, u32 width, u32 height, u32 rgb) {
+    u32 px;
+    u32 py;
+    u32 end_x;
+    u32 end_y;
+    u64 end_x64;
+    u64 end_y64;
 
     if (clks_fb.ready == CLKS_FALSE) {
         return;
     }
 
-    for (y = 0U; y < clks_fb.info.height; y++) {
-        for (x = 0U; x < clks_fb.info.width; x++) {
-            clks_fb_put_pixel(x, y, rgb);
+    if (width == 0U || height == 0U) {
+        return;
+    }
+
+    if (x >= clks_fb.info.width || y >= clks_fb.info.height) {
+        return;
+    }
+
+    end_x64 = (u64)x + (u64)width;
+    end_y64 = (u64)y + (u64)height;
+
+    end_x = (end_x64 > (u64)clks_fb.info.width) ? clks_fb.info.width : (u32)end_x64;
+    end_y = (end_y64 > (u64)clks_fb.info.height) ? clks_fb.info.height : (u32)end_y64;
+
+    for (py = y; py < end_y; py++) {
+        for (px = x; px < end_x; px++) {
+            clks_fb_put_pixel(px, py, rgb);
         }
     }
+}
+
+void clks_fb_clear(u32 rgb) {
+    clks_fb_fill_rect(0U, 0U, clks_fb.info.width, clks_fb.info.height, rgb);
 }
 
 void clks_fb_scroll_up(u32 pixel_rows, u32 fill_rgb) {

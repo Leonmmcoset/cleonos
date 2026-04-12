@@ -57,46 +57,19 @@ function Pixel-On {
     return (($Pixel.R + $Pixel.G + $Pixel.B) -ge 384)
 }
 
-function Render-NormalizedGlyph {
-    param(
-        [char]$Char,
-        [System.Drawing.Font]$Font,
-        [int]$GlyphWidth,
-        [int]$GlyphHeight,
-        [int]$ShiftX,
-        [int]$ShiftY,
-        [int]$DoCenter
-    )
+function Get-BBox {
+    param([System.Drawing.Bitmap]$Bmp)
 
-    $workW = [Math]::Max($GlyphWidth * 4, 64)
-    $workH = [Math]::Max($GlyphHeight * 4, 64)
-
-    $src = New-Object System.Drawing.Bitmap $workW, $workH
-    $g = [System.Drawing.Graphics]::FromImage($src)
-    $g.Clear([System.Drawing.Color]::Black)
-    $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::SingleBitPerPixelGridFit
-
-    $fmt = New-Object System.Drawing.StringFormat
-    $fmt.FormatFlags = [System.Drawing.StringFormatFlags]::NoClip
-    $fmt.Alignment = [System.Drawing.StringAlignment]::Near
-    $fmt.LineAlignment = [System.Drawing.StringAlignment]::Near
-
-    $size = $g.MeasureString([string]$Char, $Font, 1000, $fmt)
-    $drawX = [int][Math]::Floor(($workW - $size.Width) / 2.0)
-    $drawY = [int][Math]::Floor(($workH - $size.Height) / 2.0)
-
-    $g.DrawString([string]$Char, $Font, [System.Drawing.Brushes]::White, $drawX, $drawY, $fmt)
-    $g.Dispose()
-    $fmt.Dispose()
-
-    $minX = $workW
-    $minY = $workH
+    $w = $Bmp.Width
+    $h = $Bmp.Height
+    $minX = $w
+    $minY = $h
     $maxX = -1
     $maxY = -1
 
-    for ($y = 0; $y -lt $workH; $y++) {
-        for ($x = 0; $x -lt $workW; $x++) {
-            if (Pixel-On ($src.GetPixel($x, $y))) {
+    for ($y = 0; $y -lt $h; $y++) {
+        for ($x = 0; $x -lt $w; $x++) {
+            if (Pixel-On ($Bmp.GetPixel($x, $y))) {
                 if ($x -lt $minX) { $minX = $x }
                 if ($y -lt $minY) { $minY = $y }
                 if ($x -gt $maxX) { $maxX = $x }
@@ -105,46 +78,11 @@ function Render-NormalizedGlyph {
         }
     }
 
-    $dst = New-Object System.Drawing.Bitmap $GlyphWidth, $GlyphHeight
-    for ($y = 0; $y -lt $GlyphHeight; $y++) {
-        for ($x = 0; $x -lt $GlyphWidth; $x++) {
-            $dst.SetPixel($x, $y, [System.Drawing.Color]::Black)
-        }
+    if ($maxX -lt 0 -or $maxY -lt 0) {
+        return @{ Empty = $true; MinX = 0; MinY = 0; MaxX = -1; MaxY = -1 }
     }
 
-    if ($maxX -ge $minX -and $maxY -ge $minY) {
-        $contentW = $maxX - $minX + 1
-        $contentH = $maxY - $minY + 1
-
-        if ($DoCenter -ne 0) {
-            $baseX = [int][Math]::Floor(($GlyphWidth - $contentW) / 2.0)
-            $baseY = [int][Math]::Floor(($GlyphHeight - $contentH) / 2.0)
-        } else {
-            $baseX = 0
-            $baseY = 0
-        }
-
-        $targetX = $baseX + $ShiftX
-        $targetY = $baseY + $ShiftY
-
-        for ($y = $minY; $y -le $maxY; $y++) {
-            for ($x = $minX; $x -le $maxX; $x++) {
-                if (-not (Pixel-On ($src.GetPixel($x, $y)))) {
-                    continue
-                }
-
-                $nx = $targetX + ($x - $minX)
-                $ny = $targetY + ($y - $minY)
-
-                if ($nx -ge 0 -and $nx -lt $GlyphWidth -and $ny -ge 0 -and $ny -lt $GlyphHeight) {
-                    $dst.SetPixel($nx, $ny, [System.Drawing.Color]::White)
-                }
-            }
-        }
-    }
-
-    $src.Dispose()
-    return $dst
+    return @{ Empty = $false; MinX = $minX; MinY = $minY; MaxX = $maxX; MaxY = $maxY }
 }
 
 $headerSize = 32
@@ -168,18 +106,83 @@ for ($i = $headerSize; $i -lt $totalSize; $i++) {
     $bytes[$i] = 0x00
 }
 
+$workW = [Math]::Max($Width * 4, 96)
+$workH = [Math]::Max($Height * 4, 96)
+$drawX = [Math]::Max(16, [Math]::Floor($workW / 4))
+$drawY = [Math]::Max(16, [Math]::Floor($workH / 4))
+
+$fmt = New-Object System.Drawing.StringFormat
+$fmt.FormatFlags = [System.Drawing.StringFormatFlags]::NoClip
+$fmt.Alignment = [System.Drawing.StringAlignment]::Near
+$fmt.LineAlignment = [System.Drawing.StringAlignment]::Near
+
+$rendered = @{}
+$globalMinX = $workW
+$globalMinY = $workH
+$globalMaxX = -1
+$globalMaxY = -1
+
 for ($code = 32; $code -le [Math]::Min(126, $GlyphCount - 1); $code++) {
     $ch = [char]$code
-    $glyphBmp = Render-NormalizedGlyph -Char $ch -Font $font -GlyphWidth $Width -GlyphHeight $Height -ShiftX $OffsetX -ShiftY $OffsetY -DoCenter $AutoCenter
 
+    $bmp = New-Object System.Drawing.Bitmap $workW, $workH
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.Clear([System.Drawing.Color]::Black)
+    $g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::SingleBitPerPixelGridFit
+    $g.DrawString([string]$ch, $font, [System.Drawing.Brushes]::White, $drawX, $drawY, $fmt)
+    $g.Dispose()
+
+    $bbox = Get-BBox -Bmp $bmp
+
+    if ($bbox.Empty -eq $false) {
+        if ($bbox.MinX -lt $globalMinX) { $globalMinX = $bbox.MinX }
+        if ($bbox.MinY -lt $globalMinY) { $globalMinY = $bbox.MinY }
+        if ($bbox.MaxX -gt $globalMaxX) { $globalMaxX = $bbox.MaxX }
+        if ($bbox.MaxY -gt $globalMaxY) { $globalMaxY = $bbox.MaxY }
+    }
+
+    $rendered[$code] = $bmp
+}
+
+if ($globalMaxX -lt $globalMinX -or $globalMaxY -lt $globalMinY) {
+    $fmt.Dispose()
+    $font.Dispose()
+    throw "No visible glyph pixels found during render"
+}
+
+$globalW = $globalMaxX - $globalMinX + 1
+$globalH = $globalMaxY - $globalMinY + 1
+
+$cropX = $globalMinX
+$cropY = $globalMinY
+
+if ($AutoCenter -ne 0 -and $globalW -lt $Width) {
+    $cropX = $cropX - [Math]::Floor(($Width - $globalW) / 2)
+}
+
+# Keep top anchored to preserve english punctuation/baseline relationships.
+$cropX = $cropX + $OffsetX
+$cropY = $cropY + $OffsetY
+
+for ($code = 32; $code -le [Math]::Min(126, $GlyphCount - 1); $code++) {
+    $src = $rendered[$code]
     $glyphOffset = $headerSize + ($code * $bytesPerGlyph)
 
     for ($y = 0; $y -lt $Height; $y++) {
+        $srcY = $cropY + $y
+        if ($srcY -lt 0 -or $srcY -ge $workH) {
+            continue
+        }
+
         $rowOffset = $glyphOffset + ($y * $bytesPerRow)
 
         for ($x = 0; $x -lt $Width; $x++) {
-            $p = $glyphBmp.GetPixel($x, $y)
-            if (Pixel-On $p) {
+            $srcX = $cropX + $x
+            if ($srcX -lt 0 -or $srcX -ge $workW) {
+                continue
+            }
+
+            if (Pixel-On ($src.GetPixel($srcX, $srcY))) {
                 $byteIndex = ($x -shr 3)
                 $bitIndex = 7 - ($x -band 7)
                 $target = $rowOffset + $byteIndex
@@ -187,10 +190,13 @@ for ($code = 32; $code -le [Math]::Min(126, $GlyphCount - 1); $code++) {
             }
         }
     }
-
-    $glyphBmp.Dispose()
 }
 
+foreach ($bmp in $rendered.Values) {
+    $bmp.Dispose()
+}
+
+$fmt.Dispose()
 $font.Dispose()
 
 if ([System.IO.Path]::IsPathRooted($OutputPath)) {
@@ -205,4 +211,4 @@ if (-not [string]::IsNullOrWhiteSpace($dir)) {
 }
 
 [System.IO.File]::WriteAllBytes($fullOutput, $bytes)
-Write-Output "Generated PSF2: $OutputPath (w=$Width, h=$Height, glyphs=$GlyphCount, bytes=$($bytes.Length), center=$AutoCenter)"
+Write-Output "Generated PSF2: $OutputPath (w=$Width, h=$Height, glyphs=$GlyphCount, bytes=$($bytes.Length), global_bbox=${globalW}x${globalH})"

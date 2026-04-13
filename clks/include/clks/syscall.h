@@ -43,6 +43,12 @@
 #define CLKS_SYSCALL_KBD_POPPED          37ULL
 #define CLKS_SYSCALL_KBD_DROPPED         38ULL
 #define CLKS_SYSCALL_KBD_HOTKEY_SWITCHES 39ULL
+#define CLKS_SYSCALL_GETPID              40ULL
+#define CLKS_SYSCALL_SPAWN_PATH          41ULL
+#define CLKS_SYSCALL_WAITPID             42ULL
+#define CLKS_SYSCALL_EXIT                43ULL
+#define CLKS_SYSCALL_SLEEP_TICKS         44ULL
+#define CLKS_SYSCALL_YIELD               45ULL
 
 void clks_syscall_init(void);
 u64 clks_syscall_dispatch(void *frame_ptr);

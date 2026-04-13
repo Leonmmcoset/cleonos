@@ -14,5 +14,9 @@ int cleonos_app_main(void) {
     for (;;) {
         ush_read_line(&sh, line, (u64)sizeof(line));
         ush_execute_line(&sh, line);
+
+        if (sh.exit_requested != 0) {
+            return (int)(sh.exit_code & 0x7FFFFFFFULL);
+        }
     }
 }

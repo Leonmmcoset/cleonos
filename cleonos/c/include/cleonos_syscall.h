@@ -46,6 +46,12 @@ typedef unsigned long long usize;
 #define CLEONOS_SYSCALL_KBD_POPPED          37ULL
 #define CLEONOS_SYSCALL_KBD_DROPPED         38ULL
 #define CLEONOS_SYSCALL_KBD_HOTKEY_SWITCHES 39ULL
+#define CLEONOS_SYSCALL_GETPID              40ULL
+#define CLEONOS_SYSCALL_SPAWN_PATH          41ULL
+#define CLEONOS_SYSCALL_WAITPID             42ULL
+#define CLEONOS_SYSCALL_EXIT                43ULL
+#define CLEONOS_SYSCALL_SLEEP_TICKS         44ULL
+#define CLEONOS_SYSCALL_YIELD               45ULL
 
 u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 u64 cleonos_sys_log_write(const char *message, u64 length);
@@ -87,5 +93,11 @@ u64 cleonos_sys_kbd_pushed(void);
 u64 cleonos_sys_kbd_popped(void);
 u64 cleonos_sys_kbd_dropped(void);
 u64 cleonos_sys_kbd_hotkey_switches(void);
+u64 cleonos_sys_getpid(void);
+u64 cleonos_sys_spawn_path(const char *path);
+u64 cleonos_sys_wait_pid(u64 pid, u64 *out_status);
+u64 cleonos_sys_exit(u64 status);
+u64 cleonos_sys_sleep_ticks(u64 ticks);
+u64 cleonos_sys_yield(void);
 
 #endif

@@ -22,6 +22,8 @@ void ush_init_state(ush_state *sh) {
     sh->cmd_ok = 0ULL;
     sh->cmd_fail = 0ULL;
     sh->cmd_unknown = 0ULL;
+    sh->exit_requested = 0;
+    sh->exit_code = 0ULL;
 }
 
 u64 ush_strlen(const char *str) {

@@ -200,6 +200,48 @@ static u64 clks_syscall_exec_path(u64 arg0) {
     return status;
 }
 
+static u64 clks_syscall_getpid(void) {
+    return clks_exec_current_pid();
+}
+
+static u64 clks_syscall_spawn_path(u64 arg0) {
+    char path[CLKS_SYSCALL_PATH_MAX];
+    u64 pid = (u64)-1;
+
+    if (clks_syscall_copy_user_string(arg0, path, sizeof(path)) == CLKS_FALSE) {
+        return (u64)-1;
+    }
+
+    if (clks_exec_spawn_path(path, &pid) == CLKS_FALSE) {
+        return (u64)-1;
+    }
+
+    return pid;
+}
+
+static u64 clks_syscall_waitpid(u64 arg0, u64 arg1) {
+    u64 status = (u64)-1;
+    u64 wait_ret = clks_exec_wait_pid(arg0, &status);
+
+    if (wait_ret == 1ULL && arg1 != 0ULL) {
+        clks_memcpy((void *)arg1, &status, sizeof(status));
+    }
+
+    return wait_ret;
+}
+
+static u64 clks_syscall_exit(u64 arg0) {
+    return (clks_exec_request_exit(arg0) == CLKS_TRUE) ? 1ULL : 0ULL;
+}
+
+static u64 clks_syscall_sleep_ticks(u64 arg0) {
+    return clks_exec_sleep_ticks(arg0);
+}
+
+static u64 clks_syscall_yield(void) {
+    return clks_exec_yield();
+}
+
 static u64 clks_syscall_fs_stat_type(u64 arg0) {
     char path[CLKS_SYSCALL_PATH_MAX];
     struct clks_fs_node_info info;
@@ -436,6 +478,18 @@ u64 clks_syscall_dispatch(void *frame_ptr) {
             return clks_keyboard_drop_count();
         case CLKS_SYSCALL_KBD_HOTKEY_SWITCHES:
             return clks_keyboard_hotkey_switch_count();
+        case CLKS_SYSCALL_GETPID:
+            return clks_syscall_getpid();
+        case CLKS_SYSCALL_SPAWN_PATH:
+            return clks_syscall_spawn_path(frame->rbx);
+        case CLKS_SYSCALL_WAITPID:
+            return clks_syscall_waitpid(frame->rbx, frame->rcx);
+        case CLKS_SYSCALL_EXIT:
+            return clks_syscall_exit(frame->rbx);
+        case CLKS_SYSCALL_SLEEP_TICKS:
+            return clks_syscall_sleep_ticks(frame->rbx);
+        case CLKS_SYSCALL_YIELD:
+            return clks_syscall_yield();
         default:
             return (u64)-1;
     }

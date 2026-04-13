@@ -48,6 +48,12 @@ SYS_KBD_PUSHED = 36
 SYS_KBD_POPPED = 37
 SYS_KBD_DROPPED = 38
 SYS_KBD_HOTKEY_SWITCHES = 39
+SYS_GETPID = 40
+SYS_SPAWN_PATH = 41
+SYS_WAITPID = 42
+SYS_EXIT = 43
+SYS_SLEEP_TICKS = 44
+SYS_YIELD = 45
 
 
 def u64(value: int) -> int:
@@ -63,4 +69,4 @@ def page_floor(addr: int) -> int:
 
 
 def page_ceil(addr: int) -> int:
-    return (addr + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1)
+    return (addr + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1)`n

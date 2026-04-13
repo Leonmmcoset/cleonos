@@ -168,3 +168,27 @@ u64 cleonos_sys_kbd_dropped(void) {
 u64 cleonos_sys_kbd_hotkey_switches(void) {
     return cleonos_syscall(CLEONOS_SYSCALL_KBD_HOTKEY_SWITCHES, 0ULL, 0ULL, 0ULL);
 }
+
+u64 cleonos_sys_getpid(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_GETPID, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_spawn_path(const char *path) {
+    return cleonos_syscall(CLEONOS_SYSCALL_SPAWN_PATH, (u64)path, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_wait_pid(u64 pid, u64 *out_status) {
+    return cleonos_syscall(CLEONOS_SYSCALL_WAITPID, pid, (u64)out_status, 0ULL);
+}
+
+u64 cleonos_sys_exit(u64 status) {
+    return cleonos_syscall(CLEONOS_SYSCALL_EXIT, status, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_sleep_ticks(u64 ticks) {
+    return cleonos_syscall(CLEONOS_SYSCALL_SLEEP_TICKS, ticks, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_yield(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_YIELD, 0ULL, 0ULL, 0ULL);
+}

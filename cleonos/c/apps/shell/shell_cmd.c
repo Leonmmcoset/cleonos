@@ -127,6 +127,12 @@ static int ush_cmd_help(void) {
     ush_writeln("  cp <src> <dst>   (dst /temp only)");
     ush_writeln("  mv <src> <dst>   (/temp only)");
     ush_writeln("  rm <path>        (/temp only)");
+    ush_writeln("  pid");
+    ush_writeln("  spawn <path|name>");
+    ush_writeln("  wait <pid>");
+    ush_writeln("  sleep <ticks>");
+    ush_writeln("  yield");
+    ush_writeln("  exit [code]");
     ush_writeln("  rusttest / panic / elfloader (kernel shell only)");
     ush_writeln("edit keys: Left/Right, Home/End, Up/Down history");
     return 1;
@@ -283,6 +289,114 @@ static int ush_cmd_exec(const ush_state *sh, const char *arg) {
     return 0;
 }
 
+static int ush_cmd_pid(void) {
+    ush_print_kv_hex("PID", cleonos_sys_getpid());
+    return 1;
+}
+
+static int ush_cmd_spawn(const ush_state *sh, const char *arg) {
+    char path[USH_PATH_MAX];
+    u64 pid;
+
+    if (ush_resolve_exec_path(sh, arg, path, (u64)sizeof(path)) == 0) {
+        ush_writeln("spawn: invalid target");
+        return 0;
+    }
+
+    if (ush_path_is_under_system(path) != 0) {
+        ush_writeln("spawn: /system/*.elf is kernel-mode (KELF), not user-exec");
+        return 0;
+    }
+
+    pid = cleonos_sys_spawn_path(path);
+
+    if (pid == (u64)-1) {
+        ush_writeln("spawn: request failed");
+        return 0;
+    }
+
+    ush_writeln("spawn: completed");
+    ush_print_kv_hex("  PID", pid);
+    return 1;
+}
+
+static int ush_cmd_wait(const char *arg) {
+    u64 pid;
+    u64 status = (u64)-1;
+    u64 wait_ret;
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("wait: usage wait <pid>");
+        return 0;
+    }
+
+    if (ush_parse_u64_dec(arg, &pid) == 0) {
+        ush_writeln("wait: invalid pid");
+        return 0;
+    }
+
+    wait_ret = cleonos_sys_wait_pid(pid, &status);
+
+    if (wait_ret == (u64)-1) {
+        ush_writeln("wait: pid not found");
+        return 0;
+    }
+
+    if (wait_ret == 0ULL) {
+        ush_writeln("wait: still running");
+        return 1;
+    }
+
+    ush_writeln("wait: exited");
+    ush_print_kv_hex("  STATUS", status);
+    return 1;
+}
+
+static int ush_cmd_sleep(const char *arg) {
+    u64 ticks;
+    u64 elapsed;
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("sleep: usage sleep <ticks>");
+        return 0;
+    }
+
+    if (ush_parse_u64_dec(arg, &ticks) == 0) {
+        ush_writeln("sleep: invalid ticks");
+        return 0;
+    }
+
+    elapsed = cleonos_sys_sleep_ticks(ticks);
+    ush_print_kv_hex("SLEPT_TICKS", elapsed);
+    return 1;
+}
+
+static int ush_cmd_yield(void) {
+    ush_print_kv_hex("YIELD_TICK", cleonos_sys_yield());
+    return 1;
+}
+
+static int ush_cmd_exit(ush_state *sh, const char *arg) {
+    u64 code = 0ULL;
+
+    if (sh == (ush_state *)0) {
+        return 0;
+    }
+
+    if (arg != (const char *)0 && arg[0] != '\0') {
+        if (ush_parse_u64_dec(arg, &code) == 0) {
+            ush_writeln("exit: usage exit [code]");
+            return 0;
+        }
+    }
+
+    sh->exit_requested = 1;
+    sh->exit_code = code;
+    (void)cleonos_sys_exit(code);
+    ush_writeln("exit: shell stopping");
+    return 1;
+}
+
 static int ush_cmd_clear(void) {
     u64 i;
 
@@ -352,6 +466,8 @@ static int ush_cmd_shstat(const ush_state *sh) {
     ush_print_kv_hex("  CMD_OK", sh->cmd_ok);
     ush_print_kv_hex("  CMD_FAIL", sh->cmd_fail);
     ush_print_kv_hex("  CMD_UNKNOWN", sh->cmd_unknown);
+    ush_print_kv_hex("  EXIT_REQUESTED", (sh->exit_requested != 0) ? 1ULL : 0ULL);
+    ush_print_kv_hex("  EXIT_CODE", sh->exit_code);
     return 1;
 }
 
@@ -744,6 +860,18 @@ void ush_execute_line(ush_state *sh, const char *line) {
         success = ush_cmd_cd(sh, arg);
     } else if (ush_streq(cmd, "exec") != 0 || ush_streq(cmd, "run") != 0) {
         success = ush_cmd_exec(sh, arg);
+    } else if (ush_streq(cmd, "pid") != 0) {
+        success = ush_cmd_pid();
+    } else if (ush_streq(cmd, "spawn") != 0) {
+        success = ush_cmd_spawn(sh, arg);
+    } else if (ush_streq(cmd, "wait") != 0) {
+        success = ush_cmd_wait(arg);
+    } else if (ush_streq(cmd, "sleep") != 0) {
+        success = ush_cmd_sleep(arg);
+    } else if (ush_streq(cmd, "yield") != 0) {
+        success = ush_cmd_yield();
+    } else if (ush_streq(cmd, "exit") != 0) {
+        success = ush_cmd_exit(sh, arg);
     } else if (ush_streq(cmd, "clear") != 0 || ush_streq(cmd, "cls") != 0) {
         success = ush_cmd_clear();
     } else if (ush_streq(cmd, "memstat") != 0) {

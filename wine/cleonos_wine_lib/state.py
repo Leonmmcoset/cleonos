@@ -4,7 +4,7 @@ import collections
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Deque, Optional
+from typing import Deque, Dict, Optional, Tuple
 
 from .constants import u64
 
@@ -38,6 +38,12 @@ class SharedKernelState:
     log_journal_cap: int = 256
     log_journal: Deque[str] = field(default_factory=lambda: collections.deque(maxlen=256))
     fs_write_max: int = 65536
+
+    proc_lock: threading.Lock = field(default_factory=threading.Lock)
+    proc_next_pid: int = 1
+    proc_current_pid: int = 0
+    proc_parents: Dict[int, int] = field(default_factory=dict)
+    proc_status: Dict[int, Optional[int]] = field(default_factory=dict)
 
     def timer_ticks(self) -> int:
         return (time.monotonic_ns() - self.start_ns) // 1_000_000
@@ -80,3 +86,46 @@ class SharedKernelState:
         if index_from_oldest < 0 or index_from_oldest >= len(self.log_journal):
             return None
         return list(self.log_journal)[index_from_oldest]
+
+    def alloc_pid(self, ppid: int) -> int:
+        with self.proc_lock:
+            pid = int(self.proc_next_pid)
+
+            if pid == 0:
+                pid = 1
+
+            self.proc_next_pid = int(u64(pid + 1))
+
+            if self.proc_next_pid == 0:
+                self.proc_next_pid = 1
+
+            self.proc_parents[pid] = int(ppid)
+            self.proc_status[pid] = None
+            return pid
+
+    def set_current_pid(self, pid: int) -> None:
+        with self.proc_lock:
+            self.proc_current_pid = int(pid)
+
+    def get_current_pid(self) -> int:
+        with self.proc_lock:
+            return int(self.proc_current_pid)
+
+    def mark_exited(self, pid: int, status: int) -> None:
+        if pid <= 0:
+            return
+
+        with self.proc_lock:
+            self.proc_status[int(pid)] = int(u64(status))
+
+    def wait_pid(self, pid: int) -> Tuple[int, int]:
+        with self.proc_lock:
+            if pid not in self.proc_status:
+                return int(u64(-1)), 0
+
+            status = self.proc_status[pid]
+
+            if status is None:
+                return 0, 0
+
+            return 1, int(status)`n

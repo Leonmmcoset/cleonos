@@ -41,6 +41,8 @@ typedef struct ush_state {
     u64 cmd_ok;
     u64 cmd_fail;
     u64 cmd_unknown;
+    int exit_requested;
+    u64 exit_code;
 } ush_state;
 
 void ush_init_state(ush_state *sh);

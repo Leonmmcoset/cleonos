@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import struct
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -18,6 +19,12 @@ from .constants import (
     SYS_EXEC_PATH,
     SYS_EXEC_REQUESTS,
     SYS_EXEC_SUCCESS,
+    SYS_EXIT,
+    SYS_GETPID,
+    SYS_SLEEP_TICKS,
+    SYS_SPAWN_PATH,
+    SYS_WAITPID,
+    SYS_YIELD,
     SYS_FS_APPEND,
     SYS_FS_CHILD_COUNT,
     SYS_FS_GET_CHILD_NAME,
@@ -107,6 +114,8 @@ class CLeonOSWineNative:
         no_kbd: bool = False,
         verbose: bool = False,
         top_level: bool = True,
+        pid: int = 0,
+        ppid: int = 0,
     ) -> None:
         self.elf_path = elf_path
         self.rootfs = rootfs
@@ -117,6 +126,10 @@ class CLeonOSWineNative:
         self.no_kbd = no_kbd
         self.verbose = verbose
         self.top_level = top_level
+        self.pid = int(pid)
+        self.ppid = int(ppid)
+        self._exit_requested = False
+        self._exit_status = 0
 
         self.image = self._parse_elf(self.elf_path)
         self.exit_code: Optional[int] = None
@@ -128,6 +141,12 @@ class CLeonOSWineNative:
         self._mapped_ranges: List[Tuple[int, int]] = []
 
     def run(self) -> Optional[int]:
+        if self.pid == 0:
+            self.pid = self.state.alloc_pid(self.ppid)
+
+        prev_pid = self.state.get_current_pid()
+        self.state.set_current_pid(self.pid)
+
         uc = Uc(UC_ARCH_X86, UC_MODE_64)
         self._install_hooks(uc)
         self._load_segments(uc)
@@ -137,24 +156,37 @@ class CLeonOSWineNative:
             self._input_pump = InputPump(self.state)
             self._input_pump.start()
 
+        run_failed = False
+
         try:
             uc.emu_start(self.image.entry, 0)
         except KeyboardInterrupt:
+            run_failed = True
             if self.top_level:
                 print("\n[WINE] interrupted by user", file=sys.stderr)
-            return None
         except UcError as exc:
+            run_failed = True
             if self.verbose or self.top_level:
                 print(f"[WINE][ERROR] runtime crashed: {exc}", file=sys.stderr)
-            return None
         finally:
             if self.top_level and self._input_pump is not None:
                 self._input_pump.stop()
 
+        if run_failed:
+            self.state.mark_exited(self.pid, u64_neg1())
+            self.state.set_current_pid(prev_pid)
+            return None
+
         if self.exit_code is None:
             self.exit_code = self._reg_read(uc, UC_X86_REG_RAX)
 
-        return u64(self.exit_code)
+        if self._exit_requested:
+            self.exit_code = self._exit_status
+
+        self.exit_code = u64(self.exit_code)
+        self.state.mark_exited(self.pid, self.exit_code)
+        self.state.set_current_pid(prev_pid)
+        return self.exit_code
 
     def _install_hooks(self, uc: Uc) -> None:
         uc.hook_add(UC_HOOK_INTR, self._hook_intr)
@@ -212,6 +244,18 @@ class CLeonOSWineNative:
             return self._fs_read(uc, arg0, arg1, arg2)
         if sid == SYS_EXEC_PATH:
             return self._exec_path(uc, arg0)
+        if sid == SYS_SPAWN_PATH:
+            return self._spawn_path(uc, arg0)
+        if sid == SYS_WAITPID:
+            return self._wait_pid(uc, arg0, arg1)
+        if sid == SYS_GETPID:
+            return self.state.get_current_pid()
+        if sid == SYS_EXIT:
+            return self._request_exit(uc, arg0)
+        if sid == SYS_SLEEP_TICKS:
+            return self._sleep_ticks(arg0)
+        if sid == SYS_YIELD:
+            return self._yield_once()
         if sid == SYS_EXEC_REQUESTS:
             return self.state.exec_requests
         if sid == SYS_EXEC_SUCCESS:
@@ -618,6 +662,12 @@ class CLeonOSWineNative:
         return 1 if self._write_guest_bytes(uc, out_ptr, encoded + b"\x00") else 0
 
     def _exec_path(self, uc: Uc, path_ptr: int) -> int:
+        return self._spawn_path_common(uc, path_ptr, return_pid=False)
+
+    def _spawn_path(self, uc: Uc, path_ptr: int) -> int:
+        return self._spawn_path_common(uc, path_ptr, return_pid=True)
+
+    def _spawn_path_common(self, uc: Uc, path_ptr: int, *, return_pid: bool) -> int:
         path = self._read_guest_cstring(uc, path_ptr)
         guest_path = self._normalize_guest_path(path)
         host_path = self._guest_to_host(guest_path, must_exist=True)
@@ -635,6 +685,9 @@ class CLeonOSWineNative:
             self.state.user_launch_fail = u64(self.state.user_launch_fail + 1)
             return u64_neg1()
 
+        parent_pid = self.state.get_current_pid()
+        child_pid = self.state.alloc_pid(parent_pid)
+
         child = CLeonOSWineNative(
             elf_path=host_path,
             rootfs=self.rootfs,
@@ -645,17 +698,56 @@ class CLeonOSWineNative:
             no_kbd=True,
             verbose=self.verbose,
             top_level=False,
+            pid=child_pid,
+            ppid=parent_pid,
         )
         child_ret = child.run()
+
         if child_ret is None:
             self.state.user_launch_fail = u64(self.state.user_launch_fail + 1)
             return u64_neg1()
 
         self.state.exec_success = u64(self.state.exec_success + 1)
         self.state.user_launch_ok = u64(self.state.user_launch_ok + 1)
+
         if guest_path.lower().startswith("/system/"):
             self.state.kelf_runs = u64(self.state.kelf_runs + 1)
+
+        if return_pid:
+            return child_pid
+
         return 0
+
+    def _wait_pid(self, uc: Uc, pid: int, out_ptr: int) -> int:
+        wait_ret, status = self.state.wait_pid(int(pid))
+
+        if wait_ret == 1 and out_ptr != 0:
+            self._write_guest_bytes(uc, out_ptr, struct.pack("<Q", u64(status)))
+
+        return int(wait_ret)
+
+    def _request_exit(self, uc: Uc, status: int) -> int:
+        self._exit_requested = True
+        self._exit_status = u64(status)
+        uc.emu_stop()
+        return 1
+
+    def _sleep_ticks(self, ticks: int) -> int:
+        ticks = int(u64(ticks))
+
+        if ticks == 0:
+            return 0
+
+        start = self.state.timer_ticks()
+
+        while (self.state.timer_ticks() - start) < ticks:
+            time.sleep(0.001)
+
+        return self.state.timer_ticks() - start
+
+    def _yield_once(self) -> int:
+        time.sleep(0)
+        return self.state.timer_ticks()
 
     def _guest_to_host(self, guest_path: str, *, must_exist: bool) -> Optional[Path]:
         norm = self._normalize_guest_path(guest_path)
@@ -782,4 +874,4 @@ def resolve_elf_target(elf_arg: str, rootfs: Path) -> Tuple[Path, str]:
     host_path = _guest_to_host_for_resolve(rootfs, guest_path)
     if host_path is None:
         raise FileNotFoundError(f"ELF not found as host path or guest path: {elf_arg}")
-    return host_path.resolve(), guest_path
+    return host_path.resolve(), guest_path`n

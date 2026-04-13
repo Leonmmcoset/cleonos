@@ -52,7 +52,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 
 - `FS_MKDIR` / `FS_WRITE` / `FS_APPEND` / `FS_REMOVE` 仅允许 `/temp` 树下路径。
 
-## 4. Syscall 列表（0~39）
+## 4. Syscall 列表（0~45）
 
 ### 0 `CLEONOS_SYSCALL_LOG_WRITE`
 
@@ -294,6 +294,50 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - 参数：无
 - 返回：ALT+F1..F4 热键切换计数
 
+### 40 `CLEONOS_SYSCALL_GETPID`
+
+- 参数：无
+- 返回：当前进程 PID（无活动进程时为 `0`）
+
+### 41 `CLEONOS_SYSCALL_SPAWN_PATH`
+
+- 参数：
+- `arg0`: `const char *path`
+- 返回：
+- 成功：子进程 PID
+- 失败：`-1`
+- 说明：当前 Stage27 为同步 spawn（内部会执行完成后再返回 PID）。
+
+### 42 `CLEONOS_SYSCALL_WAITPID`
+
+- 参数：
+- `arg0`: `u64 pid`
+- `arg1`: `u64 *out_status`（可为 `0`）
+- 返回：
+- `-1`：PID 不存在
+- `0`：目标进程仍在运行
+- `1`：目标进程已退出
+- 说明：当返回 `1` 且 `arg1!=0` 时，会写入退出码。
+
+### 43 `CLEONOS_SYSCALL_EXIT`
+
+- 参数：
+- `arg0`: `u64 status`
+- 返回：
+- `1`：已记录退出请求
+- `0`：当前上下文不支持退出请求
+
+### 44 `CLEONOS_SYSCALL_SLEEP_TICKS`
+
+- 参数：
+- `arg0`: `u64 ticks`
+- 返回：实际休眠 tick 数
+
+### 45 `CLEONOS_SYSCALL_YIELD`
+
+- 参数：无
+- 返回：当前 tick
+
 ## 5. 用户态封装函数
 
 用户态封装位于：
@@ -308,9 +352,11 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `cleonos_sys_exec_path()`
 - `cleonos_sys_tty_write()`
 - `cleonos_sys_kbd_get_char()` / `cleonos_sys_kbd_buffered()`
+- `cleonos_sys_getpid()` / `cleonos_sys_spawn_path()` / `cleonos_sys_wait_pid()`
+- `cleonos_sys_exit()` / `cleonos_sys_sleep_ticks()` / `cleonos_sys_yield()`
 
 ## 6. 开发注意事项
 
 - 传入的字符串/缓冲指针目前按“同地址空间可直接访问”模型处理，后续若引入严格用户态地址隔离，需要补充用户内存校验。
 - `FS_READ` 不保证文本终止符；读取文本请预留 1 字节并手动 `buf[n] = '\0'`。
-- `FS_WRITE`/`FS_APPEND` 仅允许 `/temp`，并有单次长度上限。
+- `FS_WRITE`/`FS_APPEND` 仅允许 `/temp`，并有单次长度上限。`n

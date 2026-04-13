@@ -874,4 +874,4 @@ def resolve_elf_target(elf_arg: str, rootfs: Path) -> Tuple[Path, str]:
     host_path = _guest_to_host_for_resolve(rootfs, guest_path)
     if host_path is None:
         raise FileNotFoundError(f"ELF not found as host path or guest path: {elf_arg}")
-    return host_path.resolve(), guest_path`n
+    return host_path.resolve(), guest_path

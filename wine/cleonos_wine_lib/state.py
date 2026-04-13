@@ -128,4 +128,4 @@ class SharedKernelState:
             if status is None:
                 return 0, 0
 
-            return 1, int(status)`n
+            return 1, int(status)

@@ -69,4 +69,4 @@ def page_floor(addr: int) -> int:
 
 
 def page_ceil(addr: int) -> int:
-    return (addr + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1)`n
+    return (addr + PAGE_SIZE - 1) & ~(PAGE_SIZE - 1)

@@ -52,7 +52,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 
 - `FS_MKDIR` / `FS_WRITE` / `FS_APPEND` / `FS_REMOVE` 仅允许 `/temp` 树下路径。
 
-## 4. Syscall 列表（0~45）
+## 4. Syscall 列表（0~47）
 
 ### 0 `CLEONOS_SYSCALL_LOG_WRITE`
 
@@ -209,7 +209,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - 参数：无
 - 返回：
 - 无输入时 `-1`
-- 有输入时返回字符值（低 8 位）
+- 有输入时返回字符值（低 8 位；按当前进程/TTY 上下文读取）
 
 ### 27 `CLEONOS_SYSCALL_FS_STAT_TYPE`
 
@@ -306,7 +306,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - 返回：
 - 成功：子进程 PID
 - 失败：`-1`
-- 说明：当前 Stage27 为同步 spawn（内部会执行完成后再返回 PID）。
+- 说明：当前实现为异步 spawn（进入 pending 队列，后续由调度 tick 派发执行）。
 
 ### 42 `CLEONOS_SYSCALL_WAITPID`
 
@@ -338,6 +338,18 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - 参数：无
 - 返回：当前 tick
 
+### 46 `CLEONOS_SYSCALL_SHUTDOWN`
+
+- 参数：无
+- 返回：理论上不返回；成功路径会触发关机流程（当前 x86_64 走 QEMU/ACPI 关机端口）
+- 说明：若关机流程未生效，内核会进入 halt 循环。
+
+### 47 `CLEONOS_SYSCALL_RESTART`
+
+- 参数：无
+- 返回：理论上不返回；成功路径会触发重启流程（当前 x86_64 走 8042 reset）
+- 说明：若重启流程未生效，内核会进入 halt 循环。
+
 ## 5. 用户态封装函数
 
 用户态封装位于：
@@ -353,10 +365,10 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `cleonos_sys_tty_write()`
 - `cleonos_sys_kbd_get_char()` / `cleonos_sys_kbd_buffered()`
 - `cleonos_sys_getpid()` / `cleonos_sys_spawn_path()` / `cleonos_sys_wait_pid()`
-- `cleonos_sys_exit()` / `cleonos_sys_sleep_ticks()` / `cleonos_sys_yield()`
+- `cleonos_sys_exit()` / `cleonos_sys_sleep_ticks()` / `cleonos_sys_yield()` / `cleonos_sys_shutdown()` / `cleonos_sys_restart()`
 
 ## 6. 开发注意事项
 
 - 传入的字符串/缓冲指针目前按“同地址空间可直接访问”模型处理，后续若引入严格用户态地址隔离，需要补充用户内存校验。
 - `FS_READ` 不保证文本终止符；读取文本请预留 1 字节并手动 `buf[n] = '\0'`。
-- `FS_WRITE`/`FS_APPEND` 仅允许 `/temp`，并有单次长度上限。`n
+- `FS_WRITE`/`FS_APPEND` 仅允许 `/temp`，并有单次长度上限。

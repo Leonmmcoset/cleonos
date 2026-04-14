@@ -192,3 +192,10 @@ u64 cleonos_sys_sleep_ticks(u64 ticks) {
 u64 cleonos_sys_yield(void) {
     return cleonos_syscall(CLEONOS_SYSCALL_YIELD, 0ULL, 0ULL, 0ULL);
 }
+u64 cleonos_sys_shutdown(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_SHUTDOWN, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_restart(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_RESTART, 0ULL, 0ULL, 0ULL);
+}

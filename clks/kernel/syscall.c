@@ -1,3 +1,4 @@
+#include <clks/cpu.h>
 #include <clks/exec.h>
 #include <clks/fs.h>
 #include <clks/heap.h>
@@ -50,6 +51,17 @@ struct clks_syscall_frame {
 static clks_bool clks_syscall_ready = CLKS_FALSE;
 static clks_bool clks_syscall_user_trace_active = CLKS_FALSE;
 static u64 clks_syscall_user_trace_budget = 0ULL;
+
+#if defined(CLKS_ARCH_X86_64)
+static inline void clks_syscall_outb(u16 port, u8 value) {
+    __asm__ volatile("outb %0, %1" : : "a"(value), "Nd"(port));
+}
+
+static inline void clks_syscall_outw(u16 port, u16 value) {
+    __asm__ volatile("outw %0, %1" : : "a"(value), "Nd"(port));
+}
+#endif
+
 
 static clks_bool clks_syscall_copy_user_string(u64 src_addr, char *dst, usize dst_size) {
     const char *src = (const char *)src_addr;
@@ -246,6 +258,27 @@ static u64 clks_syscall_sleep_ticks(u64 arg0) {
 static u64 clks_syscall_yield(void) {
     return clks_exec_yield();
 }
+
+static u64 clks_syscall_shutdown(void) {
+    clks_log(CLKS_LOG_WARN, "SYSCALL", "SHUTDOWN REQUESTED BY USERLAND");
+    clks_serial_write("[WARN][SYSCALL] SHUTDOWN REQUESTED\n");
+#if defined(CLKS_ARCH_X86_64)
+    clks_syscall_outw(0x604U, 0x2000U);
+#endif
+    clks_cpu_halt_forever();
+    return 1ULL;
+}
+
+static u64 clks_syscall_restart(void) {
+    clks_log(CLKS_LOG_WARN, "SYSCALL", "RESTART REQUESTED BY USERLAND");
+    clks_serial_write("[WARN][SYSCALL] RESTART REQUESTED\n");
+#if defined(CLKS_ARCH_X86_64)
+    clks_syscall_outb(0x64U, 0xFEU);
+#endif
+    clks_cpu_halt_forever();
+    return 1ULL;
+}
+
 
 static u64 clks_syscall_fs_stat_type(u64 arg0) {
     char path[CLKS_SYSCALL_PATH_MAX];
@@ -545,6 +578,10 @@ u64 clks_syscall_dispatch(void *frame_ptr) {
             return clks_syscall_sleep_ticks(frame->rbx);
         case CLKS_SYSCALL_YIELD:
             return clks_syscall_yield();
+        case CLKS_SYSCALL_SHUTDOWN:
+            return clks_syscall_shutdown();
+        case CLKS_SYSCALL_RESTART:
+            return clks_syscall_restart();
         default:
             return (u64)-1;
     }

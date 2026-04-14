@@ -49,6 +49,8 @@
 #define CLKS_SYSCALL_EXIT                43ULL
 #define CLKS_SYSCALL_SLEEP_TICKS         44ULL
 #define CLKS_SYSCALL_YIELD               45ULL
+#define CLKS_SYSCALL_SHUTDOWN            46ULL
+#define CLKS_SYSCALL_RESTART             47ULL
 
 void clks_syscall_init(void);
 u64 clks_syscall_dispatch(void *frame_ptr);

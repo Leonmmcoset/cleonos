@@ -54,6 +54,8 @@ SYS_WAITPID = 42
 SYS_EXIT = 43
 SYS_SLEEP_TICKS = 44
 SYS_YIELD = 45
+SYS_SHUTDOWN = 46
+SYS_RESTART = 47
 
 
 def u64(value: int) -> int:

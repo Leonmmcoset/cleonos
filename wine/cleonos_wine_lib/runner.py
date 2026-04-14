@@ -25,6 +25,8 @@ from .constants import (
     SYS_SPAWN_PATH,
     SYS_WAITPID,
     SYS_YIELD,
+    SYS_SHUTDOWN,
+    SYS_RESTART,
     SYS_FS_APPEND,
     SYS_FS_CHILD_COUNT,
     SYS_FS_GET_CHILD_NAME,
@@ -256,6 +258,16 @@ class CLeonOSWineNative:
             return self._sleep_ticks(arg0)
         if sid == SYS_YIELD:
             return self._yield_once()
+        if sid == SYS_SHUTDOWN:
+            self._host_write("\n[WINE] shutdown requested by guest\n")
+            self._exit_requested = True
+            self._exit_status = 0
+            return 1
+        if sid == SYS_RESTART:
+            self._host_write("\n[WINE] restart requested by guest\n")
+            self._exit_requested = True
+            self._exit_status = 0
+            return 1
         if sid == SYS_EXEC_REQUESTS:
             return self.state.exec_requests
         if sid == SYS_EXEC_SUCCESS:

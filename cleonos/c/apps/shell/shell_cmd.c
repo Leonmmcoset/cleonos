@@ -132,6 +132,7 @@ static int ush_cmd_help(void) {
     ush_writeln("  wait <pid>");
     ush_writeln("  sleep <ticks>");
     ush_writeln("  yield");
+    ush_writeln("  shutdown / restart");
     ush_writeln("  exit [code]");
     ush_writeln("  rusttest / panic / elfloader (kernel shell only)");
     ush_writeln("edit keys: Left/Right, Home/End, Up/Down history");
@@ -373,6 +374,19 @@ static int ush_cmd_sleep(const char *arg) {
 
 static int ush_cmd_yield(void) {
     ush_print_kv_hex("YIELD_TICK", cleonos_sys_yield());
+    return 1;
+}
+
+
+static int ush_cmd_shutdown(void) {
+    ush_writeln("shutdown: powering off...");
+    (void)cleonos_sys_shutdown();
+    return 1;
+}
+
+static int ush_cmd_restart(void) {
+    ush_writeln("restart: rebooting...");
+    (void)cleonos_sys_restart();
     return 1;
 }
 
@@ -874,6 +888,10 @@ void ush_execute_line(ush_state *sh, const char *line) {
         success = ush_cmd_sleep(arg);
     } else if (ush_streq(cmd, "yield") != 0) {
         success = ush_cmd_yield();
+    } else if (ush_streq(cmd, "shutdown") != 0 || ush_streq(cmd, "poweroff") != 0) {
+        success = ush_cmd_shutdown();
+    } else if (ush_streq(cmd, "restart") != 0 || ush_streq(cmd, "reboot") != 0) {
+        success = ush_cmd_restart();
     } else if (ush_streq(cmd, "exit") != 0) {
         success = ush_cmd_exit(sh, arg);
     } else if (ush_streq(cmd, "clear") != 0 || ush_streq(cmd, "cls") != 0) {

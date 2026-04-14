@@ -15,6 +15,7 @@ void clks_keyboard_init(void);
 void clks_keyboard_handle_scancode(u8 scancode);
 u64 clks_keyboard_hotkey_switch_count(void);
 clks_bool clks_keyboard_pop_char(char *out_ch);
+clks_bool clks_keyboard_pop_char_for_tty(u32 tty_index, char *out_ch);
 u64 clks_keyboard_buffered_count(void);
 u64 clks_keyboard_drop_count(void);
 u64 clks_keyboard_push_count(void);

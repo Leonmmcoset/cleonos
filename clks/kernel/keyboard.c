@@ -23,6 +23,7 @@
 #define CLKS_SC_EXT_DELETE       0x53U
 
 #define CLKS_KBD_INPUT_CAP       256U
+#define CLKS_KBD_TTY_MAX         8U
 #define CLKS_KBD_DROP_LOG_EVERY  64ULL
 
 static const char clks_kbd_map[128] = {
@@ -47,10 +48,10 @@ static const char clks_kbd_shift_map[128] = {
     [51] = '<', [52] = '>', [53] = '?', [57] = ' '
 };
 
-static char clks_kbd_input_queue[CLKS_KBD_INPUT_CAP];
-static u16 clks_kbd_input_head = 0U;
-static u16 clks_kbd_input_tail = 0U;
-static u16 clks_kbd_input_count = 0U;
+static char clks_kbd_input_queue[CLKS_KBD_TTY_MAX][CLKS_KBD_INPUT_CAP];
+static u16 clks_kbd_input_head[CLKS_KBD_TTY_MAX];
+static u16 clks_kbd_input_tail[CLKS_KBD_TTY_MAX];
+static u16 clks_kbd_input_count[CLKS_KBD_TTY_MAX];
 
 static clks_bool clks_kbd_alt_down = CLKS_FALSE;
 static clks_bool clks_kbd_lshift_down = CLKS_FALSE;
@@ -61,6 +62,30 @@ static u64 clks_kbd_hotkey_switches = 0ULL;
 static u64 clks_kbd_push_count = 0ULL;
 static u64 clks_kbd_pop_count = 0ULL;
 static u64 clks_kbd_drop_count = 0ULL;
+
+static u32 clks_keyboard_effective_tty_count(void) {
+    u32 tty_count = clks_tty_count();
+
+    if (tty_count == 0U) {
+        return 1U;
+    }
+
+    if (tty_count > CLKS_KBD_TTY_MAX) {
+        return CLKS_KBD_TTY_MAX;
+    }
+
+    return tty_count;
+}
+
+static u32 clks_keyboard_clamp_tty_index(u32 tty_index) {
+    u32 tty_count = clks_keyboard_effective_tty_count();
+
+    if (tty_index >= tty_count) {
+        return 0U;
+    }
+
+    return tty_index;
+}
 
 static char clks_keyboard_translate_ext_scancode(u8 code) {
     switch (code) {
@@ -83,21 +108,24 @@ static char clks_keyboard_translate_ext_scancode(u8 code) {
     }
 }
 
-static clks_bool clks_keyboard_queue_push(char ch) {
-    if (clks_kbd_input_count >= CLKS_KBD_INPUT_CAP) {
+static clks_bool clks_keyboard_queue_push_for_tty(u32 tty_index, char ch) {
+    u32 tty = clks_keyboard_clamp_tty_index(tty_index);
+
+    if (clks_kbd_input_count[tty] >= CLKS_KBD_INPUT_CAP) {
         clks_kbd_drop_count++;
 
         if ((clks_kbd_drop_count % CLKS_KBD_DROP_LOG_EVERY) == 1ULL) {
             clks_log(CLKS_LOG_WARN, "KBD", "INPUT QUEUE OVERFLOW");
+            clks_log_hex(CLKS_LOG_WARN, "KBD", "TTY", (u64)tty);
             clks_log_hex(CLKS_LOG_WARN, "KBD", "DROPPED", clks_kbd_drop_count);
         }
 
         return CLKS_FALSE;
     }
 
-    clks_kbd_input_queue[clks_kbd_input_head] = ch;
-    clks_kbd_input_head = (u16)((clks_kbd_input_head + 1U) % CLKS_KBD_INPUT_CAP);
-    clks_kbd_input_count++;
+    clks_kbd_input_queue[tty][clks_kbd_input_head[tty]] = ch;
+    clks_kbd_input_head[tty] = (u16)((clks_kbd_input_head[tty] + 1U) % CLKS_KBD_INPUT_CAP);
+    clks_kbd_input_count[tty]++;
     clks_kbd_push_count++;
     return CLKS_TRUE;
 }
@@ -131,9 +159,14 @@ static char clks_keyboard_translate_scancode(u8 code) {
 }
 
 void clks_keyboard_init(void) {
-    clks_kbd_input_head = 0U;
-    clks_kbd_input_tail = 0U;
-    clks_kbd_input_count = 0U;
+    u32 tty;
+
+    for (tty = 0U; tty < CLKS_KBD_TTY_MAX; tty++) {
+        clks_kbd_input_head[tty] = 0U;
+        clks_kbd_input_tail[tty] = 0U;
+        clks_kbd_input_count[tty] = 0U;
+    }
+
     clks_kbd_alt_down = CLKS_FALSE;
     clks_kbd_lshift_down = CLKS_FALSE;
     clks_kbd_rshift_down = CLKS_FALSE;
@@ -184,10 +217,13 @@ void clks_keyboard_handle_scancode(u8 scancode) {
 
     if (clks_kbd_e0_prefix == CLKS_TRUE) {
         char ext = clks_keyboard_translate_ext_scancode(code);
+        u32 active_tty = clks_tty_active();
+
         clks_kbd_e0_prefix = CLKS_FALSE;
 
-        if (ext != '\0' && clks_keyboard_shell_input_enabled() == CLKS_TRUE) {
-            if (clks_keyboard_queue_push(ext) == CLKS_TRUE && clks_keyboard_should_pump_shell_now() == CLKS_TRUE) {
+        if (ext != '\0') {
+            if (clks_keyboard_queue_push_for_tty(active_tty, ext) == CLKS_TRUE &&
+                clks_keyboard_should_pump_shell_now() == CLKS_TRUE) {
                 clks_shell_pump_input(1U);
             }
         }
@@ -215,9 +251,11 @@ void clks_keyboard_handle_scancode(u8 scancode) {
 
     {
         char translated = clks_keyboard_translate_scancode(code);
+        u32 active_tty = clks_tty_active();
 
-        if (translated != '\0' && clks_keyboard_shell_input_enabled() == CLKS_TRUE) {
-            if (clks_keyboard_queue_push(translated) == CLKS_TRUE && clks_keyboard_should_pump_shell_now() == CLKS_TRUE) {
+        if (translated != '\0') {
+            if (clks_keyboard_queue_push_for_tty(active_tty, translated) == CLKS_TRUE &&
+                clks_keyboard_should_pump_shell_now() == CLKS_TRUE) {
                 clks_shell_pump_input(1U);
             }
         }
@@ -228,20 +266,33 @@ u64 clks_keyboard_hotkey_switch_count(void) {
     return clks_kbd_hotkey_switches;
 }
 
-clks_bool clks_keyboard_pop_char(char *out_ch) {
-    if (out_ch == CLKS_NULL || clks_kbd_input_count == 0U) {
+clks_bool clks_keyboard_pop_char_for_tty(u32 tty_index, char *out_ch) {
+    u32 tty = clks_keyboard_clamp_tty_index(tty_index);
+
+    if (out_ch == CLKS_NULL || clks_kbd_input_count[tty] == 0U) {
         return CLKS_FALSE;
     }
 
-    *out_ch = clks_kbd_input_queue[clks_kbd_input_tail];
-    clks_kbd_input_tail = (u16)((clks_kbd_input_tail + 1U) % CLKS_KBD_INPUT_CAP);
-    clks_kbd_input_count--;
+    *out_ch = clks_kbd_input_queue[tty][clks_kbd_input_tail[tty]];
+    clks_kbd_input_tail[tty] = (u16)((clks_kbd_input_tail[tty] + 1U) % CLKS_KBD_INPUT_CAP);
+    clks_kbd_input_count[tty]--;
     clks_kbd_pop_count++;
     return CLKS_TRUE;
 }
 
+clks_bool clks_keyboard_pop_char(char *out_ch) {
+    return clks_keyboard_pop_char_for_tty(clks_tty_active(), out_ch);
+}
+
 u64 clks_keyboard_buffered_count(void) {
-    return (u64)clks_kbd_input_count;
+    u64 total = 0ULL;
+    u32 tty;
+
+    for (tty = 0U; tty < CLKS_KBD_TTY_MAX; tty++) {
+        total += (u64)clks_kbd_input_count[tty];
+    }
+
+    return total;
 }
 
 u64 clks_keyboard_drop_count(void) {
@@ -255,4 +306,3 @@ u64 clks_keyboard_push_count(void) {
 u64 clks_keyboard_pop_count(void) {
     return clks_kbd_pop_count;
 }
-

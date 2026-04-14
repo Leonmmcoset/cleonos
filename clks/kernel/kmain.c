@@ -100,7 +100,7 @@ void clks_kernel_main(void) {
         clks_tty_init();
     }
 
-    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS Stage28 START");
+    clks_log(CLKS_LOG_INFO, "BOOT", "CLEONOS Stage29 START");
 
     if (boot_fb == CLKS_NULL) {
         clks_log(CLKS_LOG_WARN, "VIDEO", "NO FRAMEBUFFER FROM LIMINE");

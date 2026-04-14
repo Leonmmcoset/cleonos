@@ -9,6 +9,7 @@ clks_bool clks_exec_spawn_path(const char *path, u64 *out_pid);
 u64 clks_exec_wait_pid(u64 pid, u64 *out_status);
 clks_bool clks_exec_request_exit(u64 status);
 u64 clks_exec_current_pid(void);
+u32 clks_exec_current_tty(void);
 u64 clks_exec_sleep_ticks(u64 ticks);
 u64 clks_exec_yield(void);
 void clks_exec_tick(u64 tick);

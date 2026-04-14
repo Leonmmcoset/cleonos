@@ -128,8 +128,9 @@ static u64 clks_syscall_tty_write_char(u64 arg0) {
 
 static u64 clks_syscall_kbd_get_char(void) {
     char ch;
+    u32 tty_index = clks_exec_current_tty();
 
-    if (clks_keyboard_pop_char(&ch) == CLKS_FALSE) {
+    if (clks_keyboard_pop_char_for_tty(tty_index, &ch) == CLKS_FALSE) {
         return (u64)-1;
     }
 

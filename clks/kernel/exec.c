@@ -7,6 +7,7 @@
 #include <clks/log.h>
 #include <clks/string.h>
 #include <clks/types.h>
+#include <clks/tty.h>
 
 typedef u64 (*clks_exec_entry_fn)(void);
 
@@ -30,6 +31,7 @@ struct clks_exec_proc_record {
     u64 started_tick;
     u64 exited_tick;
     u64 exit_status;
+    u32 tty_index;
     char path[CLKS_EXEC_PATH_MAX];
 };
 
@@ -206,6 +208,7 @@ static struct clks_exec_proc_record *clks_exec_prepare_proc_record(i32 slot,
     proc->started_tick = 0ULL;
     proc->exited_tick = 0ULL;
     proc->exit_status = (u64)-1;
+    proc->tty_index = clks_tty_active();
     clks_exec_copy_path(proc->path, sizeof(proc->path), path);
     return proc;
 }
@@ -581,6 +584,36 @@ u64 clks_exec_current_pid(void) {
     }
 
     return clks_exec_pid_stack[(u32)depth_index];
+}
+
+u32 clks_exec_current_tty(void) {
+    i32 depth_index = clks_exec_current_depth_index();
+    u32 tty_count = clks_tty_count();
+    i32 slot;
+    const struct clks_exec_proc_record *proc;
+
+    if (tty_count == 0U) {
+        return 0U;
+    }
+
+    if (depth_index < 0) {
+        u32 active = clks_tty_active();
+        return (active < tty_count) ? active : 0U;
+    }
+
+    slot = clks_exec_proc_find_slot_by_pid(clks_exec_pid_stack[(u32)depth_index]);
+
+    if (slot < 0) {
+        return 0U;
+    }
+
+    proc = &clks_exec_proc_table[(u32)slot];
+
+    if (proc->used == CLKS_FALSE || proc->tty_index >= tty_count) {
+        return 0U;
+    }
+
+    return proc->tty_index;
 }
 
 u64 clks_exec_sleep_ticks(u64 ticks) {

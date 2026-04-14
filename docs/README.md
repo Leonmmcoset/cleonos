@@ -25,6 +25,7 @@
 - `stage26.md`
 - `stage27.md`
 - `stage28.md`
+- `stage29.md`
 
 - `syscall.md` (syscall ABI reference)
 

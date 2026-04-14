@@ -1,0 +1,56 @@
+name: Build CLeonOS
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-os:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            tar \
+            xorriso \
+            clang \
+            lld \
+            llvm \
+            autoconf \
+            automake \
+            libtool \
+            pkg-config \
+            nasm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Configure
+        run: |
+          cmake -S . -B build-cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DNO_COLOR=1 \
+            -DLIMINE_REPO=https://github.com/limine-bootloader/limine.git
+
+      - name: Build ISO
+        run: cmake --build build-cmake --target iso -- -j"$(nproc)"
+
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleonos-iso
+          path: build/CLeonOS-x86_64.iso
+          if-no-files-found: error

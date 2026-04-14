@@ -66,6 +66,7 @@ static void clks_task_kelfd(u64 tick) {
 
 static void clks_task_usrd(u64 tick) {
     clks_service_heartbeat(CLKS_SERVICE_USER, tick);
+    clks_exec_tick(tick);
     clks_userland_tick(tick);
     clks_desktop_tick(tick);
     clks_tty_tick(tick);

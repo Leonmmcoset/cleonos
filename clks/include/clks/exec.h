@@ -11,6 +11,7 @@ clks_bool clks_exec_request_exit(u64 status);
 u64 clks_exec_current_pid(void);
 u64 clks_exec_sleep_ticks(u64 ticks);
 u64 clks_exec_yield(void);
+void clks_exec_tick(u64 tick);
 u64 clks_exec_request_count(void);
 u64 clks_exec_success_count(void);
 clks_bool clks_exec_is_running(void);

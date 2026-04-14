@@ -1,0 +1,157 @@
+Date : 2026-04-14 20:12:49
+Directory : d:\Projects\C\cleonos
+Total : 98 files,  6203 codes, 2 comments, 1653 blanks, all 7858 lines
+
+Languages
++------------------+------------+------------+------------+------------+------------+
+| language         | files      | code       | comment    | blank      | total      |
++------------------+------------+------------+------------+------------+------------+
+| C                |         59 |      4,091 |          0 |      1,166 |      5,257 |
+| Python           |          8 |      1,090 |          2 |        209 |      1,301 |
+| Markdown         |         11 |        636 |          0 |        195 |        831 |
+| C++              |         14 |        206 |          0 |         37 |        243 |
+| PowerShell       |          1 |        107 |          0 |         24 |        131 |
+| CMake            |          1 |         44 |          0 |          9 |         53 |
+| Rust             |          1 |         21 |          0 |          6 |         27 |
+| Go Assembly      |          1 |         14 |          0 |          6 |         20 |
+| pip requirements |          1 |          1 |          0 |          1 |          2 |
+| Batch            |          1 |         -7 |          0 |          0 |         -7 |
++------------------+------------+------------+------------+------------+------------+
+
+Directories
++-------------------------------------------------------------+------------+------------+------------+------------+------------+
+| path                                                        | files      | code       | comment    | blank      | total      |
++-------------------------------------------------------------+------------+------------+------------+------------+------------+
+| .                                                           |         98 |      6,203 |          2 |      1,653 |      7,858 |
+| . (Files)                                                   |          1 |         44 |          0 |          9 |         53 |
+| cleonos                                                     |         44 |      1,596 |          0 |        473 |      2,069 |
+| cleonos\c                                                   |         44 |      1,596 |          0 |        473 |      2,069 |
+| cleonos\c\apps                                              |         41 |      1,494 |          0 |        452 |      1,946 |
+| cleonos\c\apps (Files)                                      |         34 |       -243 |          0 |        -20 |       -263 |
+| cleonos\c\apps\shell                                        |          7 |      1,737 |          0 |        472 |      2,209 |
+| cleonos\c\include                                           |          1 |         42 |          0 |          1 |         43 |
+| cleonos\c\src                                               |          2 |         60 |          0 |         20 |         80 |
+| clks                                                        |         31 |      2,736 |          0 |        742 |      3,478 |
+| clks\arch                                                   |          1 |         14 |          0 |          6 |         20 |
+| clks\arch\x86_64                                            |          1 |         14 |          0 |          6 |         20 |
+| clks\drivers                                                |          3 |        140 |          0 |         44 |        184 |
+| clks\drivers\video                                          |          3 |        140 |          0 |         44 |        184 |
+| clks\include                                                |         11 |         79 |          0 |         16 |         95 |
+| clks\include\clks                                           |         11 |         79 |          0 |         16 |         95 |
+| clks\kernel                                                 |         14 |      2,457 |          0 |        663 |      3,120 |
+| clks\lib                                                    |          1 |         25 |          0 |          7 |         32 |
+| clks\rust                                                   |          1 |         21 |          0 |          6 |         27 |
+| clks\rust\src                                               |          1 |         21 |          0 |          6 |         27 |
+| docs                                                        |         10 |        599 |          0 |        181 |        780 |
+| ramdisk                                                     |          1 |         -7 |          0 |          0 |         -7 |
+| ramdisk\shell                                               |          1 |         -7 |          0 |          0 |         -7 |
+| scripts                                                     |          1 |        107 |          0 |         24 |        131 |
+| wine                                                        |         10 |      1,128 |          2 |        224 |      1,354 |
+| wine (Files)                                                |          3 |         41 |          1 |         18 |         60 |
+| wine\cleonos_wine_lib                                       |          7 |      1,087 |          1 |        206 |      1,294 |
++-------------------------------------------------------------+------------+------------+------------+------------+------------+
+
+Files
++-------------------------------------------------------------+------------------+------------+------------+------------+------------+
+| filename                                                    | language         | code       | comment    | blank      | total      |
++-------------------------------------------------------------+------------------+------------+------------+------------+------------+
+| d:\Projects\C\cleonos\CMakeLists.txt                        | CMake            |         44 |          0 |          9 |         53 |
+| d:\Projects\C\cleonos\cleonos\c\apps\ansi_main.c            | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\append_main.c          | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\cat_main.c             | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\cd_main.c              | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\clear_main.c           | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\cp_main.c              | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\dmesg_main.c           | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\exec_main.c            | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\exit_main.c            | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\fsstat_main.c          | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\hello_main.c           | C                |          6 |          0 |          2 |          8 |
+| d:\Projects\C\cleonos\cleonos\c\apps\help_main.c            | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\kbdstat_main.c         | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\ls_main.c              | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\memstat_main.c         | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\mkdir_main.c           | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\mv_main.c              | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\pid_main.c             | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\pwd_main.c             | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\restart_main.c         | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\rm_main.c              | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\shell\shell_cmd.c      | C                |        776 |          0 |        182 |        958 |
+| d:\Projects\C\cleonos\cleonos\c\apps\shell\shell_external.c | C                |        223 |          0 |         75 |        298 |
+| d:\Projects\C\cleonos\cleonos\c\apps\shell\shell_input.c    | C                |        255 |          0 |         68 |        323 |
+| d:\Projects\C\cleonos\cleonos\c\apps\shell\shell_internal.h | C++              |         84 |          0 |         19 |        103 |
+| d:\Projects\C\cleonos\cleonos\c\apps\shell\shell_path.c     | C                |        153 |          0 |         50 |        203 |
+| d:\Projects\C\cleonos\cleonos\c\apps\shell\shell_script.c   | C                |         35 |          0 |         12 |         47 |
+| d:\Projects\C\cleonos\cleonos\c\apps\shell\shell_util.c     | C                |        211 |          0 |         66 |        277 |
+| d:\Projects\C\cleonos\cleonos\c\apps\shell_main.c           | C                |       -377 |          0 |       -118 |       -495 |
+| d:\Projects\C\cleonos\cleonos\c\apps\shstat_main.c          | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\shutdown_main.c        | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\sleep_main.c           | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\spawn_main.c           | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\stats_main.c           | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\taskstat_main.c        | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\touch_main.c           | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\tty_main.c             | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\userstat_main.c        | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\wait_main.c            | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\write_main.c           | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\apps\yield_main.c           | C                |          4 |          0 |          3 |          7 |
+| d:\Projects\C\cleonos\cleonos\c\include\cleonos_syscall.h   | C++              |         42 |          0 |          1 |         43 |
+| d:\Projects\C\cleonos\cleonos\c\src\runtime.c               | C                |         -3 |          0 |         -1 |         -4 |
+| d:\Projects\C\cleonos\cleonos\c\src\syscall.c               | C                |         63 |          0 |         21 |         84 |
+| d:\Projects\C\cleonos\clks\arch\x86_64\exec_stack_call.S    | Go Assembly      |         14 |          0 |          6 |         20 |
+| d:\Projects\C\cleonos\clks\drivers\video\framebuffer.c      | C                |         68 |          0 |         22 |         90 |
+| d:\Projects\C\cleonos\clks\drivers\video\psf_font.c         | C                |         71 |          0 |         21 |         92 |
+| d:\Projects\C\cleonos\clks\drivers\video\psf_font.h         | C++              |          1 |          0 |          1 |          2 |
+| d:\Projects\C\cleonos\clks\include\clks\desktop.h           | C++              |          7 |          0 |          4 |         11 |
+| d:\Projects\C\cleonos\clks\include\clks\elf64.h             | C++              |          5 |          0 |          1 |          6 |
+| d:\Projects\C\cleonos\clks\include\clks\exec.h              | C++              |         10 |          0 |          1 |         11 |
+| d:\Projects\C\cleonos\clks\include\clks\framebuffer.h       | C++              |          3 |          0 |          1 |          4 |
+| d:\Projects\C\cleonos\clks\include\clks\keyboard.h          | C++              |          1 |          0 |          0 |          1 |
+| d:\Projects\C\cleonos\clks\include\clks\log.h               | C++              |          2 |          0 |          1 |          3 |
+| d:\Projects\C\cleonos\clks\include\clks\mouse.h             | C++              |         20 |          0 |          6 |         26 |
+| d:\Projects\C\cleonos\clks\include\clks\panic.h             | C++              |          7 |          0 |          3 |         10 |
+| d:\Projects\C\cleonos\clks\include\clks\syscall.h           | C++              |         21 |          0 |          0 |         21 |
+| d:\Projects\C\cleonos\clks\include\clks\tty.h               | C++              |          2 |          0 |         -1 |          1 |
+| d:\Projects\C\cleonos\clks\include\clks\userland.h          | C++              |          1 |          0 |          0 |          1 |
+| d:\Projects\C\cleonos\clks\kernel\desktop.c                 | C                |        321 |          0 |         86 |        407 |
+| d:\Projects\C\cleonos\clks\kernel\elf64.c                   | C                |         69 |          0 |         21 |         90 |
+| d:\Projects\C\cleonos\clks\kernel\exec.c                    | C                |        504 |          0 |        151 |        655 |
+| d:\Projects\C\cleonos\clks\kernel\interrupts.c              | C                |          4 |          0 |          0 |          4 |
+| d:\Projects\C\cleonos\clks\kernel\keyboard.c                | C                |         60 |          0 |         22 |         82 |
+| d:\Projects\C\cleonos\clks\kernel\kmain.c                   | C                |         18 |          0 |          2 |         20 |
+| d:\Projects\C\cleonos\clks\kernel\log.c                     | C                |         44 |          0 |         16 |         60 |
+| d:\Projects\C\cleonos\clks\kernel\mouse.c                   | C                |        246 |          0 |         63 |        309 |
+| d:\Projects\C\cleonos\clks\kernel\panic.c                   | C                |        179 |          0 |         60 |        239 |
+| d:\Projects\C\cleonos\clks\kernel\scheduler.c               | C                |          9 |          0 |          2 |         11 |
+| d:\Projects\C\cleonos\clks\kernel\shell.c                   | C                |        389 |          0 |         87 |        476 |
+| d:\Projects\C\cleonos\clks\kernel\syscall.c                 | C                |        249 |          0 |         60 |        309 |
+| d:\Projects\C\cleonos\clks\kernel\tty.c                     | C                |        354 |          0 |         90 |        444 |
+| d:\Projects\C\cleonos\clks\kernel\userland.c                | C                |         11 |          0 |          3 |         14 |
+| d:\Projects\C\cleonos\clks\lib\libc_compat.c                | C                |         25 |          0 |          7 |         32 |
+| d:\Projects\C\cleonos\clks\rust\src\lib.rs                  | Rust             |         21 |          0 |          6 |         27 |
+| d:\Projects\C\cleonos\docs\README.md                        | Markdown         |          9 |          0 |          2 |         11 |
+| d:\Projects\C\cleonos\docs\stage22.md                       | Markdown         |         68 |          0 |          7 |         75 |
+| d:\Projects\C\cleonos\docs\stage23.md                       | Markdown         |         41 |          0 |          6 |         47 |
+| d:\Projects\C\cleonos\docs\stage24.md                       | Markdown         |         42 |          0 |          7 |         49 |
+| d:\Projects\C\cleonos\docs\stage25.md                       | Markdown         |         58 |          0 |          7 |         65 |
+| d:\Projects\C\cleonos\docs\stage26.md                       | Markdown         |         32 |          0 |          7 |         39 |
+| d:\Projects\C\cleonos\docs\stage27.md                       | Markdown         |         28 |          0 |          7 |         35 |
+| d:\Projects\C\cleonos\docs\stage28.md                       | Markdown         |         37 |          0 |          7 |         44 |
+| d:\Projects\C\cleonos\docs\stage29.md                       | Markdown         |         33 |          0 |          7 |         40 |
+| d:\Projects\C\cleonos\docs\syscall.md                       | Markdown         |        251 |          0 |        124 |        375 |
+| d:\Projects\C\cleonos\ramdisk\shell\init.cmd                | Batch            |         -7 |          0 |          0 |         -7 |
+| d:\Projects\C\cleonos\scripts\gen-tty-psf.ps1               | PowerShell       |        107 |          0 |         24 |        131 |
+| d:\Projects\C\cleonos\wine\README.md                        | Markdown         |         37 |          0 |         14 |         51 |
+| d:\Projects\C\cleonos\wine\cleonos_wine.py                  | Python           |          3 |          1 |          3 |          7 |
+| d:\Projects\C\cleonos\wine\cleonos_wine_lib\__init__.py     | Python           |          4 |          0 |          1 |          5 |
+| d:\Projects\C\cleonos\wine\cleonos_wine_lib\cli.py          | Python           |         44 |          0 |         10 |         54 |
+| d:\Projects\C\cleonos\wine\cleonos_wine_lib\constants.py    | Python           |         63 |          1 |         10 |         74 |
+| d:\Projects\C\cleonos\wine\cleonos_wine_lib\input_pump.py   | Python           |         82 |          0 |         17 |         99 |
+| d:\Projects\C\cleonos\wine\cleonos_wine_lib\platform.py     | Python           |         37 |          0 |          4 |         41 |
+| d:\Projects\C\cleonos\wine\cleonos_wine_lib\runner.py       | Python           |        753 |          0 |        137 |        890 |
+| d:\Projects\C\cleonos\wine\cleonos_wine_lib\state.py        | Python           |        104 |          0 |         27 |        131 |
+| d:\Projects\C\cleonos\wine\requirements.txt                 | pip requirements |          1 |          0 |          1 |          2 |
+| Total                                                       |                  |      6,203 |          2 |      1,653 |      7,858 |
++-------------------------------------------------------------+------------------+------------+------------+------------+------------+

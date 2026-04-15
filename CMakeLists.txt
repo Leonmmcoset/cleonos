@@ -349,7 +349,7 @@ set(RAMDISK_ROOT_APPS)
 
 set(USER_SHELL_COMMAND_APPS
     help ls cat pwd cd exec pid spawn wait sleep yield
-    shutdown restart exit clear ansi ansitest memstat fsstat taskstat userstat
+    shutdown restart exit clear ansi ansitest fastfetch memstat fsstat taskstat userstat
     shstat stats tty dmesg kbdstat mkdir touch write append cp mv grep rm
 )
 

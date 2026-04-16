@@ -123,113 +123,1508 @@ static int ush_split_two_args(const char *arg,
     return (out_first[0] != '\0' && out_second[0] != '\0') ? 1 : 0;
 }
 
-#include "cmd/help.inc"
+static int ush_cmd_help(void) {
+    ush_writeln("commands:");
+    ush_writeln("  help");
+    ush_writeln("  ls [-l] [-R] [path]");
+    ush_writeln("  cat [file]        (reads pipeline input when file omitted)");
+    ush_writeln("  grep [-n] <pattern> [file]");
+    ush_writeln("  pwd");
+    ush_writeln("  cd [dir]");
+    ush_writeln("  exec|run <path|name>");
+    ush_writeln("  clear");
+    ush_writeln("  ansi / ansitest / color");
+    ush_writeln("  fastfetch [--plain]");
+    ush_writeln("  memstat / fsstat / taskstat / userstat / shstat / stats");
+    ush_writeln("  tty [index]");
+    ush_writeln("  dmesg [n]");
+    ush_writeln("  kbdstat");
+    ush_writeln("  mkdir <dir>      (/temp only)");
+    ush_writeln("  touch <file>     (/temp only)");
+    ush_writeln("  write <file> <text>   (/temp only, or from pipeline)");
+    ush_writeln("  append <file> <text>  (/temp only, or from pipeline)");
+    ush_writeln("  cp <src> <dst>   (dst /temp only)");
+    ush_writeln("  mv <src> <dst>   (/temp only)");
+    ush_writeln("  rm <path>        (/temp only)");
+    ush_writeln("  pid");
+    ush_writeln("  spawn <path|name>");
+    ush_writeln("  wait <pid>");
+    ush_writeln("  sleep <ticks>");
+    ush_writeln("  yield");
+    ush_writeln("  shutdown / restart");
+    ush_writeln("  exit [code]");
+    ush_writeln("  rusttest / panic / elfloader (kernel shell only)");
+    ush_writeln("pipeline/redirection: cmd1 | cmd2 | cmd3 > /temp/out.txt");
+    ush_writeln("redirection append:   cmd >> /temp/out.txt");
+    ush_writeln("edit keys: Left/Right, Home/End, Up/Down history");
+    return 1;
+}
 
-#include "cmd/ls_join_path.inc"
+static int ush_ls_join_path(const char *dir_path, const char *name, char *out_path, u64 out_size) {
+    u64 p = 0ULL;
+    u64 i;
 
-#include "cmd/ls_basename.inc"
+    if (dir_path == (const char *)0 || name == (const char *)0 || out_path == (char *)0 || out_size == 0ULL) {
+        return 0;
+    }
 
-#include "cmd/ls_is_dot_entry.inc"
+    if (dir_path[0] == '/' && dir_path[1] == '\0') {
+        if (out_size < 2ULL) {
+            return 0;
+        }
 
-#include "cmd/ls_print_one.inc"
+        out_path[p++] = '/';
+    } else {
+        for (i = 0ULL; dir_path[i] != '\0'; i++) {
+            if (p + 1ULL >= out_size) {
+                return 0;
+            }
 
-#include "cmd/ls_parse_args.inc"
+            out_path[p++] = dir_path[i];
+        }
 
-#include "cmd/ls_dir.inc"
+        if (p == 0ULL || out_path[p - 1ULL] != '/') {
+            if (p + 1ULL >= out_size) {
+                return 0;
+            }
 
-#include "cmd/ls.inc"
+            out_path[p++] = '/';
+        }
+    }
 
-#include "cmd/cat.inc"
+    for (i = 0ULL; name[i] != '\0'; i++) {
+        if (p + 1ULL >= out_size) {
+            return 0;
+        }
 
-#include "cmd/grep_write_u64_dec.inc"
+        out_path[p++] = name[i];
+    }
 
-#include "cmd/grep_line_has_pattern.inc"
+    out_path[p] = '\0';
+    return 1;
+}
 
-#include "cmd/grep_emit_matches.inc"
+static const char *ush_ls_basename(const char *path) {
+    const char *name = path;
+    u64 i = 0ULL;
 
-#include "cmd/grep.inc"
-#include "cmd/pwd.inc"
+    if (path == (const char *)0 || path[0] == '\0') {
+        return "";
+    }
 
-#include "cmd/cd.inc"
+    while (path[i] != '\0') {
+        if (path[i] == '/' && path[i + 1ULL] != '\0') {
+            name = &path[i + 1ULL];
+        }
 
-#include "cmd/exec.inc"
+        i++;
+    }
 
-#include "cmd/pid.inc"
+    return name;
+}
 
-#include "cmd/spawn.inc"
+static int ush_ls_is_dot_entry(const char *name) {
+    if (name == (const char *)0) {
+        return 0;
+    }
 
-#include "cmd/wait.inc"
+    if (name[0] == '.' && name[1] == '\0') {
+        return 1;
+    }
 
-#include "cmd/sleep.inc"
+    if (name[0] == '.' && name[1] == '.' && name[2] == '\0') {
+        return 1;
+    }
 
-#include "cmd/yield.inc"
+    return 0;
+}
 
+static void ush_ls_print_one(const char *name, u64 type, u64 size, int long_mode) {
+    if (long_mode == 0) {
+        ush_writeln(name);
+        return;
+    }
 
-#include "cmd/shutdown.inc"
+    if (type == 2ULL) {
+        ush_write("d ");
+    } else if (type == 1ULL) {
+        ush_write("f ");
+    } else {
+        ush_write("? ");
+    }
 
-#include "cmd/restart.inc"
+    ush_write(name);
 
-#include "cmd/exit.inc"
+    if (type == 1ULL) {
+        ush_write("  size=");
+        ush_write_hex_u64(size);
+    } else if (type == 2ULL) {
+        ush_write("  <DIR>");
+    } else {
+        ush_write("  <UNKNOWN>");
+    }
 
-#include "cmd/clear.inc"
+    ush_write_char('\n');
+}
 
-#include "cmd/ansi.inc"
+static int ush_ls_parse_args(const char *arg,
+                             int *out_long_mode,
+                             int *out_recursive,
+                             char *out_target,
+                             u64 out_target_size) {
+    char token[USH_PATH_MAX];
+    u64 i = 0ULL;
+    int path_set = 0;
 
-#include "cmd/ansitest_u64_to_dec.inc"
+    if (out_long_mode == (int *)0 ||
+        out_recursive == (int *)0 ||
+        out_target == (char *)0 ||
+        out_target_size == 0ULL) {
+        return 0;
+    }
 
-#include "cmd/ansitest_emit_bg256.inc"
+    *out_long_mode = 0;
+    *out_recursive = 0;
+    ush_copy(out_target, out_target_size, ".");
 
-#include "cmd/ansitest.inc"
-#include "cmd/fastfetch_u64_to_dec.inc"
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        return 1;
+    }
 
-#include "cmd/fastfetch_write_u64_dec.inc"
+    while (arg[i] != '\0') {
+        u64 p = 0ULL;
+        u64 j;
 
-#include "cmd/fastfetch_write_key.inc"
+        while (arg[i] != '\0' && ush_is_space(arg[i]) != 0) {
+            i++;
+        }
 
-#include "cmd/fastfetch_print_text.inc"
+        if (arg[i] == '\0') {
+            break;
+        }
 
-#include "cmd/fastfetch_print_u64.inc"
+        while (arg[i] != '\0' && ush_is_space(arg[i]) == 0) {
+            if (p + 1ULL < (u64)sizeof(token)) {
+                token[p++] = arg[i];
+            }
 
-#include "cmd/fastfetch_print_logo.inc"
+            i++;
+        }
 
-#include "cmd/fastfetch_print_palette.inc"
+        token[p] = '\0';
 
-#include "cmd/fastfetch.inc"
-#include "cmd/kbdstat.inc"
+        if (token[0] == '-' && token[1] != '\0') {
+            for (j = 1ULL; token[j] != '\0'; j++) {
+                if (token[j] == 'l') {
+                    *out_long_mode = 1;
+                } else if (token[j] == 'R') {
+                    *out_recursive = 1;
+                } else {
+                    return 0;
+                }
+            }
 
-#include "cmd/memstat.inc"
+            continue;
+        }
 
-#include "cmd/fsstat.inc"
+        if (path_set != 0) {
+            return 0;
+        }
 
-#include "cmd/taskstat.inc"
+        ush_copy(out_target, out_target_size, token);
+        path_set = 1;
+    }
 
-#include "cmd/userstat.inc"
+    return 1;
+}
 
-#include "cmd/shstat.inc"
+static int ush_ls_dir(const char *path,
+                      int long_mode,
+                      int recursive,
+                      int print_header,
+                      u64 depth) {
+    u64 count;
+    u64 i;
 
-#include "cmd/tty.inc"
+    if (depth > 16ULL) {
+        ush_writeln("ls: recursion depth limit reached");
+        return 0;
+    }
 
-#include "cmd/dmesg.inc"
+    count = cleonos_sys_fs_child_count(path);
 
-#include "cmd/mkdir.inc"
+    if (print_header != 0) {
+        ush_write(path);
+        ush_writeln(":");
+    }
 
-#include "cmd/touch.inc"
+    if (count == 0ULL) {
+        ush_writeln("(empty)");
+    }
 
-#include "cmd/write.inc"
+    for (i = 0ULL; i < count; i++) {
+        char name[CLEONOS_FS_NAME_MAX];
+        char child_path[USH_PATH_MAX];
+        u64 type;
+        u64 size = 0ULL;
 
-#include "cmd/append.inc"
+        name[0] = '\0';
 
-#include "cmd/copy_file.inc"
+        if (cleonos_sys_fs_get_child_name(path, i, name) == 0ULL) {
+            continue;
+        }
 
-#include "cmd/cp.inc"
+        if (ush_ls_join_path(path, name, child_path, (u64)sizeof(child_path)) == 0) {
+            continue;
+        }
 
-#include "cmd/mv.inc"
+        type = cleonos_sys_fs_stat_type(child_path);
 
-#include "cmd/rm.inc"
+        if (type == 1ULL) {
+            size = cleonos_sys_fs_stat_size(child_path);
+        }
 
-#include "cmd/stats.inc"
+        ush_ls_print_one(name, type, size, long_mode);
+    }
 
-#include "cmd/not_supported.inc"
+    if (recursive == 0) {
+        return 1;
+    }
+
+    for (i = 0ULL; i < count; i++) {
+        char name[CLEONOS_FS_NAME_MAX];
+        char child_path[USH_PATH_MAX];
+
+        name[0] = '\0';
+
+        if (cleonos_sys_fs_get_child_name(path, i, name) == 0ULL) {
+            continue;
+        }
+
+        if (ush_ls_is_dot_entry(name) != 0) {
+            continue;
+        }
+
+        if (ush_ls_join_path(path, name, child_path, (u64)sizeof(child_path)) == 0) {
+            continue;
+        }
+
+        if (cleonos_sys_fs_stat_type(child_path) == 2ULL) {
+            ush_write_char('\n');
+            (void)ush_ls_dir(child_path, long_mode, recursive, 1, depth + 1ULL);
+        }
+    }
+
+    return 1;
+}
+
+static int ush_cmd_ls(const ush_state *sh, const char *arg) {
+    char target[USH_PATH_MAX];
+    char path[USH_PATH_MAX];
+    u64 type;
+    int long_mode;
+    int recursive;
+
+    if (ush_ls_parse_args(arg, &long_mode, &recursive, target, (u64)sizeof(target)) == 0) {
+        ush_writeln("ls: usage ls [-l] [-R] [path]");
+        return 0;
+    }
+
+    if (ush_resolve_path(sh, target, path, (u64)sizeof(path)) == 0) {
+        ush_writeln("ls: invalid path");
+        return 0;
+    }
+
+    type = cleonos_sys_fs_stat_type(path);
+
+    if (type == 1ULL) {
+        u64 size = cleonos_sys_fs_stat_size(path);
+        ush_ls_print_one(ush_ls_basename(path), type, size, long_mode);
+        return 1;
+    }
+
+    if (type != 2ULL) {
+        ush_writeln("ls: path not found");
+        return 0;
+    }
+
+    return ush_ls_dir(path, long_mode, recursive, recursive, 0ULL);
+}
+
+static int ush_cmd_cat(const ush_state *sh, const char *arg) {
+    char path[USH_PATH_MAX];
+    char buf[USH_CAT_MAX + 1ULL];
+    u64 size;
+    u64 req;
+    u64 got;
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        if (ush_pipeline_stdin_text != (const char *)0 && ush_pipeline_stdin_len > 0ULL) {
+            ush_write(ush_pipeline_stdin_text);
+            return 1;
+        }
+
+        ush_writeln("cat: file path required");
+        return 0;
+    }
+
+    if (ush_resolve_path(sh, arg, path, (u64)sizeof(path)) == 0) {
+        ush_writeln("cat: invalid path");
+        return 0;
+    }
+
+    if (cleonos_sys_fs_stat_type(path) != 1ULL) {
+        ush_writeln("cat: file not found");
+        return 0;
+    }
+
+    size = cleonos_sys_fs_stat_size(path);
+
+    if (size == (u64)-1) {
+        ush_writeln("cat: failed to stat file");
+        return 0;
+    }
+
+    if (size == 0ULL) {
+        return 1;
+    }
+
+    req = (size < USH_CAT_MAX) ? size : USH_CAT_MAX;
+    got = cleonos_sys_fs_read(path, buf, req);
+
+    if (got == 0ULL) {
+        ush_writeln("cat: read failed");
+        return 0;
+    }
+
+    if (got > USH_CAT_MAX) {
+        got = USH_CAT_MAX;
+    }
+
+    buf[got] = '\0';
+    ush_writeln(buf);
+
+    if (size > got) {
+        ush_writeln("[cat] output truncated");
+    }
+
+    return 1;
+}
+
+static void ush_grep_write_u64_dec(u64 value) {
+    char tmp[32];
+    u64 len = 0ULL;
+
+    if (value == 0ULL) {
+        ush_write_char('0');
+        return;
+    }
+
+    while (value > 0ULL && len < (u64)sizeof(tmp)) {
+        tmp[len++] = (char)('0' + (value % 10ULL));
+        value /= 10ULL;
+    }
+
+    while (len > 0ULL) {
+        len--;
+        ush_write_char(tmp[len]);
+    }
+}
+
+static int ush_grep_line_has_pattern(const char *line, u64 line_len, const char *pattern, u64 pattern_len) {
+    u64 i;
+
+    if (line == (const char *)0 || pattern == (const char *)0) {
+        return 0;
+    }
+
+    if (pattern_len == 0ULL) {
+        return 1;
+    }
+
+    if (pattern_len > line_len) {
+        return 0;
+    }
+
+    for (i = 0ULL; i + pattern_len <= line_len; i++) {
+        u64 j = 0ULL;
+
+        while (j < pattern_len && line[i + j] == pattern[j]) {
+            j++;
+        }
+
+        if (j == pattern_len) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static u64 ush_grep_emit_matches(const char *input, u64 input_len, const char *pattern, int with_line_number) {
+    u64 matches = 0ULL;
+    u64 line_no = 1ULL;
+    u64 start = 0ULL;
+    u64 i;
+    u64 pattern_len;
+
+    if (input == (const char *)0 || pattern == (const char *)0) {
+        return 0ULL;
+    }
+
+    pattern_len = ush_strlen(pattern);
+
+    for (i = 0ULL; i <= input_len; i++) {
+        if (i == input_len || input[i] == '\n') {
+            u64 line_len = i - start;
+
+            if (ush_grep_line_has_pattern(&input[start], line_len, pattern, pattern_len) != 0) {
+                u64 j;
+
+                matches++;
+
+                if (with_line_number != 0) {
+                    ush_grep_write_u64_dec(line_no);
+                    ush_write(":");
+                }
+
+                for (j = 0ULL; j < line_len; j++) {
+                    ush_write_char(input[start + j]);
+                }
+
+                ush_write_char('\n');
+            }
+
+            start = i + 1ULL;
+            line_no++;
+        }
+    }
+
+    return matches;
+}
+
+static int ush_cmd_grep(const ush_state *sh, const char *arg) {
+    char first[USH_PATH_MAX];
+    char second[USH_PATH_MAX];
+    char third[USH_PATH_MAX];
+    char path[USH_PATH_MAX];
+    const char *rest = "";
+    const char *rest2 = "";
+    const char *pattern = (const char *)0;
+    const char *file_arg = (const char *)0;
+    const char *input = (const char *)0;
+    u64 input_len = 0ULL;
+    u64 size;
+    u64 got;
+    int with_line_number = 0;
+    static char file_buf[USH_COPY_MAX + 1U];
+
+    if (sh == (const ush_state *)0 || arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("grep: usage grep [-n] <pattern> [file]");
+        return 0;
+    }
+
+    if (ush_split_first_and_rest(arg, first, (u64)sizeof(first), &rest) == 0) {
+        ush_writeln("grep: usage grep [-n] <pattern> [file]");
+        return 0;
+    }
+
+    if (ush_streq(first, "-n") != 0) {
+        with_line_number = 1;
+
+        if (ush_split_first_and_rest(rest, second, (u64)sizeof(second), &rest2) == 0) {
+            ush_writeln("grep: usage grep [-n] <pattern> [file]");
+            return 0;
+        }
+
+        pattern = second;
+        rest = rest2;
+    } else {
+        pattern = first;
+    }
+
+    if (rest != (const char *)0 && rest[0] != '\0') {
+        if (ush_split_first_and_rest(rest, third, (u64)sizeof(third), &rest2) == 0) {
+            ush_writeln("grep: usage grep [-n] <pattern> [file]");
+            return 0;
+        }
+
+        file_arg = third;
+
+        if (rest2 != (const char *)0 && rest2[0] != '\0') {
+            ush_writeln("grep: usage grep [-n] <pattern> [file]");
+            return 0;
+        }
+    }
+
+    if (pattern == (const char *)0 || pattern[0] == '\0') {
+        ush_writeln("grep: pattern required");
+        return 0;
+    }
+
+    if (file_arg != (const char *)0) {
+        if (ush_resolve_path(sh, file_arg, path, (u64)sizeof(path)) == 0) {
+            ush_writeln("grep: invalid path");
+            return 0;
+        }
+
+        if (cleonos_sys_fs_stat_type(path) != 1ULL) {
+            ush_writeln("grep: file not found");
+            return 0;
+        }
+
+        size = cleonos_sys_fs_stat_size(path);
+
+        if (size == (u64)-1) {
+            ush_writeln("grep: failed to stat file");
+            return 0;
+        }
+
+        if (size > (u64)USH_COPY_MAX) {
+            ush_writeln("grep: file too large for user buffer");
+            return 0;
+        }
+
+        if (size == 0ULL) {
+            return 1;
+        }
+
+        got = cleonos_sys_fs_read(path, file_buf, size);
+
+        if (got == 0ULL || got != size) {
+            ush_writeln("grep: read failed");
+            return 0;
+        }
+
+        file_buf[got] = '\0';
+        input = file_buf;
+        input_len = got;
+    } else {
+        if (ush_pipeline_stdin_text == (const char *)0) {
+            ush_writeln("grep: file path required (or pipeline input)");
+            return 0;
+        }
+
+        input = ush_pipeline_stdin_text;
+        input_len = ush_pipeline_stdin_len;
+    }
+
+    (void)ush_grep_emit_matches(input, input_len, pattern, with_line_number);
+    return 1;
+}
+
+static int ush_cmd_pwd(const ush_state *sh) {
+    ush_writeln(sh->cwd);
+    return 1;
+}
+
+static int ush_cmd_cd(ush_state *sh, const char *arg) {
+    const char *target = arg;
+    char path[USH_PATH_MAX];
+
+    if (target == (const char *)0 || target[0] == '\0') {
+        target = "/";
+    }
+
+    if (ush_resolve_path(sh, target, path, (u64)sizeof(path)) == 0) {
+        ush_writeln("cd: invalid path");
+        return 0;
+    }
+
+    if (cleonos_sys_fs_stat_type(path) != 2ULL) {
+        ush_writeln("cd: directory not found");
+        return 0;
+    }
+
+    ush_copy(sh->cwd, (u64)sizeof(sh->cwd), path);
+    return 1;
+}
+
+static int ush_cmd_exec(const ush_state *sh, const char *arg) {
+    char path[USH_PATH_MAX];
+    u64 status;
+
+    if (ush_resolve_exec_path(sh, arg, path, (u64)sizeof(path)) == 0) {
+        ush_writeln("exec: invalid target");
+        return 0;
+    }
+
+    if (ush_path_is_under_system(path) != 0) {
+        ush_writeln("exec: /system/*.elf is kernel-mode (KELF), not user-exec");
+        return 0;
+    }
+
+    status = cleonos_sys_exec_path(path);
+
+    if (status == (u64)-1) {
+        ush_writeln("exec: request failed");
+        return 0;
+    }
+
+    if (status == 0ULL) {
+        ush_writeln("exec: request accepted");
+        return 1;
+    }
+
+    ush_writeln("exec: returned non-zero status");
+    return 0;
+}
+
+static int ush_cmd_pid(void) {
+    ush_print_kv_hex("PID", cleonos_sys_getpid());
+    return 1;
+}
+
+static int ush_cmd_spawn(const ush_state *sh, const char *arg) {
+    char path[USH_PATH_MAX];
+    u64 pid;
+
+    if (ush_resolve_exec_path(sh, arg, path, (u64)sizeof(path)) == 0) {
+        ush_writeln("spawn: invalid target");
+        return 0;
+    }
+
+    if (ush_path_is_under_system(path) != 0) {
+        ush_writeln("spawn: /system/*.elf is kernel-mode (KELF), not user-exec");
+        return 0;
+    }
+
+    pid = cleonos_sys_spawn_path(path);
+
+    if (pid == (u64)-1) {
+        ush_writeln("spawn: request failed");
+        return 0;
+    }
+
+    ush_writeln("spawn: completed");
+    ush_print_kv_hex("  PID", pid);
+    return 1;
+}
+
+static int ush_cmd_wait(const char *arg) {
+    u64 pid;
+    u64 status = (u64)-1;
+    u64 wait_ret;
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("wait: usage wait <pid>");
+        return 0;
+    }
+
+    if (ush_parse_u64_dec(arg, &pid) == 0) {
+        ush_writeln("wait: invalid pid");
+        return 0;
+    }
+
+    wait_ret = cleonos_sys_wait_pid(pid, &status);
+
+    if (wait_ret == (u64)-1) {
+        ush_writeln("wait: pid not found");
+        return 0;
+    }
+
+    if (wait_ret == 0ULL) {
+        ush_writeln("wait: still running");
+        return 1;
+    }
+
+    ush_writeln("wait: exited");
+    ush_print_kv_hex("  STATUS", status);
+    return 1;
+}
+
+static int ush_cmd_sleep(const char *arg) {
+    u64 ticks;
+    u64 elapsed;
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("sleep: usage sleep <ticks>");
+        return 0;
+    }
+
+    if (ush_parse_u64_dec(arg, &ticks) == 0) {
+        ush_writeln("sleep: invalid ticks");
+        return 0;
+    }
+
+    elapsed = cleonos_sys_sleep_ticks(ticks);
+    ush_print_kv_hex("SLEPT_TICKS", elapsed);
+    return 1;
+}
+
+static int ush_cmd_yield(void) {
+    ush_print_kv_hex("YIELD_TICK", cleonos_sys_yield());
+    return 1;
+}
+
+static int ush_cmd_shutdown(void) {
+    ush_writeln("shutdown: powering off...");
+    (void)cleonos_sys_shutdown();
+    return 1;
+}
+
+static int ush_cmd_restart(void) {
+    ush_writeln("restart: rebooting...");
+    (void)cleonos_sys_restart();
+    return 1;
+}
+
+static int ush_cmd_exit(ush_state *sh, const char *arg) {
+    u64 code = 0ULL;
+
+    if (sh == (ush_state *)0) {
+        return 0;
+    }
+
+    if (arg != (const char *)0 && arg[0] != '\0') {
+        if (ush_parse_u64_dec(arg, &code) == 0) {
+            ush_writeln("exit: usage exit [code]");
+            return 0;
+        }
+    }
+
+    sh->exit_requested = 1;
+    sh->exit_code = code;
+    (void)cleonos_sys_exit(code);
+    ush_writeln("exit: shell stopping");
+    return 1;
+}
+
+static int ush_cmd_clear(void) {
+    ush_write("\x1B[2J\x1B[H");
+    return 1;
+}
+
+static int ush_cmd_ansi(void) {
+    ush_writeln("\x1B[1;36mansi color demo\x1B[0m");
+    ush_writeln("  \x1B[30mblack\x1B[0m \x1B[31mred\x1B[0m \x1B[32mgreen\x1B[0m \x1B[33myellow\x1B[0m");
+    ush_writeln("  \x1B[34mblue\x1B[0m \x1B[35mmagenta\x1B[0m \x1B[36mcyan\x1B[0m \x1B[37mwhite\x1B[0m");
+    ush_writeln("  \x1B[90mbright-black\x1B[0m \x1B[91mbright-red\x1B[0m \x1B[92mbright-green\x1B[0m \x1B[93mbright-yellow\x1B[0m");
+    ush_writeln("  \x1B[94mbright-blue\x1B[0m \x1B[95mbright-magenta\x1B[0m \x1B[96mbright-cyan\x1B[0m \x1B[97mbright-white\x1B[0m");
+    return 1;
+}
+
+static u64 ush_ansitest_u64_to_dec(char *out, u64 out_size, u64 value) {
+    char rev[10];
+    u64 digits = 0ULL;
+    u64 i;
+
+    if (out == (char *)0 || out_size == 0ULL) {
+        return 0ULL;
+    }
+
+    if (value == 0U) {
+        if (out_size < 2ULL) {
+            return 0ULL;
+        }
+
+        out[0] = '0';
+        out[1] = '\0';
+        return 1ULL;
+    }
+
+    while (value > 0U && digits < (u64)sizeof(rev)) {
+        rev[digits++] = (char)('0' + (value % 10U));
+        value /= 10U;
+    }
+
+    if (digits + 1ULL > out_size) {
+        out[0] = '\0';
+        return 0ULL;
+    }
+
+    for (i = 0ULL; i < digits; i++) {
+        out[i] = rev[digits - 1ULL - i];
+    }
+
+    out[digits] = '\0';
+    return digits;
+}
+
+static void ush_ansitest_emit_bg256(u64 index) {
+    char num[4];
+    char seq[24];
+    u64 digits;
+    u64 p = 0ULL;
+    u64 i;
+
+    if (index > 255U) {
+        index = 255U;
+    }
+
+    digits = ush_ansitest_u64_to_dec(num, (u64)sizeof(num), index);
+    if (digits == 0ULL) {
+        return;
+    }
+
+    seq[p++] = '\x1B';
+    seq[p++] = '[';
+    seq[p++] = '4';
+    seq[p++] = '8';
+    seq[p++] = ';';
+    seq[p++] = '5';
+    seq[p++] = ';';
+
+    for (i = 0ULL; i < digits && p + 1ULL < (u64)sizeof(seq); i++) {
+        seq[p++] = num[i];
+    }
+
+    if (p + 7ULL >= (u64)sizeof(seq)) {
+        return;
+    }
+
+    seq[p++] = 'm';
+    seq[p++] = ' ';
+    seq[p++] = ' ';
+    seq[p++] = '\x1B';
+    seq[p++] = '[';
+    seq[p++] = '0';
+    seq[p++] = 'm';
+    seq[p] = '\0';
+
+    ush_write(seq);
+}
+
+static int ush_cmd_ansitest(void) {
+    u64 i;
+
+    ush_writeln("\x1B[1;96mANSI test suite\x1B[0m");
+    ush_writeln("styles: \x1B[1mbold\x1B[0m  \x1B[7minverse\x1B[0m  \x1B[4munderline\x1B[0m");
+    ush_writeln("16-color demo:");
+    (void)ush_cmd_ansi();
+
+    ush_writeln("256-color palette (0..255):");
+    for (i = 0ULL; i < 256ULL; i++) {
+        ush_ansitest_emit_bg256(i);
+        if ((i % 32ULL) == 31ULL) {
+            ush_write_char('\n');
+        }
+    }
+    ush_write_char('\n');
+
+    ush_writeln("truecolor demo:");
+    ush_writeln("  \x1B[38;2;255;64;64mRGB(255,64,64)\x1B[0m  \x1B[38;2;64;255;64mRGB(64,255,64)\x1B[0m  \x1B[38;2;64;128;255mRGB(64,128,255)\x1B[0m");
+
+    ush_writeln("cursor control demo:");
+    ush_write("  0123456789");
+    ush_write("\x1B[5D");
+    ush_write("\x1B[93m<OK>\x1B[0m");
+    ush_write_char('\n');
+
+    ush_write("  save");
+    ush_write("\x1B[s");
+    ush_write("....");
+    ush_write("\x1B[u");
+    ush_write("\x1B[92m<restore>\x1B[0m");
+    ush_write_char('\n');
+
+    ush_writeln("erase-line demo:");
+    ush_write("  left|right-to-clear");
+    ush_write("\x1B[14D\x1B[K");
+    ush_write_char('\n');
+
+    ush_writeln("ansitest done");
+    return 1;
+}
+
+static u64 ush_fastfetch_u64_to_dec(char *out, u64 out_size, u64 value) {
+    char rev[32];
+    u64 digits = 0ULL;
+    u64 i;
+
+    if (out == (char *)0 || out_size == 0ULL) {
+        return 0ULL;
+    }
+
+    if (value == 0ULL) {
+        if (out_size < 2ULL) {
+            return 0ULL;
+        }
+        out[0] = '0';
+        out[1] = '\0';
+        return 1ULL;
+    }
+
+    while (value > 0ULL && digits < (u64)sizeof(rev)) {
+        rev[digits++] = (char)('0' + (value % 10ULL));
+        value /= 10ULL;
+    }
+
+    if (digits + 1ULL > out_size) {
+        out[0] = '\0';
+        return 0ULL;
+    }
+
+    for (i = 0ULL; i < digits; i++) {
+        out[i] = rev[digits - 1ULL - i];
+    }
+    out[digits] = '\0';
+    return digits;
+}
+
+static void ush_fastfetch_write_u64_dec(u64 value) {
+    char text[32];
+
+    if (ush_fastfetch_u64_to_dec(text, (u64)sizeof(text), value) == 0ULL) {
+        ush_write("0");
+        return;
+    }
+
+    ush_write(text);
+}
+
+static void ush_fastfetch_write_key(int plain, const char *key) {
+    ush_write("  ");
+    if (plain == 0) {
+        ush_write("\x1B[1;96m");
+    }
+    ush_write(key);
+    if (plain == 0) {
+        ush_write("\x1B[0m");
+    }
+    ush_write(": ");
+}
+
+static void ush_fastfetch_print_text(int plain, const char *key, const char *value) {
+    ush_fastfetch_write_key(plain, key);
+    ush_writeln(value);
+}
+
+static void ush_fastfetch_print_u64(int plain, const char *key, u64 value) {
+    ush_fastfetch_write_key(plain, key);
+    ush_fastfetch_write_u64_dec(value);
+    ush_write_char('\n');
+}
+
+static void ush_fastfetch_print_logo(int plain) {
+    if (plain == 0) {
+        ush_writeln("\x1B[1;34m $$$$$$\\  $$\\                                      $$$$$$\\   $$$$$$\\  \x1B[0m");
+        ush_writeln("\x1B[1;36m$$  __$$\\ $$ |                                    $$  __$$\\ $$  __$$\\ \x1B[0m");
+        ush_writeln("\x1B[1;32m$$ /  \\__|$$ |       $$$$$$\\   $$$$$$\\  $$$$$$$\\  $$ /  $$ |$$ /  \\__|\x1B[0m");
+        ush_writeln("\x1B[1;33m$$ |      $$ |      $$  __$$\\ $$  __$$\\ $$  __$$\\ $$ |  $$ |\\$$$$$$\\  \x1B[0m");
+        ush_writeln("\x1B[1;31m$$ |      $$ |      $$$$$$$$ |$$ /  $$ |$$ |  $$ |$$ |  $$ | \\____$$\\ \x1B[0m");
+        ush_writeln("\x1B[1;35m$$ |  $$\\ $$ |      $$   ____|$$ |  $$ |$$ |  $$ |$$ |  $$ |$$\\   $$ |\x1B[0m");
+        ush_writeln("\x1B[1;94m\\$$$$$$  |$$$$$$$$\\ \\$$$$$$$\\ \\$$$$$$  |$$ |  $$ | $$$$$$  |\\$$$$$$  |\x1B[0m");
+        ush_writeln("\x1B[1;96m \\______/ \\________| \\_______| \\______/ \\__|  \\__| \\______/  \\______/ \x1B[0m");
+        ush_writeln("                                                                      ");
+        ush_writeln("                                                                      ");
+    } else {
+        ush_writeln(" $$$$$$\\  $$\\                                      $$$$$$\\   $$$$$$\\  ");
+        ush_writeln("$$  __$$\\ $$ |                                    $$  __$$\\ $$  __$$\\ ");
+        ush_writeln("$$ /  \\__|$$ |       $$$$$$\\   $$$$$$\\  $$$$$$$\\  $$ /  $$ |$$ /  \\__|");
+        ush_writeln("$$ |      $$ |      $$  __$$\\ $$  __$$\\ $$  __$$\\ $$ |  $$ |\\$$$$$$\\  ");
+        ush_writeln("$$ |      $$ |      $$$$$$$$ |$$ /  $$ |$$ |  $$ |$$ |  $$ | \\____$$\\ ");
+        ush_writeln("$$ |  $$\\ $$ |      $$   ____|$$ |  $$ |$$ |  $$ |$$ |  $$ |$$\\   $$ |");
+        ush_writeln("\\$$$$$$  |$$$$$$$$\\ \\$$$$$$$\\ \\$$$$$$  |$$ |  $$ | $$$$$$  |\\$$$$$$  |");
+        ush_writeln(" \\______/ \\________| \\_______| \\______/ \\__|  \\__| \\______/  \\______/ ");
+        ush_writeln("                                                                      ");
+        ush_writeln("                                                                      ");
+    }
+}
+
+static void ush_fastfetch_print_palette(int plain) {
+    ush_fastfetch_write_key(plain, "Palette");
+
+    if (plain != 0) {
+        ush_writeln("ANSI16");
+        return;
+    }
+
+    ush_write("\x1B[40m  \x1B[0m\x1B[41m  \x1B[0m\x1B[42m  \x1B[0m\x1B[43m  \x1B[0m");
+    ush_write("\x1B[44m  \x1B[0m\x1B[45m  \x1B[0m\x1B[46m  \x1B[0m\x1B[47m  \x1B[0m ");
+    ush_write("\x1B[100m  \x1B[0m\x1B[101m  \x1B[0m\x1B[102m  \x1B[0m\x1B[103m  \x1B[0m");
+    ush_write("\x1B[104m  \x1B[0m\x1B[105m  \x1B[0m\x1B[106m  \x1B[0m\x1B[107m  \x1B[0m");
+    ush_write_char('\n');
+}
+
+static int ush_cmd_fastfetch(const char *arg) {
+    int plain = 0;
+    u64 tty_active;
+    u64 tty_count;
+    u64 exec_req;
+    u64 exec_ok;
+
+    if (arg != (const char *)0 && arg[0] != '\0') {
+        if (ush_streq(arg, "--plain") != 0) {
+            plain = 1;
+        } else if (ush_streq(arg, "--help") != 0 || ush_streq(arg, "-h") != 0) {
+            ush_writeln("usage: fastfetch [--plain]");
+            return 1;
+        } else {
+            ush_writeln("fastfetch: usage fastfetch [--plain]");
+            return 0;
+        }
+    }
+
+    tty_active = cleonos_sys_tty_active();
+    tty_count = cleonos_sys_tty_count();
+    exec_req = cleonos_sys_exec_request_count();
+    exec_ok = cleonos_sys_exec_success_count();
+
+    ush_fastfetch_print_logo(plain);
+    ush_write_char('\n');
+
+    ush_fastfetch_print_text(plain, "OS", "CLeonOS x86_64");
+    ush_fastfetch_print_text(plain, "Shell", "User Shell (/shell/shell.elf)");
+    ush_fastfetch_print_u64(plain, "PID", cleonos_sys_getpid());
+    ush_fastfetch_print_u64(plain, "UptimeTicks", cleonos_sys_timer_ticks());
+    ush_fastfetch_print_u64(plain, "Tasks", cleonos_sys_task_count());
+    ush_fastfetch_print_u64(plain, "Services", cleonos_sys_service_count());
+    ush_fastfetch_print_u64(plain, "SvcReady", cleonos_sys_service_ready_count());
+    ush_fastfetch_print_u64(plain, "CtxSwitches", cleonos_sys_context_switches());
+    ush_fastfetch_print_u64(plain, "KELFApps", cleonos_sys_kelf_count());
+    ush_fastfetch_print_u64(plain, "KELFRuns", cleonos_sys_kelf_runs());
+    ush_fastfetch_print_u64(plain, "FSNodes", cleonos_sys_fs_node_count());
+    ush_fastfetch_print_u64(plain, "RootChildren", cleonos_sys_fs_child_count("/"));
+
+    ush_fastfetch_write_key(plain, "TTY");
+    ush_fastfetch_write_u64_dec(tty_active);
+    ush_write(" / ");
+    ush_fastfetch_write_u64_dec(tty_count);
+    ush_write_char('\n');
+
+    ush_fastfetch_write_key(plain, "ExecSuccess");
+    ush_fastfetch_write_u64_dec(exec_ok);
+    ush_write(" / ");
+    ush_fastfetch_write_u64_dec(exec_req);
+    ush_write_char('\n');
+
+    ush_fastfetch_print_u64(plain, "KbdBuffered", cleonos_sys_kbd_buffered());
+    ush_fastfetch_print_palette(plain);
+    return 1;
+}
+
+static int ush_cmd_kbdstat(void) {
+    ush_writeln("kbdstat:");
+    ush_print_kv_hex("  BUFFERED", cleonos_sys_kbd_buffered());
+    ush_print_kv_hex("  PUSHED", cleonos_sys_kbd_pushed());
+    ush_print_kv_hex("  POPPED", cleonos_sys_kbd_popped());
+    ush_print_kv_hex("  DROPPED", cleonos_sys_kbd_dropped());
+    ush_print_kv_hex("  HOTKEY_SWITCHES", cleonos_sys_kbd_hotkey_switches());
+    return 1;
+}
+
+static int ush_cmd_memstat(void) {
+    ush_writeln("memstat (user ABI limited):");
+    ush_print_kv_hex("  SERVICE_COUNT", cleonos_sys_service_count());
+    ush_print_kv_hex("  SERVICE_READY_COUNT", cleonos_sys_service_ready_count());
+    ush_print_kv_hex("  KELF_COUNT", cleonos_sys_kelf_count());
+    ush_print_kv_hex("  KELF_RUNS", cleonos_sys_kelf_runs());
+    return 1;
+}
+
+static int ush_cmd_fsstat(void) {
+    ush_writeln("fsstat:");
+    ush_print_kv_hex("  NODE_COUNT", cleonos_sys_fs_node_count());
+    ush_print_kv_hex("  ROOT_CHILDREN", cleonos_sys_fs_child_count("/"));
+    ush_print_kv_hex("  SYSTEM_CHILDREN", cleonos_sys_fs_child_count("/system"));
+    ush_print_kv_hex("  SHELL_CHILDREN", cleonos_sys_fs_child_count("/shell"));
+    ush_print_kv_hex("  TEMP_CHILDREN", cleonos_sys_fs_child_count("/temp"));
+    ush_print_kv_hex("  DRIVER_CHILDREN", cleonos_sys_fs_child_count("/driver"));
+    return 1;
+}
+
+static int ush_cmd_taskstat(void) {
+    ush_writeln("taskstat:");
+    ush_print_kv_hex("  TASK_COUNT", cleonos_sys_task_count());
+    ush_print_kv_hex("  CURRENT_TASK", cleonos_syscall(CLEONOS_SYSCALL_CUR_TASK, 0ULL, 0ULL, 0ULL));
+    ush_print_kv_hex("  TIMER_TICKS", cleonos_sys_timer_ticks());
+    ush_print_kv_hex("  CONTEXT_SWITCHES", cleonos_sys_context_switches());
+    return 1;
+}
+
+static int ush_cmd_userstat(void) {
+    ush_writeln("userstat:");
+    ush_print_kv_hex("  USER_SHELL_READY", cleonos_sys_user_shell_ready());
+    ush_print_kv_hex("  USER_EXEC_REQUESTED", cleonos_sys_user_exec_requested());
+    ush_print_kv_hex("  USER_LAUNCH_TRIES", cleonos_sys_user_launch_tries());
+    ush_print_kv_hex("  USER_LAUNCH_OK", cleonos_sys_user_launch_ok());
+    ush_print_kv_hex("  USER_LAUNCH_FAIL", cleonos_sys_user_launch_fail());
+    ush_print_kv_hex("  EXEC_REQUESTS", cleonos_sys_exec_request_count());
+    ush_print_kv_hex("  EXEC_SUCCESS", cleonos_sys_exec_success_count());
+    ush_print_kv_hex("  TTY_COUNT", cleonos_sys_tty_count());
+    ush_print_kv_hex("  TTY_ACTIVE", cleonos_sys_tty_active());
+    return 1;
+}
+
+static int ush_cmd_shstat(const ush_state *sh) {
+    ush_writeln("shstat:");
+    ush_print_kv_hex("  CMD_TOTAL", sh->cmd_total);
+    ush_print_kv_hex("  CMD_OK", sh->cmd_ok);
+    ush_print_kv_hex("  CMD_FAIL", sh->cmd_fail);
+    ush_print_kv_hex("  CMD_UNKNOWN", sh->cmd_unknown);
+    ush_print_kv_hex("  EXIT_REQUESTED", (sh->exit_requested != 0) ? 1ULL : 0ULL);
+    ush_print_kv_hex("  EXIT_CODE", sh->exit_code);
+    return 1;
+}
+
+static int ush_cmd_tty(const char *arg) {
+    u64 tty_count = cleonos_sys_tty_count();
+    u64 active = cleonos_sys_tty_active();
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_print_kv_hex("TTY_COUNT", tty_count);
+        ush_print_kv_hex("TTY_ACTIVE", active);
+        return 1;
+    }
+
+    {
+        u64 idx;
+
+        if (ush_parse_u64_dec(arg, &idx) == 0) {
+            ush_writeln("tty: usage tty [index]");
+            return 0;
+        }
+
+        if (idx >= tty_count) {
+            ush_writeln("tty: index out of range");
+            return 0;
+        }
+
+        if (cleonos_sys_tty_switch(idx) == (u64)-1) {
+            ush_writeln("tty: switch failed");
+            return 0;
+        }
+
+        ush_writeln("tty: switched");
+        ush_print_kv_hex("TTY_ACTIVE", cleonos_sys_tty_active());
+        return 1;
+    }
+}
+
+static int ush_cmd_dmesg(const char *arg) {
+    u64 total = cleonos_sys_log_journal_count();
+    u64 limit = USH_DMESG_DEFAULT;
+    u64 start;
+    u64 i;
+
+    if (arg != (const char *)0 && arg[0] != '\0') {
+        if (ush_parse_u64_dec(arg, &limit) == 0 || limit == 0ULL) {
+            ush_writeln("dmesg: usage dmesg [positive_count]");
+            return 0;
+        }
+    }
+
+    if (total == 0ULL) {
+        ush_writeln("(journal empty)");
+        return 1;
+    }
+
+    if (limit > total) {
+        limit = total;
+    }
+
+    start = total - limit;
+
+    for (i = start; i < total; i++) {
+        char line[USH_DMESG_LINE_MAX];
+
+        if (cleonos_sys_log_journal_read(i, line, (u64)sizeof(line)) != 0ULL) {
+            ush_writeln(line);
+        }
+    }
+
+    return 1;
+}
+
+static int ush_cmd_mkdir(const ush_state *sh, const char *arg) {
+    char path[USH_PATH_MAX];
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("mkdir: directory path required");
+        return 0;
+    }
+
+    if (ush_resolve_path(sh, arg, path, (u64)sizeof(path)) == 0) {
+        ush_writeln("mkdir: invalid path");
+        return 0;
+    }
+
+    if (ush_path_is_under_temp(path) == 0) {
+        ush_writeln("mkdir: target must be under /temp");
+        return 0;
+    }
+
+    if (cleonos_sys_fs_mkdir(path) == 0ULL) {
+        ush_writeln("mkdir: failed");
+        return 0;
+    }
+
+    return 1;
+}
+
+static int ush_cmd_touch(const ush_state *sh, const char *arg) {
+    static const char empty_data[1] = {'\0'};
+    char path[USH_PATH_MAX];
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("touch: file path required");
+        return 0;
+    }
+
+    if (ush_resolve_path(sh, arg, path, (u64)sizeof(path)) == 0) {
+        ush_writeln("touch: invalid path");
+        return 0;
+    }
+
+    if (ush_path_is_under_temp(path) == 0) {
+        ush_writeln("touch: target must be under /temp");
+        return 0;
+    }
+
+    if (cleonos_sys_fs_write(path, empty_data, 0ULL) == 0ULL) {
+        ush_writeln("touch: failed");
+        return 0;
+    }
+
+    return 1;
+}
+
+static int ush_cmd_write(const ush_state *sh, const char *arg) {
+    char path_arg[USH_PATH_MAX];
+    char abs_path[USH_PATH_MAX];
+    const char *payload = (const char *)0;
+    u64 payload_len;
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("write: usage write <file> <text>");
+        return 0;
+    }
+
+    if (ush_split_first_and_rest(arg, path_arg, (u64)sizeof(path_arg), &payload) == 0) {
+        ush_writeln("write: usage write <file> <text>");
+        return 0;
+    }
+
+    if (ush_resolve_path(sh, path_arg, abs_path, (u64)sizeof(abs_path)) == 0) {
+        ush_writeln("write: invalid path");
+        return 0;
+    }
+
+    if (ush_path_is_under_temp(abs_path) == 0) {
+        ush_writeln("write: target must be under /temp");
+        return 0;
+    }
+
+    if (payload == (const char *)0 || payload[0] == '\0') {
+        if (ush_pipeline_stdin_text == (const char *)0) {
+            ush_writeln("write: usage write <file> <text>");
+            return 0;
+        }
+        payload = ush_pipeline_stdin_text;
+        payload_len = ush_pipeline_stdin_len;
+    } else {
+        payload_len = ush_strlen(payload);
+    }
+
+    if (cleonos_sys_fs_write(abs_path, payload, payload_len) == 0ULL) {
+        ush_writeln("write: failed");
+        return 0;
+    }
+
+    return 1;
+}
+
+static int ush_cmd_append(const ush_state *sh, const char *arg) {
+    char path_arg[USH_PATH_MAX];
+    char abs_path[USH_PATH_MAX];
+    const char *payload = (const char *)0;
+    u64 payload_len;
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("append: usage append <file> <text>");
+        return 0;
+    }
+
+    if (ush_split_first_and_rest(arg, path_arg, (u64)sizeof(path_arg), &payload) == 0) {
+        ush_writeln("append: usage append <file> <text>");
+        return 0;
+    }
+
+    if (ush_resolve_path(sh, path_arg, abs_path, (u64)sizeof(abs_path)) == 0) {
+        ush_writeln("append: invalid path");
+        return 0;
+    }
+
+    if (ush_path_is_under_temp(abs_path) == 0) {
+        ush_writeln("append: target must be under /temp");
+        return 0;
+    }
+
+    if (payload == (const char *)0 || payload[0] == '\0') {
+        if (ush_pipeline_stdin_text == (const char *)0) {
+            ush_writeln("append: usage append <file> <text>");
+            return 0;
+        }
+        payload = ush_pipeline_stdin_text;
+        payload_len = ush_pipeline_stdin_len;
+    } else {
+        payload_len = ush_strlen(payload);
+    }
+
+    if (cleonos_sys_fs_append(abs_path, payload, payload_len) == 0ULL) {
+        ush_writeln("append: failed");
+        return 0;
+    }
+
+    return 1;
+}
+
+static int ush_copy_file(const char *src_path, const char *dst_path) {
+    static char copy_buf[USH_COPY_MAX];
+    u64 src_type;
+    u64 src_size;
+    u64 got;
+
+    src_type = cleonos_sys_fs_stat_type(src_path);
+
+    if (src_type != 1ULL) {
+        ush_writeln("cp: source file not found");
+        return 0;
+    }
+
+    src_size = cleonos_sys_fs_stat_size(src_path);
+
+    if (src_size == (u64)-1) {
+        ush_writeln("cp: failed to stat source");
+        return 0;
+    }
+
+    if (src_size > (u64)USH_COPY_MAX) {
+        ush_writeln("cp: source too large for user shell buffer");
+        return 0;
+    }
+
+    if (src_size == 0ULL) {
+        got = 0ULL;
+    } else {
+        got = cleonos_sys_fs_read(src_path, copy_buf, src_size);
+
+        if (got == 0ULL || got != src_size) {
+            ush_writeln("cp: failed to read source");
+            return 0;
+        }
+    }
+
+    if (cleonos_sys_fs_write(dst_path, copy_buf, got) == 0ULL) {
+        ush_writeln("cp: failed to write destination");
+        return 0;
+    }
+
+    return 1;
+}
+
+static int ush_cmd_cp(const ush_state *sh, const char *arg) {
+    char src_arg[USH_PATH_MAX];
+    char dst_arg[USH_PATH_MAX];
+    char src_path[USH_PATH_MAX];
+    char dst_path[USH_PATH_MAX];
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("cp: usage cp <src> <dst>");
+        return 0;
+    }
+
+    if (ush_split_two_args(arg, src_arg, (u64)sizeof(src_arg), dst_arg, (u64)sizeof(dst_arg)) == 0) {
+        ush_writeln("cp: usage cp <src> <dst>");
+        return 0;
+    }
+
+    if (ush_resolve_path(sh, src_arg, src_path, (u64)sizeof(src_path)) == 0 ||
+        ush_resolve_path(sh, dst_arg, dst_path, (u64)sizeof(dst_path)) == 0) {
+        ush_writeln("cp: invalid path");
+        return 0;
+    }
+
+    if (ush_path_is_under_temp(dst_path) == 0) {
+        ush_writeln("cp: destination must be under /temp");
+        return 0;
+    }
+
+    return ush_copy_file(src_path, dst_path);
+}
+
+static int ush_cmd_mv(const ush_state *sh, const char *arg) {
+    char src_arg[USH_PATH_MAX];
+    char dst_arg[USH_PATH_MAX];
+    char src_path[USH_PATH_MAX];
+    char dst_path[USH_PATH_MAX];
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("mv: usage mv <src> <dst>");
+        return 0;
+    }
+
+    if (ush_split_two_args(arg, src_arg, (u64)sizeof(src_arg), dst_arg, (u64)sizeof(dst_arg)) == 0) {
+        ush_writeln("mv: usage mv <src> <dst>");
+        return 0;
+    }
+
+    if (ush_resolve_path(sh, src_arg, src_path, (u64)sizeof(src_path)) == 0 ||
+        ush_resolve_path(sh, dst_arg, dst_path, (u64)sizeof(dst_path)) == 0) {
+        ush_writeln("mv: invalid path");
+        return 0;
+    }
+
+    if (ush_path_is_under_temp(src_path) == 0 || ush_path_is_under_temp(dst_path) == 0) {
+        ush_writeln("mv: source and destination must be under /temp");
+        return 0;
+    }
+
+    if (ush_copy_file(src_path, dst_path) == 0) {
+        return 0;
+    }
+
+    if (cleonos_sys_fs_remove(src_path) == 0ULL) {
+        ush_writeln("mv: source remove failed");
+        return 0;
+    }
+
+    return 1;
+}
+
+static int ush_cmd_rm(const ush_state *sh, const char *arg) {
+    char path[USH_PATH_MAX];
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        ush_writeln("rm: path required");
+        return 0;
+    }
+
+    if (ush_resolve_path(sh, arg, path, (u64)sizeof(path)) == 0) {
+        ush_writeln("rm: invalid path");
+        return 0;
+    }
+
+    if (ush_path_is_under_temp(path) == 0) {
+        ush_writeln("rm: target must be under /temp");
+        return 0;
+    }
+
+    if (cleonos_sys_fs_remove(path) == 0ULL) {
+        ush_writeln("rm: failed (directory must be empty)");
+        return 0;
+    }
+
+    return 1;
+}
+
+static int ush_cmd_stats(const ush_state *sh) {
+    (void)ush_cmd_memstat();
+    (void)ush_cmd_fsstat();
+    (void)ush_cmd_taskstat();
+    (void)ush_cmd_userstat();
+    (void)ush_cmd_kbdstat();
+    (void)ush_cmd_shstat(sh);
+    return 1;
+}
+
+static int ush_cmd_not_supported(const char *name, const char *why) {
+    ush_write(name);
+    ush_write(": ");
+    ush_writeln(why);
+    return 0;
+}
 
 static int ush_execute_single_command(ush_state *sh,
                                       const char *cmd,
@@ -666,5 +2061,6 @@ void ush_execute_line(ush_state *sh, const char *line) {
         sh->cmd_unknown++;
     }
 }
+
 
 

@@ -1,5 +1,5 @@
-#ifndef CLEONOS_USER_SHELL_INTERNAL_H
-#define CLEONOS_USER_SHELL_INTERNAL_H
+#ifndef CLEONOS_CMD_RUNTIME_H
+#define CLEONOS_CMD_RUNTIME_H
 
 #include <cleonos_syscall.h>
 
@@ -13,21 +13,9 @@ typedef long long i64;
 #define USH_SCRIPT_MAX     1024ULL
 #define USH_CLEAR_LINES      56ULL
 #define USH_HISTORY_MAX      16ULL
-
-#define USH_KEY_LEFT    ((char)0x01)
-#define USH_KEY_RIGHT   ((char)0x02)
-#define USH_KEY_UP      ((char)0x03)
-#define USH_KEY_DOWN    ((char)0x04)
-#define USH_KEY_HOME    ((char)0x05)
-#define USH_KEY_END     ((char)0x06)
-#define USH_KEY_DELETE  ((char)0x07)
-#define USH_KEY_SELECT_ALL ((char)0x10)
-#define USH_KEY_COPY       ((char)0x11)
-#define USH_KEY_PASTE      ((char)0x12)
-#define USH_KEY_SHIFT_LEFT ((char)0x13)
-#define USH_KEY_SHIFT_RIGHT ((char)0x14)
-#define USH_KEY_SHIFT_HOME ((char)0x15)
-#define USH_KEY_SHIFT_END  ((char)0x16)
+#define USH_DMESG_DEFAULT    64ULL
+#define USH_DMESG_LINE_MAX  256ULL
+#define USH_COPY_MAX      65536U
 
 #define USH_CMD_CTX_PATH "/temp/.ush_cmd_ctx.bin"
 #define USH_CMD_RET_PATH "/temp/.ush_cmd_ret.bin"
@@ -69,6 +57,10 @@ typedef struct ush_cmd_ret {
     char cwd[USH_PATH_MAX];
 } ush_cmd_ret;
 
+extern const char *ush_pipeline_stdin_text;
+extern u64 ush_pipeline_stdin_len;
+
+void ush_zero(void *ptr, u64 size);
 void ush_init_state(ush_state *sh);
 
 u64 ush_strlen(const char *str);
@@ -85,27 +77,22 @@ void ush_parse_line(const char *line, char *out_cmd, u64 cmd_size, char *out_arg
 void ush_write(const char *text);
 void ush_write_char(char ch);
 void ush_writeln(const char *text);
-void ush_output_capture_begin(char *buffer, u64 buffer_size, int mirror_to_tty);
-u64 ush_output_capture_end(void);
-int ush_output_capture_truncated(void);
-void ush_prompt(const ush_state *sh);
 void ush_write_hex_u64(u64 value);
 void ush_print_kv_hex(const char *label, u64 value);
 
 int ush_resolve_path(const ush_state *sh, const char *arg, char *out_path, u64 out_size);
 int ush_resolve_exec_path(const ush_state *sh, const char *arg, char *out_path, u64 out_size);
 int ush_path_is_under_system(const char *path);
+int ush_path_is_under_temp(const char *path);
 
-void ush_read_line(ush_state *sh, char *out_line, u64 out_size);
-int ush_run_script_file(ush_state *sh, const char *path);
-void ush_execute_line(ush_state *sh, const char *line);
+int ush_split_first_and_rest(const char *arg, char *out_first, u64 out_first_size, const char **out_rest);
+int ush_split_two_args(const char *arg,
+                       char *out_first,
+                       u64 out_first_size,
+                       char *out_second,
+                       u64 out_second_size);
 
-int ush_command_ctx_write(const char *cmd, const char *arg, const char *cwd);
 int ush_command_ctx_read(ush_cmd_ctx *out_ctx);
-void ush_command_ret_reset(void);
 int ush_command_ret_write(const ush_cmd_ret *ret);
-int ush_command_ret_read(ush_cmd_ret *out_ret);
-int ush_try_exec_external(ush_state *sh, const char *cmd, const char *arg, int *out_success);
 
 #endif
-

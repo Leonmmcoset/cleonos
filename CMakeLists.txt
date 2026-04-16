@@ -392,10 +392,7 @@ foreach(SRC IN LISTS USER_APP_MAIN_SOURCES)
 
     list(FIND USER_SHELL_COMMAND_APPS "${_app_name}" _shell_cmd_idx)
     if(NOT _shell_cmd_idx EQUAL -1)
-        file(GLOB _shell_cmd_shared_abs CONFIGURE_DEPENDS
-            "${CMAKE_SOURCE_DIR}/cleonos/c/apps/shell/*.c"
-        )
-        list(APPEND _app_specific_abs ${_shell_cmd_shared_abs})
+        list(APPEND _app_specific_abs "${CMAKE_SOURCE_DIR}/cleonos/c/apps/cmd_runtime.c")
     endif()
     foreach(_extra_abs IN LISTS _app_specific_abs)
         file(RELATIVE_PATH _extra_rel "${CMAKE_SOURCE_DIR}" "${_extra_abs}")

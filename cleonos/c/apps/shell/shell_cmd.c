@@ -5,6 +5,7 @@
 #define USH_COPY_MAX      65536U
 #define USH_PIPELINE_MAX_STAGES 8ULL
 #define USH_PIPE_CAPTURE_MAX   USH_COPY_MAX
+#define USH_SORT_MAX_LINES 4096ULL
 
 typedef struct ush_pipeline_stage {
     char text[USH_LINE_MAX];
@@ -129,6 +130,8 @@ static int ush_cmd_help(void) {
     ush_writeln("  ls [-l] [-R] [path]");
     ush_writeln("  cat [file]        (reads pipeline input when file omitted)");
     ush_writeln("  grep [-n] <pattern> [file]");
+    ush_writeln("  head [-n N] [file] / tail [-n N] [file]");
+    ush_writeln("  wc [file] / cut -d <char> -f <N> [file] / uniq [file] / sort [file]");
     ush_writeln("  pwd");
     ush_writeln("  cd [dir]");
     ush_writeln("  exec|run <path|name>");
@@ -711,6 +714,746 @@ static int ush_cmd_grep(const ush_state *sh, const char *arg) {
     }
 
     (void)ush_grep_emit_matches(input, input_len, pattern, with_line_number);
+    return 1;
+}
+
+static void ush_text_error(const char *cmd, const char *message) {
+    ush_write(cmd);
+    ush_write(": ");
+    ush_writeln(message);
+}
+
+static int ush_text_parse_optional_file(const char *arg, char *out_file, u64 out_file_size) {
+    char first[USH_PATH_MAX];
+    const char *rest = "";
+
+    if (out_file == (char *)0 || out_file_size == 0ULL) {
+        return 0;
+    }
+
+    out_file[0] = '\0';
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        return 1;
+    }
+
+    if (ush_split_first_and_rest(arg, first, (u64)sizeof(first), &rest) == 0) {
+        return 0;
+    }
+
+    if (rest != (const char *)0 && rest[0] != '\0') {
+        return 0;
+    }
+
+    ush_copy(out_file, out_file_size, first);
+    return 1;
+}
+
+static int ush_text_load_input(const ush_state *sh,
+                               const char *cmd,
+                               const char *file_arg,
+                               const char **out_input,
+                               u64 *out_input_len) {
+    static char file_buf[USH_COPY_MAX + 1U];
+    char path[USH_PATH_MAX];
+    u64 size;
+    u64 got;
+
+    if (sh == (const ush_state *)0 ||
+        cmd == (const char *)0 ||
+        out_input == (const char **)0 ||
+        out_input_len == (u64 *)0) {
+        return 0;
+    }
+
+    *out_input = (const char *)0;
+    *out_input_len = 0ULL;
+
+    if (file_arg != (const char *)0 && file_arg[0] != '\0') {
+        if (ush_resolve_path(sh, file_arg, path, (u64)sizeof(path)) == 0) {
+            ush_text_error(cmd, "invalid path");
+            return 0;
+        }
+
+        if (cleonos_sys_fs_stat_type(path) != 1ULL) {
+            ush_text_error(cmd, "file not found");
+            return 0;
+        }
+
+        size = cleonos_sys_fs_stat_size(path);
+
+        if (size == (u64)-1) {
+            ush_text_error(cmd, "failed to stat file");
+            return 0;
+        }
+
+        if (size > (u64)USH_COPY_MAX) {
+            ush_text_error(cmd, "file too large for user buffer");
+            return 0;
+        }
+
+        if (size == 0ULL) {
+            file_buf[0] = '\0';
+            *out_input = file_buf;
+            *out_input_len = 0ULL;
+            return 1;
+        }
+
+        got = cleonos_sys_fs_read(path, file_buf, size);
+
+        if (got == 0ULL || got != size) {
+            ush_text_error(cmd, "read failed");
+            return 0;
+        }
+
+        file_buf[got] = '\0';
+        *out_input = file_buf;
+        *out_input_len = got;
+        return 1;
+    }
+
+    if (ush_pipeline_stdin_text == (const char *)0) {
+        ush_text_error(cmd, "file path required (or pipeline input)");
+        return 0;
+    }
+
+    *out_input = ush_pipeline_stdin_text;
+    *out_input_len = ush_pipeline_stdin_len;
+    return 1;
+}
+
+static int ush_head_parse_args(const char *arg, u64 *out_line_count, char *out_file, u64 out_file_size) {
+    char first[USH_PATH_MAX];
+    char second[USH_PATH_MAX];
+    char third[USH_PATH_MAX];
+    const char *rest = "";
+    const char *rest2 = "";
+
+    if (out_line_count == (u64 *)0 || out_file == (char *)0 || out_file_size == 0ULL) {
+        return 0;
+    }
+
+    *out_line_count = 10ULL;
+    out_file[0] = '\0';
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        return 1;
+    }
+
+    if (ush_split_first_and_rest(arg, first, (u64)sizeof(first), &rest) == 0) {
+        return 0;
+    }
+
+    if (ush_streq(first, "-n") != 0) {
+        if (ush_split_first_and_rest(rest, second, (u64)sizeof(second), &rest2) == 0) {
+            return 0;
+        }
+
+        if (ush_parse_u64_dec(second, out_line_count) == 0) {
+            return 0;
+        }
+
+        if (rest2 != (const char *)0 && rest2[0] != '\0') {
+            if (ush_split_first_and_rest(rest2, third, (u64)sizeof(third), &rest) == 0) {
+                return 0;
+            }
+
+            if (rest != (const char *)0 && rest[0] != '\0') {
+                return 0;
+            }
+
+            ush_copy(out_file, out_file_size, third);
+        }
+
+        return 1;
+    }
+
+    if (rest != (const char *)0 && rest[0] != '\0') {
+        return 0;
+    }
+
+    ush_copy(out_file, out_file_size, first);
+    return 1;
+}
+
+static int ush_cmd_head(const ush_state *sh, const char *arg) {
+    char file_arg[USH_PATH_MAX];
+    const char *input = (const char *)0;
+    u64 input_len = 0ULL;
+    u64 line_count;
+    u64 i;
+    u64 emitted = 0ULL;
+
+    if (sh == (const ush_state *)0) {
+        return 0;
+    }
+
+    if (ush_head_parse_args(arg, &line_count, file_arg, (u64)sizeof(file_arg)) == 0) {
+        ush_writeln("head: usage head [-n N] [file]");
+        return 0;
+    }
+
+    if (line_count == 0ULL) {
+        return 1;
+    }
+
+    if (ush_text_load_input(sh, "head", file_arg, &input, &input_len) == 0) {
+        return 0;
+    }
+
+    for (i = 0ULL; i < input_len; i++) {
+        if (emitted >= line_count) {
+            break;
+        }
+
+        ush_write_char(input[i]);
+
+        if (input[i] == '\n') {
+            emitted++;
+        }
+    }
+
+    return 1;
+}
+
+static int ush_tail_parse_args(const char *arg, u64 *out_line_count, char *out_file, u64 out_file_size) {
+    char first[USH_PATH_MAX];
+    char second[USH_PATH_MAX];
+    char third[USH_PATH_MAX];
+    const char *rest = "";
+    const char *rest2 = "";
+
+    if (out_line_count == (u64 *)0 || out_file == (char *)0 || out_file_size == 0ULL) {
+        return 0;
+    }
+
+    *out_line_count = 10ULL;
+    out_file[0] = '\0';
+
+    if (arg == (const char *)0 || arg[0] == '\0') {
+        return 1;
+    }
+
+    if (ush_split_first_and_rest(arg, first, (u64)sizeof(first), &rest) == 0) {
+        return 0;
+    }
+
+    if (ush_streq(first, "-n") != 0) {
+        if (ush_split_first_and_rest(rest, second, (u64)sizeof(second), &rest2) == 0) {
+            return 0;
+        }
+
+        if (ush_parse_u64_dec(second, out_line_count) == 0) {
+            return 0;
+        }
+
+        if (rest2 != (const char *)0 && rest2[0] != '\0') {
+            if (ush_split_first_and_rest(rest2, third, (u64)sizeof(third), &rest) == 0) {
+                return 0;
+            }
+
+            if (rest != (const char *)0 && rest[0] != '\0') {
+                return 0;
+            }
+
+            ush_copy(out_file, out_file_size, third);
+        }
+
+        return 1;
+    }
+
+    if (rest != (const char *)0 && rest[0] != '\0') {
+        return 0;
+    }
+
+    ush_copy(out_file, out_file_size, first);
+    return 1;
+}
+
+static u64 ush_tail_count_lines(const char *input, u64 input_len) {
+    u64 i;
+    u64 lines = 0ULL;
+
+    if (input == (const char *)0 || input_len == 0ULL) {
+        return 0ULL;
+    }
+
+    lines = 1ULL;
+
+    for (i = 0ULL; i < input_len; i++) {
+        if (input[i] == '\n' && i + 1ULL < input_len) {
+            lines++;
+        }
+    }
+
+    return lines;
+}
+
+static u64 ush_tail_find_start_offset(const char *input, u64 input_len, u64 skip_lines) {
+    u64 i;
+    u64 lines_seen = 0ULL;
+
+    if (input == (const char *)0 || input_len == 0ULL || skip_lines == 0ULL) {
+        return 0ULL;
+    }
+
+    for (i = 0ULL; i < input_len; i++) {
+        if (input[i] == '\n' && i + 1ULL < input_len) {
+            lines_seen++;
+            if (lines_seen == skip_lines) {
+                return i + 1ULL;
+            }
+        }
+    }
+
+    return input_len;
+}
+
+static int ush_cmd_tail(const ush_state *sh, const char *arg) {
+    char file_arg[USH_PATH_MAX];
+    const char *input = (const char *)0;
+    u64 input_len = 0ULL;
+    u64 line_count;
+    u64 total_lines;
+    u64 skip_lines;
+    u64 start_offset;
+    u64 i;
+
+    if (sh == (const ush_state *)0) {
+        return 0;
+    }
+
+    if (ush_tail_parse_args(arg, &line_count, file_arg, (u64)sizeof(file_arg)) == 0) {
+        ush_writeln("tail: usage tail [-n N] [file]");
+        return 0;
+    }
+
+    if (line_count == 0ULL) {
+        return 1;
+    }
+
+    if (ush_text_load_input(sh, "tail", file_arg, &input, &input_len) == 0) {
+        return 0;
+    }
+
+    if (input_len == 0ULL) {
+        return 1;
+    }
+
+    total_lines = ush_tail_count_lines(input, input_len);
+    skip_lines = (total_lines > line_count) ? (total_lines - line_count) : 0ULL;
+    start_offset = ush_tail_find_start_offset(input, input_len, skip_lines);
+
+    for (i = start_offset; i < input_len; i++) {
+        ush_write_char(input[i]);
+    }
+
+    return 1;
+}
+
+static int ush_cmd_wc(const ush_state *sh, const char *arg) {
+    char file_arg[USH_PATH_MAX];
+    const char *input = (const char *)0;
+    u64 input_len = 0ULL;
+    u64 bytes = 0ULL;
+    u64 lines = 0ULL;
+    u64 words = 0ULL;
+    u64 i;
+    int in_word = 0;
+
+    if (sh == (const ush_state *)0) {
+        return 0;
+    }
+
+    if (ush_text_parse_optional_file(arg, file_arg, (u64)sizeof(file_arg)) == 0) {
+        ush_writeln("wc: usage wc [file]");
+        return 0;
+    }
+
+    if (ush_text_load_input(sh, "wc", file_arg, &input, &input_len) == 0) {
+        return 0;
+    }
+
+    bytes = input_len;
+
+    for (i = 0ULL; i < input_len; i++) {
+        char ch = input[i];
+
+        if (ch == '\n') {
+            lines++;
+        }
+
+        if (ush_is_space(ch) != 0) {
+            in_word = 0;
+        } else if (in_word == 0) {
+            words++;
+            in_word = 1;
+        }
+    }
+
+    ush_grep_write_u64_dec(lines);
+    ush_write(" ");
+    ush_grep_write_u64_dec(words);
+    ush_write(" ");
+    ush_grep_write_u64_dec(bytes);
+    ush_write_char('\n');
+
+    return 1;
+}
+
+static int ush_cut_parse_delim(const char *token, char *out_delim) {
+    if (token == (const char *)0 || out_delim == (char *)0) {
+        return 0;
+    }
+
+    if (token[0] == '\\' && token[1] == 't' && token[2] == '\0') {
+        *out_delim = '\t';
+        return 1;
+    }
+
+    if (token[0] == '\0' || token[1] != '\0') {
+        return 0;
+    }
+
+    *out_delim = token[0];
+    return 1;
+}
+
+static int ush_cut_parse_args(const char *arg,
+                              char *out_delim,
+                              u64 *out_field,
+                              char *out_file,
+                              u64 out_file_size) {
+    char token[USH_PATH_MAX];
+    char value[USH_PATH_MAX];
+    const char *cursor = arg;
+    const char *rest = "";
+    int delim_set = 0;
+    int field_set = 0;
+    int file_set = 0;
+    u64 parsed_field = 0ULL;
+
+    if (out_delim == (char *)0 || out_field == (u64 *)0 || out_file == (char *)0 || out_file_size == 0ULL) {
+        return 0;
+    }
+
+    *out_delim = ',';
+    *out_field = 1ULL;
+    out_file[0] = '\0';
+
+    if (cursor == (const char *)0 || cursor[0] == '\0') {
+        return 0;
+    }
+
+    while (cursor != (const char *)0 && cursor[0] != '\0') {
+        if (ush_split_first_and_rest(cursor, token, (u64)sizeof(token), &rest) == 0) {
+            return 0;
+        }
+
+        if (ush_streq(token, "-d") != 0) {
+            if (ush_split_first_and_rest(rest, value, (u64)sizeof(value), &cursor) == 0) {
+                return 0;
+            }
+
+            if (ush_cut_parse_delim(value, out_delim) == 0) {
+                return 0;
+            }
+
+            delim_set = 1;
+            continue;
+        }
+
+        if (ush_streq(token, "-f") != 0) {
+            if (ush_split_first_and_rest(rest, value, (u64)sizeof(value), &cursor) == 0) {
+                return 0;
+            }
+
+            if (ush_parse_u64_dec(value, &parsed_field) == 0 || parsed_field == 0ULL) {
+                return 0;
+            }
+
+            *out_field = parsed_field;
+            field_set = 1;
+            continue;
+        }
+
+        if (token[0] == '-') {
+            return 0;
+        }
+
+        if (file_set != 0) {
+            return 0;
+        }
+
+        ush_copy(out_file, out_file_size, token);
+        file_set = 1;
+        cursor = rest;
+    }
+
+    return (delim_set != 0 && field_set != 0) ? 1 : 0;
+}
+
+static void ush_cut_emit_field(const char *line, u64 line_len, char delim, u64 field_index) {
+    u64 pos;
+    u64 current_field = 1ULL;
+    u64 field_start = 0ULL;
+
+    for (pos = 0ULL; pos <= line_len; pos++) {
+        if (pos == line_len || line[pos] == delim) {
+            if (current_field == field_index) {
+                u64 j;
+                for (j = field_start; j < pos; j++) {
+                    ush_write_char(line[j]);
+                }
+                break;
+            }
+
+            current_field++;
+            field_start = pos + 1ULL;
+        }
+    }
+
+    ush_write_char('\n');
+}
+
+static int ush_cmd_cut(const ush_state *sh, const char *arg) {
+    char file_arg[USH_PATH_MAX];
+    const char *input = (const char *)0;
+    u64 input_len = 0ULL;
+    char delim = ',';
+    u64 field_index = 1ULL;
+    u64 i;
+    u64 start = 0ULL;
+
+    if (sh == (const ush_state *)0) {
+        return 0;
+    }
+
+    if (ush_cut_parse_args(arg, &delim, &field_index, file_arg, (u64)sizeof(file_arg)) == 0) {
+        ush_writeln("cut: usage cut -d <char> -f <N> [file]");
+        return 0;
+    }
+
+    if (ush_text_load_input(sh, "cut", file_arg, &input, &input_len) == 0) {
+        return 0;
+    }
+
+    for (i = 0ULL; i < input_len; i++) {
+        if (input[i] == '\n') {
+            ush_cut_emit_field(&input[start], i - start, delim, field_index);
+            start = i + 1ULL;
+        }
+    }
+
+    if (start < input_len) {
+        ush_cut_emit_field(&input[start], input_len - start, delim, field_index);
+    }
+
+    return 1;
+}
+
+static int ush_uniq_line_equal(const char *left, u64 left_len, const char *right, u64 right_len) {
+    u64 i;
+
+    if (left_len != right_len) {
+        return 0;
+    }
+
+    for (i = 0ULL; i < left_len; i++) {
+        if (left[i] != right[i]) {
+            return 0;
+        }
+    }
+
+    return 1;
+}
+
+static void ush_uniq_emit_line(const char *line, u64 line_len) {
+    u64 i;
+
+    for (i = 0ULL; i < line_len; i++) {
+        ush_write_char(line[i]);
+    }
+
+    ush_write_char('\n');
+}
+
+static int ush_cmd_uniq(const ush_state *sh, const char *arg) {
+    char file_arg[USH_PATH_MAX];
+    const char *input = (const char *)0;
+    u64 input_len = 0ULL;
+    const char *prev_line = (const char *)0;
+    u64 prev_len = 0ULL;
+    u64 start = 0ULL;
+    u64 i;
+    int first = 1;
+
+    if (sh == (const ush_state *)0) {
+        return 0;
+    }
+
+    if (ush_text_parse_optional_file(arg, file_arg, (u64)sizeof(file_arg)) == 0) {
+        ush_writeln("uniq: usage uniq [file]");
+        return 0;
+    }
+
+    if (ush_text_load_input(sh, "uniq", file_arg, &input, &input_len) == 0) {
+        return 0;
+    }
+
+    for (i = 0ULL; i < input_len; i++) {
+        if (input[i] == '\n') {
+            u64 line_len = i - start;
+            const char *line = &input[start];
+
+            if (first != 0 || ush_uniq_line_equal(prev_line, prev_len, line, line_len) == 0) {
+                ush_uniq_emit_line(line, line_len);
+                prev_line = line;
+                prev_len = line_len;
+                first = 0;
+            }
+
+            start = i + 1ULL;
+        }
+    }
+
+    if (start < input_len) {
+        u64 line_len = input_len - start;
+        const char *line = &input[start];
+
+        if (first != 0 || ush_uniq_line_equal(prev_line, prev_len, line, line_len) == 0) {
+            ush_uniq_emit_line(line, line_len);
+        }
+    }
+
+    return 1;
+}
+
+static int ush_sort_compare_line(const char *left, const char *right) {
+    u64 i = 0ULL;
+
+    while (left[i] != '\0' && right[i] != '\0') {
+        if (left[i] < right[i]) {
+            return -1;
+        }
+
+        if (left[i] > right[i]) {
+            return 1;
+        }
+
+        i++;
+    }
+
+    if (left[i] == right[i]) {
+        return 0;
+    }
+
+    return (left[i] == '\0') ? -1 : 1;
+}
+
+static int ush_sort_collect_lines(char *buf, u64 len, char **out_lines, u64 max_lines, u64 *out_count) {
+    u64 start = 0ULL;
+    u64 i;
+    u64 count = 0ULL;
+    int truncated = 0;
+
+    if (buf == (char *)0 || out_lines == (char **)0 || out_count == (u64 *)0 || max_lines == 0ULL) {
+        return 0;
+    }
+
+    *out_count = 0ULL;
+
+    for (i = 0ULL; i < len; i++) {
+        if (buf[i] == '\n') {
+            buf[i] = '\0';
+
+            if (count < max_lines) {
+                out_lines[count++] = &buf[start];
+            } else {
+                truncated = 1;
+            }
+
+            start = i + 1ULL;
+        }
+    }
+
+    if (start < len) {
+        if (count < max_lines) {
+            out_lines[count++] = &buf[start];
+        } else {
+            truncated = 1;
+        }
+    }
+
+    *out_count = count;
+    return (truncated == 0) ? 1 : 2;
+}
+
+static void ush_sort_lines(char **lines, u64 count) {
+    u64 i;
+
+    if (lines == (char **)0 || count == 0ULL) {
+        return;
+    }
+
+    for (i = 1ULL; i < count; i++) {
+        char *key = lines[i];
+        u64 j = i;
+
+        while (j > 0ULL && ush_sort_compare_line(lines[j - 1ULL], key) > 0) {
+            lines[j] = lines[j - 1ULL];
+            j--;
+        }
+
+        lines[j] = key;
+    }
+}
+
+static int ush_cmd_sort(const ush_state *sh, const char *arg) {
+    char file_arg[USH_PATH_MAX];
+    const char *input = (const char *)0;
+    u64 input_len = 0ULL;
+    static char sort_buf[USH_COPY_MAX + 1U];
+    char *lines[USH_SORT_MAX_LINES];
+    u64 line_count = 0ULL;
+    u64 i;
+    int collect_status;
+
+    if (sh == (const ush_state *)0) {
+        return 0;
+    }
+
+    if (ush_text_parse_optional_file(arg, file_arg, (u64)sizeof(file_arg)) == 0) {
+        ush_writeln("sort: usage sort [file]");
+        return 0;
+    }
+
+    if (ush_text_load_input(sh, "sort", file_arg, &input, &input_len) == 0) {
+        return 0;
+    }
+
+    for (i = 0ULL; i < input_len; i++) {
+        sort_buf[i] = input[i];
+    }
+    sort_buf[input_len] = '\0';
+
+    collect_status = ush_sort_collect_lines(sort_buf, input_len, lines, (u64)USH_SORT_MAX_LINES, &line_count);
+
+    if (collect_status == 0) {
+        ush_writeln("sort: internal parse error");
+        return 0;
+    }
+
+    ush_sort_lines(lines, line_count);
+
+    for (i = 0ULL; i < line_count; i++) {
+        ush_writeln(lines[i]);
+    }
+
+    if (collect_status == 2) {
+        ush_writeln("[sort] line count truncated");
+    }
+
     return 1;
 }
 
@@ -1666,6 +2409,18 @@ static int ush_execute_single_command(ush_state *sh,
         success = ush_cmd_cat(sh, arg);
     } else if (ush_streq(cmd, "grep") != 0) {
         success = ush_cmd_grep(sh, arg);
+    } else if (ush_streq(cmd, "head") != 0) {
+        success = ush_cmd_head(sh, arg);
+    } else if (ush_streq(cmd, "tail") != 0) {
+        success = ush_cmd_tail(sh, arg);
+    } else if (ush_streq(cmd, "wc") != 0) {
+        success = ush_cmd_wc(sh, arg);
+    } else if (ush_streq(cmd, "cut") != 0) {
+        success = ush_cmd_cut(sh, arg);
+    } else if (ush_streq(cmd, "uniq") != 0) {
+        success = ush_cmd_uniq(sh, arg);
+    } else if (ush_streq(cmd, "sort") != 0) {
+        success = ush_cmd_sort(sh, arg);
     } else if (ush_streq(cmd, "pwd") != 0) {
         success = ush_cmd_pwd(sh);
     } else if (ush_streq(cmd, "cd") != 0) {

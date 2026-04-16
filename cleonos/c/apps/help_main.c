@@ -5,6 +5,8 @@ static int ush_cmd_help(void) {
     ush_writeln("  ls [-l] [-R] [path]");
     ush_writeln("  cat [file]        (reads pipeline input when file omitted)");
     ush_writeln("  grep [-n] <pattern> [file]");
+    ush_writeln("  head [-n N] [file] / tail [-n N] [file]");
+    ush_writeln("  wc [file] / cut -d <char> -f <N> [file] / uniq [file] / sort [file]");
     ush_writeln("  pwd");
     ush_writeln("  cd [dir]");
     ush_writeln("  exec|run <path|name>");

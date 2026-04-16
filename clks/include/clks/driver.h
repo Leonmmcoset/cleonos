@@ -10,6 +10,7 @@ enum clks_driver_kind {
     CLKS_DRIVER_KIND_BUILTIN_VIDEO = 2,
     CLKS_DRIVER_KIND_BUILTIN_TTY = 3,
     CLKS_DRIVER_KIND_ELF = 4,
+    CLKS_DRIVER_KIND_BUILTIN_AUDIO = 5,
 };
 
 enum clks_driver_state {

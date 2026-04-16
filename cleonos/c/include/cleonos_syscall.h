@@ -54,6 +54,9 @@ typedef unsigned long long usize;
 #define CLEONOS_SYSCALL_YIELD               45ULL
 #define CLEONOS_SYSCALL_SHUTDOWN            46ULL
 #define CLEONOS_SYSCALL_RESTART             47ULL
+#define CLEONOS_SYSCALL_AUDIO_AVAILABLE     48ULL
+#define CLEONOS_SYSCALL_AUDIO_PLAY_TONE     49ULL
+#define CLEONOS_SYSCALL_AUDIO_STOP          50ULL
 
 u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 u64 cleonos_sys_log_write(const char *message, u64 length);
@@ -103,5 +106,8 @@ u64 cleonos_sys_sleep_ticks(u64 ticks);
 u64 cleonos_sys_yield(void);
 u64 cleonos_sys_shutdown(void);
 u64 cleonos_sys_restart(void);
+u64 cleonos_sys_audio_available(void);
+u64 cleonos_sys_audio_play_tone(u64 hz, u64 ticks);
+u64 cleonos_sys_audio_stop(void);
 
 #endif

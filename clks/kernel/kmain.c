@@ -1,6 +1,7 @@
 // Kernel main function
 
 #include <clks/boot.h>
+#include <clks/audio.h>
 #include <clks/cpu.h>
 #include <clks/desktop.h>
 #include <clks/driver.h>
@@ -175,6 +176,7 @@ void clks_kernel_main(void) {
     }
 
     clks_exec_init();
+    clks_audio_init();
     clks_keyboard_init();
     clks_mouse_init();
     clks_desktop_init();

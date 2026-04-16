@@ -10,6 +10,7 @@ static int ush_cmd_help(void) {
     ush_writeln("  exec|run <path|name>");
     ush_writeln("  clear");
     ush_writeln("  ansi / ansitest / color");
+    ush_writeln("  wavplay <file.wav> [steps] [ticks] / wavplay --stop");
     ush_writeln("  fastfetch [--plain]");
     ush_writeln("  memstat / fsstat / taskstat / userstat / shstat / stats");
     ush_writeln("  tty [index]");
@@ -78,4 +79,3 @@ int cleonos_app_main(void) {
 
     return (success != 0) ? 0 : 1;
 }
-

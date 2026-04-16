@@ -199,3 +199,16 @@ u64 cleonos_sys_shutdown(void) {
 u64 cleonos_sys_restart(void) {
     return cleonos_syscall(CLEONOS_SYSCALL_RESTART, 0ULL, 0ULL, 0ULL);
 }
+
+
+u64 cleonos_sys_audio_available(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_AUDIO_AVAILABLE, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_audio_play_tone(u64 hz, u64 ticks) {
+    return cleonos_syscall(CLEONOS_SYSCALL_AUDIO_PLAY_TONE, hz, ticks, 0ULL);
+}
+
+u64 cleonos_sys_audio_stop(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_AUDIO_STOP, 0ULL, 0ULL, 0ULL);
+}

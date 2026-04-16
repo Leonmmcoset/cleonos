@@ -1,4 +1,5 @@
 #include <clks/cpu.h>
+#include <clks/audio.h>
 #include <clks/exec.h>
 #include <clks/fs.h>
 #include <clks/heap.h>
@@ -280,6 +281,22 @@ static u64 clks_syscall_restart(void) {
 }
 
 
+static u64 clks_syscall_audio_available(void) {
+    return (clks_audio_available() == CLKS_TRUE) ? 1ULL : 0ULL;
+}
+
+static u64 clks_syscall_audio_play_tone(u64 arg0, u64 arg1) {
+    if (clks_audio_play_tone(arg0, arg1) == CLKS_FALSE) {
+        return 0ULL;
+    }
+
+    return 1ULL;
+}
+
+static u64 clks_syscall_audio_stop(void) {
+    clks_audio_stop();
+    return 1ULL;
+}
 static u64 clks_syscall_fs_stat_type(u64 arg0) {
     char path[CLKS_SYSCALL_PATH_MAX];
     struct clks_fs_node_info info;
@@ -582,6 +599,12 @@ u64 clks_syscall_dispatch(void *frame_ptr) {
             return clks_syscall_shutdown();
         case CLKS_SYSCALL_RESTART:
             return clks_syscall_restart();
+        case CLKS_SYSCALL_AUDIO_AVAILABLE:
+            return clks_syscall_audio_available();
+        case CLKS_SYSCALL_AUDIO_PLAY_TONE:
+            return clks_syscall_audio_play_tone(frame->rbx, frame->rcx);
+        case CLKS_SYSCALL_AUDIO_STOP:
+            return clks_syscall_audio_stop();
         default:
             return (u64)-1;
     }

@@ -1,4 +1,5 @@
 #include <clks/driver.h>
+#include <clks/audio.h>
 #include <clks/elf64.h>
 #include <clks/framebuffer.h>
 #include <clks/fs.h>
@@ -114,6 +115,12 @@ static void clks_driver_register_builtins(void) {
     } else {
         clks_driver_push("framebuffer", CLKS_DRIVER_KIND_BUILTIN_VIDEO, CLKS_DRIVER_STATE_FAILED, CLKS_FALSE, 0ULL, 0ULL);
         clks_driver_push("tty", CLKS_DRIVER_KIND_BUILTIN_TTY, CLKS_DRIVER_STATE_FAILED, CLKS_FALSE, 0ULL, 0ULL);
+    }
+
+    if (clks_audio_available() == CLKS_TRUE) {
+        clks_driver_push("pcspeaker", CLKS_DRIVER_KIND_BUILTIN_AUDIO, CLKS_DRIVER_STATE_READY, CLKS_FALSE, 0ULL, 0ULL);
+    } else {
+        clks_driver_push("pcspeaker", CLKS_DRIVER_KIND_BUILTIN_AUDIO, CLKS_DRIVER_STATE_FAILED, CLKS_FALSE, 0ULL, 0ULL);
     }
 }
 

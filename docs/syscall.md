@@ -52,7 +52,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 
 - `FS_MKDIR` / `FS_WRITE` / `FS_APPEND` / `FS_REMOVE` 仅允许 `/temp` 树下路径。
 
-## 4. Syscall 列表（0~47）
+## 4. Syscall 列表（0~50）
 
 ### 0 `CLEONOS_SYSCALL_LOG_WRITE`
 
@@ -350,6 +350,27 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - 返回：理论上不返回；成功路径会触发重启流程（当前 x86_64 走 8042 reset）
 - 说明：若重启流程未生效，内核会进入 halt 循环。
 
+### 48 `CLEONOS_SYSCALL_AUDIO_AVAILABLE`
+
+- 参数：无
+- 返回：
+- `1`：音频输出可用
+- `0`：当前平台无音频输出
+
+### 49 `CLEONOS_SYSCALL_AUDIO_PLAY_TONE`
+
+- 参数：
+- `arg0`: `u64 hz`（频率，`0` 表示静音等待）
+- `arg1`: `u64 ticks`（持续 tick）
+- 返回：成功 `1`，失败 `0`
+- 说明：当前实现基于 PC Speaker（x86_64），用于最小音频链路。
+
+### 50 `CLEONOS_SYSCALL_AUDIO_STOP`
+
+- 参数：无
+- 返回：当前实现固定返回 `1`
+- 说明：立即停止当前音频输出。
+
 ## 5. 用户态封装函数
 
 用户态封装位于：
@@ -366,6 +387,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `cleonos_sys_kbd_get_char()` / `cleonos_sys_kbd_buffered()`
 - `cleonos_sys_getpid()` / `cleonos_sys_spawn_path()` / `cleonos_sys_wait_pid()`
 - `cleonos_sys_exit()` / `cleonos_sys_sleep_ticks()` / `cleonos_sys_yield()` / `cleonos_sys_shutdown()` / `cleonos_sys_restart()`
+- `cleonos_sys_audio_available()` / `cleonos_sys_audio_play_tone()` / `cleonos_sys_audio_stop()`
 
 ## 6. 开发注意事项
 

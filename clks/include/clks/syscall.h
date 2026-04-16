@@ -51,6 +51,9 @@
 #define CLKS_SYSCALL_YIELD               45ULL
 #define CLKS_SYSCALL_SHUTDOWN            46ULL
 #define CLKS_SYSCALL_RESTART             47ULL
+#define CLKS_SYSCALL_AUDIO_AVAILABLE     48ULL
+#define CLKS_SYSCALL_AUDIO_PLAY_TONE     49ULL
+#define CLKS_SYSCALL_AUDIO_STOP          50ULL
 
 void clks_syscall_init(void);
 u64 clks_syscall_dispatch(void *frame_ptr);

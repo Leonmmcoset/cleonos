@@ -68,6 +68,9 @@
 #define CLKS_SYSCALL_PROC_PID_AT         62ULL
 #define CLKS_SYSCALL_PROC_SNAPSHOT       63ULL
 #define CLKS_SYSCALL_PROC_KILL           64ULL
+#define CLKS_SYSCALL_KDBG_SYM            65ULL
+#define CLKS_SYSCALL_KDBG_BT             66ULL
+#define CLKS_SYSCALL_KDBG_REGS           67ULL
 
 void clks_syscall_init(void);
 u64 clks_syscall_dispatch(void *frame_ptr);

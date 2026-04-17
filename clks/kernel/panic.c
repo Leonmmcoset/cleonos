@@ -229,14 +229,19 @@ static clks_bool clks_panic_parse_symbol_line(const char *line,
                                               usize len,
                                               u64 *out_addr,
                                               const char **out_name,
-                                              usize *out_name_len) {
+                                              usize *out_name_len,
+                                              const char **out_source,
+                                              usize *out_source_len) {
     usize i = 0U;
     u64 addr = 0ULL;
     u32 digits = 0U;
     usize name_start;
     usize name_end;
+    usize source_start;
+    usize source_end;
 
-    if (line == CLKS_NULL || out_addr == CLKS_NULL || out_name == CLKS_NULL || out_name_len == CLKS_NULL) {
+    if (line == CLKS_NULL || out_addr == CLKS_NULL || out_name == CLKS_NULL || out_name_len == CLKS_NULL ||
+        out_source == CLKS_NULL || out_source_len == CLKS_NULL) {
         return CLKS_FALSE;
     }
 
@@ -267,20 +272,34 @@ static clks_bool clks_panic_parse_symbol_line(const char *line,
     }
 
     name_start = i;
-    name_end = len;
 
-    while (name_end > name_start &&
-           (line[name_end - 1U] == ' ' || line[name_end - 1U] == '\t' || line[name_end - 1U] == '\r')) {
-        name_end--;
+    while (i < len && line[i] != ' ' && line[i] != '\t' && line[i] != '\r') {
+        i++;
     }
+
+    name_end = i;
 
     if (name_end <= name_start) {
         return CLKS_FALSE;
     }
 
+    while (i < len && (line[i] == ' ' || line[i] == '\t')) {
+        i++;
+    }
+
+    source_start = i;
+    source_end = len;
+
+    while (source_end > source_start &&
+           (line[source_end - 1U] == ' ' || line[source_end - 1U] == '\t' || line[source_end - 1U] == '\r')) {
+        source_end--;
+    }
+
     *out_addr = addr;
     *out_name = &line[name_start];
     *out_name_len = name_end - name_start;
+    *out_source = (source_end > source_start) ? &line[source_start] : CLKS_NULL;
+    *out_source_len = (source_end > source_start) ? (source_end - source_start) : 0U;
     return CLKS_TRUE;
 }
 
@@ -309,22 +328,32 @@ static clks_bool clks_panic_symbols_ready(void) {
     return CLKS_TRUE;
 }
 
-static clks_bool clks_panic_lookup_symbol(u64 addr, const char **out_name, usize *out_name_len, u64 *out_base) {
+static clks_bool clks_panic_lookup_symbol(u64 addr,
+                                          const char **out_name,
+                                          usize *out_name_len,
+                                          u64 *out_base,
+                                          const char **out_source,
+                                          usize *out_source_len) {
     const char *data;
     const char *end;
     const char *line;
     const char *best_name = CLKS_NULL;
+    const char *best_source = CLKS_NULL;
     usize best_len = 0U;
+    usize best_source_len = 0U;
     u64 best_addr = 0ULL;
     clks_bool found = CLKS_FALSE;
 
-    if (out_name == CLKS_NULL || out_name_len == CLKS_NULL || out_base == CLKS_NULL) {
+    if (out_name == CLKS_NULL || out_name_len == CLKS_NULL || out_base == CLKS_NULL || out_source == CLKS_NULL ||
+        out_source_len == CLKS_NULL) {
         return CLKS_FALSE;
     }
 
     *out_name = CLKS_NULL;
     *out_name_len = 0U;
     *out_base = 0ULL;
+    *out_source = CLKS_NULL;
+    *out_source_len = 0U;
 
     if (clks_panic_symbols_ready() == CLKS_FALSE) {
         return CLKS_FALSE;
@@ -337,6 +366,8 @@ static clks_bool clks_panic_lookup_symbol(u64 addr, const char **out_name, usize
         u64 line_addr;
         const char *line_name;
         usize line_name_len;
+        const char *line_source;
+        usize line_source_len;
         usize line_len = 0U;
 
         line = data;
@@ -350,7 +381,13 @@ static clks_bool clks_panic_lookup_symbol(u64 addr, const char **out_name, usize
             data++;
         }
 
-        if (clks_panic_parse_symbol_line(line, line_len, &line_addr, &line_name, &line_name_len) == CLKS_FALSE) {
+        if (clks_panic_parse_symbol_line(line,
+                                         line_len,
+                                         &line_addr,
+                                         &line_name,
+                                         &line_name_len,
+                                         &line_source,
+                                         &line_source_len) == CLKS_FALSE) {
             continue;
         }
 
@@ -358,6 +395,8 @@ static clks_bool clks_panic_lookup_symbol(u64 addr, const char **out_name, usize
             best_addr = line_addr;
             best_name = line_name;
             best_len = line_name_len;
+            best_source = line_source;
+            best_source_len = line_source_len;
             found = CLKS_TRUE;
         }
     }
@@ -369,6 +408,8 @@ static clks_bool clks_panic_lookup_symbol(u64 addr, const char **out_name, usize
     *out_name = best_name;
     *out_name_len = best_len;
     *out_base = best_addr;
+    *out_source = best_source;
+    *out_source_len = best_source_len;
     return CLKS_TRUE;
 }
 
@@ -376,13 +417,15 @@ static void clks_panic_emit_bt_entry(struct clks_panic_console *console, u32 ind
     char index_dec[12];
     char rip_hex[19];
     const char *sym_name = CLKS_NULL;
+    const char *sym_source = CLKS_NULL;
     usize sym_name_len = 0U;
+    usize sym_source_len = 0U;
     u64 sym_base = 0ULL;
     clks_bool has_symbol;
 
     clks_panic_u32_to_dec(index, index_dec, sizeof(index_dec));
     clks_panic_u64_to_hex(rip, rip_hex);
-    has_symbol = clks_panic_lookup_symbol(rip, &sym_name, &sym_name_len, &sym_base);
+    has_symbol = clks_panic_lookup_symbol(rip, &sym_name, &sym_name_len, &sym_base, &sym_source, &sym_source_len);
 
     clks_serial_write("[PANIC][BT] #");
     clks_serial_write(index_dec);
@@ -398,6 +441,11 @@ static void clks_panic_emit_bt_entry(struct clks_panic_console *console, u32 ind
         clks_panic_serial_write_n(sym_name, sym_name_len);
         clks_serial_write("+");
         clks_serial_write(off_hex);
+
+        if (sym_source != CLKS_NULL && sym_source_len > 0U) {
+            clks_serial_write(" @ ");
+            clks_panic_serial_write_n(sym_source, sym_source_len);
+        }
     }
 
     clks_serial_write("\n");
@@ -420,6 +468,11 @@ static void clks_panic_emit_bt_entry(struct clks_panic_console *console, u32 ind
         clks_panic_console_write_n(console, sym_name, sym_name_len);
         clks_panic_console_write(console, "+");
         clks_panic_console_write(console, off_hex);
+
+        if (sym_source != CLKS_NULL && sym_source_len > 0U) {
+            clks_panic_console_write(console, " @ ");
+            clks_panic_console_write_n(console, sym_source, sym_source_len);
+        }
     }
 
     clks_panic_console_write(console, "\n");

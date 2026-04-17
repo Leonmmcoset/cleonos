@@ -268,3 +268,29 @@ u64 cleonos_sys_proc_snapshot(u64 pid, cleonos_proc_snapshot *out_snapshot, u64 
 u64 cleonos_sys_proc_kill(u64 pid, u64 signal) {
     return cleonos_syscall(CLEONOS_SYSCALL_PROC_KILL, pid, signal, 0ULL);
 }
+
+struct cleonos_kdbg_bt_req {
+    u64 rbp;
+    u64 rip;
+    u64 out_ptr;
+    u64 out_size;
+};
+
+u64 cleonos_sys_kdbg_sym(u64 addr, char *out_line, u64 out_size) {
+    return cleonos_syscall(CLEONOS_SYSCALL_KDBG_SYM, addr, (u64)out_line, out_size);
+}
+
+u64 cleonos_sys_kdbg_bt(u64 rbp, u64 rip, char *out_text, u64 out_size) {
+    struct cleonos_kdbg_bt_req req;
+
+    req.rbp = rbp;
+    req.rip = rip;
+    req.out_ptr = (u64)out_text;
+    req.out_size = out_size;
+
+    return cleonos_syscall(CLEONOS_SYSCALL_KDBG_BT, (u64)&req, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_kdbg_regs(char *out_text, u64 out_size) {
+    return cleonos_syscall(CLEONOS_SYSCALL_KDBG_REGS, (u64)out_text, out_size, 0ULL);
+}

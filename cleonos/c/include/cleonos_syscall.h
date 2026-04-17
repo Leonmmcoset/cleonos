@@ -100,6 +100,9 @@ typedef struct cleonos_proc_snapshot {
 #define CLEONOS_SYSCALL_PROC_PID_AT         62ULL
 #define CLEONOS_SYSCALL_PROC_SNAPSHOT       63ULL
 #define CLEONOS_SYSCALL_PROC_KILL           64ULL
+#define CLEONOS_SYSCALL_KDBG_SYM            65ULL
+#define CLEONOS_SYSCALL_KDBG_BT             66ULL
+#define CLEONOS_SYSCALL_KDBG_REGS           67ULL
 
 u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 u64 cleonos_sys_log_write(const char *message, u64 length);
@@ -166,5 +169,8 @@ u64 cleonos_sys_proc_count(void);
 u64 cleonos_sys_proc_pid_at(u64 index, u64 *out_pid);
 u64 cleonos_sys_proc_snapshot(u64 pid, cleonos_proc_snapshot *out_snapshot, u64 out_size);
 u64 cleonos_sys_proc_kill(u64 pid, u64 signal);
+u64 cleonos_sys_kdbg_sym(u64 addr, char *out_line, u64 out_size);
+u64 cleonos_sys_kdbg_bt(u64 rbp, u64 rip, char *out_text, u64 out_size);
+u64 cleonos_sys_kdbg_regs(char *out_text, u64 out_size);
 
 #endif

@@ -27,6 +27,11 @@
 #define CLKS_SYSCALL_ITEM_MAX         128U
 #define CLKS_SYSCALL_PROCFS_TEXT_MAX 2048U
 #define CLKS_SYSCALL_USER_TRACE_BUDGET 128ULL
+#define CLKS_SYSCALL_KDBG_TEXT_MAX   2048U
+#define CLKS_SYSCALL_KDBG_BT_MAX_FRAMES 16U
+#define CLKS_SYSCALL_KDBG_STACK_WINDOW_BYTES (128ULL * 1024ULL)
+#define CLKS_SYSCALL_KERNEL_SYMBOL_FILE "/system/kernel.sym"
+#define CLKS_SYSCALL_KERNEL_ADDR_BASE 0xFFFF800000000000ULL
 
 struct clks_syscall_frame {
     u64 rax;
@@ -53,9 +58,21 @@ struct clks_syscall_frame {
     u64 ss;
 };
 
+struct clks_syscall_kdbg_bt_req {
+    u64 rbp;
+    u64 rip;
+    u64 out_ptr;
+    u64 out_size;
+};
+
 static clks_bool clks_syscall_ready = CLKS_FALSE;
 static clks_bool clks_syscall_user_trace_active = CLKS_FALSE;
 static u64 clks_syscall_user_trace_budget = 0ULL;
+static struct clks_syscall_frame clks_syscall_last_frame;
+static clks_bool clks_syscall_last_frame_valid = CLKS_FALSE;
+static clks_bool clks_syscall_symbols_checked = CLKS_FALSE;
+static const char *clks_syscall_symbols_data = CLKS_NULL;
+static u64 clks_syscall_symbols_size = 0ULL;
 
 #if defined(CLKS_ARCH_X86_64)
 static inline void clks_syscall_outb(u16 port, u8 value) {
@@ -102,6 +119,24 @@ static clks_bool clks_syscall_copy_user_optional_string(u64 src_addr, char *dst,
     }
 
     return clks_syscall_copy_user_string(src_addr, dst, dst_size);
+}
+
+static u64 clks_syscall_copy_text_to_user(u64 dst_addr, u64 dst_size, const char *src, usize src_len) {
+    usize copy_len;
+
+    if (dst_addr == 0ULL || dst_size == 0ULL || src == CLKS_NULL) {
+        return 0ULL;
+    }
+
+    copy_len = src_len;
+
+    if (copy_len + 1U > (usize)dst_size) {
+        copy_len = (usize)dst_size - 1U;
+    }
+
+    clks_memcpy((void *)dst_addr, src, copy_len);
+    ((char *)dst_addr)[copy_len] = '\0';
+    return (u64)copy_len;
 }
 
 static u64 clks_syscall_log_write(u64 arg0, u64 arg1) {
@@ -334,6 +369,461 @@ static usize clks_syscall_procfs_append_u64_hex(char *out, usize out_size, usize
     }
 
     return pos;
+}
+
+static usize clks_syscall_procfs_append_n(char *out, usize out_size, usize pos, const char *text, usize text_len) {
+    usize i = 0U;
+
+    if (text == CLKS_NULL) {
+        return pos;
+    }
+
+    while (i < text_len) {
+        pos = clks_syscall_procfs_append_char(out, out_size, pos, text[i]);
+        i++;
+    }
+
+    return pos;
+}
+
+static clks_bool clks_syscall_is_hex(char ch) {
+    if ((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+        return CLKS_TRUE;
+    }
+
+    return CLKS_FALSE;
+}
+
+static u8 clks_syscall_hex_value(char ch) {
+    if (ch >= '0' && ch <= '9') {
+        return (u8)(ch - '0');
+    }
+
+    if (ch >= 'a' && ch <= 'f') {
+        return (u8)(10 + (ch - 'a'));
+    }
+
+    return (u8)(10 + (ch - 'A'));
+}
+
+static clks_bool clks_syscall_parse_symbol_line(const char *line,
+                                                usize len,
+                                                u64 *out_addr,
+                                                const char **out_name,
+                                                usize *out_name_len,
+                                                const char **out_source,
+                                                usize *out_source_len) {
+    usize i = 0U;
+    u64 addr = 0ULL;
+    u32 digits = 0U;
+    usize name_start;
+    usize name_end;
+    usize source_start;
+    usize source_end;
+
+    if (line == CLKS_NULL || out_addr == CLKS_NULL || out_name == CLKS_NULL || out_name_len == CLKS_NULL ||
+        out_source == CLKS_NULL || out_source_len == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    if (len == 0U) {
+        return CLKS_FALSE;
+    }
+
+    if (len >= 2U && line[0] == '0' && (line[1] == 'X' || line[1] == 'x')) {
+        i = 2U;
+    }
+
+    while (i < len && clks_syscall_is_hex(line[i]) == CLKS_TRUE) {
+        addr = (addr << 4) | (u64)clks_syscall_hex_value(line[i]);
+        digits++;
+        i++;
+    }
+
+    if (digits == 0U) {
+        return CLKS_FALSE;
+    }
+
+    while (i < len && (line[i] == ' ' || line[i] == '\t')) {
+        i++;
+    }
+
+    if (i >= len) {
+        return CLKS_FALSE;
+    }
+
+    name_start = i;
+
+    while (i < len && line[i] != ' ' && line[i] != '\t' && line[i] != '\r') {
+        i++;
+    }
+
+    name_end = i;
+
+    if (name_end <= name_start) {
+        return CLKS_FALSE;
+    }
+
+    while (i < len && (line[i] == ' ' || line[i] == '\t')) {
+        i++;
+    }
+
+    source_start = i;
+    source_end = len;
+
+    while (source_end > source_start &&
+           (line[source_end - 1U] == ' ' || line[source_end - 1U] == '\t' || line[source_end - 1U] == '\r')) {
+        source_end--;
+    }
+
+    *out_addr = addr;
+    *out_name = &line[name_start];
+    *out_name_len = name_end - name_start;
+    *out_source = (source_end > source_start) ? &line[source_start] : CLKS_NULL;
+    *out_source_len = (source_end > source_start) ? (source_end - source_start) : 0U;
+    return CLKS_TRUE;
+}
+
+static clks_bool clks_syscall_symbols_ready(void) {
+    const void *data;
+    u64 size = 0ULL;
+
+    if (clks_syscall_symbols_checked == CLKS_TRUE) {
+        return (clks_syscall_symbols_data != CLKS_NULL && clks_syscall_symbols_size > 0ULL) ? CLKS_TRUE : CLKS_FALSE;
+    }
+
+    clks_syscall_symbols_checked = CLKS_TRUE;
+
+    if (clks_fs_is_ready() == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    data = clks_fs_read_all(CLKS_SYSCALL_KERNEL_SYMBOL_FILE, &size);
+
+    if (data == CLKS_NULL || size == 0ULL) {
+        return CLKS_FALSE;
+    }
+
+    clks_syscall_symbols_data = (const char *)data;
+    clks_syscall_symbols_size = size;
+    return CLKS_TRUE;
+}
+
+static clks_bool clks_syscall_lookup_symbol(u64 addr,
+                                            const char **out_name,
+                                            usize *out_name_len,
+                                            u64 *out_base,
+                                            const char **out_source,
+                                            usize *out_source_len) {
+    const char *data;
+    const char *end;
+    const char *line;
+    const char *best_name = CLKS_NULL;
+    const char *best_source = CLKS_NULL;
+    usize best_name_len = 0U;
+    usize best_source_len = 0U;
+    u64 best_addr = 0ULL;
+    clks_bool found = CLKS_FALSE;
+
+    if (out_name == CLKS_NULL || out_name_len == CLKS_NULL || out_base == CLKS_NULL || out_source == CLKS_NULL ||
+        out_source_len == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    *out_name = CLKS_NULL;
+    *out_name_len = 0U;
+    *out_base = 0ULL;
+    *out_source = CLKS_NULL;
+    *out_source_len = 0U;
+
+    if (clks_syscall_symbols_ready() == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    data = clks_syscall_symbols_data;
+    end = clks_syscall_symbols_data + clks_syscall_symbols_size;
+
+    while (data < end) {
+        u64 line_addr;
+        const char *line_name;
+        usize line_name_len;
+        const char *line_source;
+        usize line_source_len;
+        usize line_len = 0U;
+
+        line = data;
+
+        while (data < end && *data != '\n') {
+            data++;
+            line_len++;
+        }
+
+        if (data < end && *data == '\n') {
+            data++;
+        }
+
+        if (clks_syscall_parse_symbol_line(line,
+                                           line_len,
+                                           &line_addr,
+                                           &line_name,
+                                           &line_name_len,
+                                           &line_source,
+                                           &line_source_len) == CLKS_FALSE) {
+            continue;
+        }
+
+        if (line_addr <= addr && (found == CLKS_FALSE || line_addr >= best_addr)) {
+            best_addr = line_addr;
+            best_name = line_name;
+            best_name_len = line_name_len;
+            best_source = line_source;
+            best_source_len = line_source_len;
+            found = CLKS_TRUE;
+        }
+    }
+
+    if (found == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    *out_name = best_name;
+    *out_name_len = best_name_len;
+    *out_base = best_addr;
+    *out_source = best_source;
+    *out_source_len = best_source_len;
+    return CLKS_TRUE;
+}
+
+static usize clks_syscall_kdbg_format_symbol_into(char *out, usize out_size, usize pos, u64 addr) {
+    const char *sym_name = CLKS_NULL;
+    const char *sym_source = CLKS_NULL;
+    usize sym_name_len = 0U;
+    usize sym_source_len = 0U;
+    u64 sym_base = 0ULL;
+    clks_bool has_symbol;
+
+    pos = clks_syscall_procfs_append_u64_hex(out, out_size, pos, addr);
+    has_symbol = clks_syscall_lookup_symbol(addr, &sym_name, &sym_name_len, &sym_base, &sym_source, &sym_source_len);
+
+    if (has_symbol == CLKS_TRUE) {
+        pos = clks_syscall_procfs_append_char(out, out_size, pos, ' ');
+        pos = clks_syscall_procfs_append_n(out, out_size, pos, sym_name, sym_name_len);
+        pos = clks_syscall_procfs_append_char(out, out_size, pos, '+');
+        pos = clks_syscall_procfs_append_u64_hex(out, out_size, pos, addr - sym_base);
+
+        if (sym_source != CLKS_NULL && sym_source_len > 0U) {
+            pos = clks_syscall_procfs_append_text(out, out_size, pos, " @ ");
+            pos = clks_syscall_procfs_append_n(out, out_size, pos, sym_source, sym_source_len);
+        }
+    } else {
+        pos = clks_syscall_procfs_append_text(out, out_size, pos, " <no-symbol>");
+    }
+
+    return pos;
+}
+
+static usize clks_syscall_kdbg_append_bt_frame(char *out, usize out_size, usize pos, u64 index, u64 rip) {
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '#');
+    pos = clks_syscall_procfs_append_u64_dec(out, out_size, pos, index);
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, ' ');
+    pos = clks_syscall_kdbg_format_symbol_into(out, out_size, pos, rip);
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+    return pos;
+}
+
+static clks_bool clks_syscall_kdbg_stack_ptr_valid(u64 ptr, u64 stack_low, u64 stack_high) {
+    if ((ptr & 0x7ULL) != 0ULL) {
+        return CLKS_FALSE;
+    }
+
+    if (ptr < stack_low || ptr + 16ULL > stack_high) {
+        return CLKS_FALSE;
+    }
+
+    if (ptr < CLKS_SYSCALL_KERNEL_ADDR_BASE) {
+        return CLKS_FALSE;
+    }
+
+    return CLKS_TRUE;
+}
+
+static u64 clks_syscall_kdbg_sym(u64 arg0, u64 arg1, u64 arg2) {
+    char text[CLKS_SYSCALL_KDBG_TEXT_MAX];
+    usize len;
+
+    if (arg1 == 0ULL || arg2 == 0ULL) {
+        return 0ULL;
+    }
+
+    text[0] = '\0';
+    len = clks_syscall_kdbg_format_symbol_into(text, sizeof(text), 0U, arg0);
+    return clks_syscall_copy_text_to_user(arg1, arg2, text, len);
+}
+
+static u64 clks_syscall_kdbg_regs(u64 arg0, u64 arg1) {
+    char text[CLKS_SYSCALL_KDBG_TEXT_MAX];
+    usize pos = 0U;
+    const struct clks_syscall_frame *frame = &clks_syscall_last_frame;
+
+    if (arg0 == 0ULL || arg1 == 0ULL) {
+        return 0ULL;
+    }
+
+    text[0] = '\0';
+
+    if (clks_syscall_last_frame_valid == CLKS_FALSE) {
+        pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, "NO REG SNAPSHOT\n");
+        return clks_syscall_copy_text_to_user(arg0, arg1, text, pos);
+    }
+
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, "RAX=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->rax);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " RBX=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->rbx);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " RCX=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->rcx);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " RDX=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->rdx);
+    pos = clks_syscall_procfs_append_char(text, sizeof(text), pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, "RSI=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->rsi);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " RDI=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->rdi);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " RBP=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->rbp);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " RSP=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->rsp);
+    pos = clks_syscall_procfs_append_char(text, sizeof(text), pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, "R8 =");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->r8);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " R9 =");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->r9);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " R10=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->r10);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " R11=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->r11);
+    pos = clks_syscall_procfs_append_char(text, sizeof(text), pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, "R12=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->r12);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " R13=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->r13);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " R14=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->r14);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " R15=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->r15);
+    pos = clks_syscall_procfs_append_char(text, sizeof(text), pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, "RIP=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->rip);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " CS=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->cs);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " RFLAGS=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->rflags);
+    pos = clks_syscall_procfs_append_char(text, sizeof(text), pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, "VECTOR=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->vector);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " ERROR=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->error_code);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " SS=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, frame->ss);
+    pos = clks_syscall_procfs_append_char(text, sizeof(text), pos, '\n');
+
+    return clks_syscall_copy_text_to_user(arg0, arg1, text, pos);
+}
+
+static u64 clks_syscall_kdbg_bt(u64 arg0) {
+    struct clks_syscall_kdbg_bt_req req;
+    char text[CLKS_SYSCALL_KDBG_TEXT_MAX];
+    usize pos = 0U;
+    u64 frame_index = 0ULL;
+
+    if (arg0 == 0ULL) {
+        return 0ULL;
+    }
+
+    clks_memcpy(&req, (const void *)arg0, sizeof(req));
+
+    if (req.out_ptr == 0ULL || req.out_size == 0ULL) {
+        return 0ULL;
+    }
+
+    text[0] = '\0';
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, "BT RBP=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, req.rbp);
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, " RIP=");
+    pos = clks_syscall_procfs_append_u64_hex(text, sizeof(text), pos, req.rip);
+    pos = clks_syscall_procfs_append_char(text, sizeof(text), pos, '\n');
+
+    if (req.rip != 0ULL) {
+        pos = clks_syscall_kdbg_append_bt_frame(text, sizeof(text), pos, frame_index, req.rip);
+        frame_index++;
+    }
+
+#if defined(CLKS_ARCH_X86_64)
+    {
+        u64 current_rbp = req.rbp;
+        u64 current_rsp = 0ULL;
+        u64 stack_low;
+        u64 stack_high;
+
+        __asm__ volatile("mov %%rsp, %0" : "=r"(current_rsp));
+
+        stack_low = (current_rsp > CLKS_SYSCALL_KDBG_STACK_WINDOW_BYTES)
+                        ? (current_rsp - CLKS_SYSCALL_KDBG_STACK_WINDOW_BYTES)
+                        : CLKS_SYSCALL_KERNEL_ADDR_BASE;
+        stack_high = current_rsp + CLKS_SYSCALL_KDBG_STACK_WINDOW_BYTES;
+
+        if (stack_high < current_rsp) {
+            stack_high = 0xFFFFFFFFFFFFFFFFULL;
+        }
+
+        if (stack_low < CLKS_SYSCALL_KERNEL_ADDR_BASE) {
+            stack_low = CLKS_SYSCALL_KERNEL_ADDR_BASE;
+        }
+
+        if (clks_syscall_kdbg_stack_ptr_valid(current_rbp, stack_low, stack_high) == CLKS_TRUE) {
+            while (frame_index < CLKS_SYSCALL_KDBG_BT_MAX_FRAMES) {
+                const u64 *frame_ptr;
+                u64 next_rbp;
+                u64 ret_rip;
+
+                frame_ptr = (const u64 *)(usize)current_rbp;
+                next_rbp = frame_ptr[0];
+                ret_rip = frame_ptr[1];
+
+                if (ret_rip == 0ULL) {
+                    break;
+                }
+
+                pos = clks_syscall_kdbg_append_bt_frame(text, sizeof(text), pos, frame_index, ret_rip);
+                frame_index++;
+
+                if (next_rbp <= current_rbp) {
+                    break;
+                }
+
+                if (clks_syscall_kdbg_stack_ptr_valid(next_rbp, stack_low, stack_high) == CLKS_FALSE) {
+                    break;
+                }
+
+                current_rbp = next_rbp;
+            }
+        } else {
+            pos = clks_syscall_procfs_append_text(text,
+                                                  sizeof(text),
+                                                  pos,
+                                                  "NOTE: stack walk skipped (rbp not in current kernel stack window)\n");
+        }
+    }
+#else
+    pos = clks_syscall_procfs_append_text(text, sizeof(text), pos, "NOTE: stack walk unsupported on this arch\n");
+#endif
+
+    return clks_syscall_copy_text_to_user(req.out_ptr, req.out_size, text, pos);
 }
 
 static clks_bool clks_syscall_procfs_snapshot_for_path(const char *path, struct clks_exec_proc_snapshot *out_snap) {
@@ -1043,6 +1533,11 @@ void clks_syscall_init(void) {
     clks_syscall_ready = CLKS_TRUE;
     clks_syscall_user_trace_active = CLKS_FALSE;
     clks_syscall_user_trace_budget = 0ULL;
+    clks_memset(&clks_syscall_last_frame, 0, sizeof(clks_syscall_last_frame));
+    clks_syscall_last_frame_valid = CLKS_FALSE;
+    clks_syscall_symbols_checked = CLKS_FALSE;
+    clks_syscall_symbols_data = CLKS_NULL;
+    clks_syscall_symbols_size = 0ULL;
     clks_log(CLKS_LOG_INFO, "SYSCALL", "INT80 FRAMEWORK ONLINE");
 }
 
@@ -1053,6 +1548,9 @@ u64 clks_syscall_dispatch(void *frame_ptr) {
     if (clks_syscall_ready == CLKS_FALSE || frame == CLKS_NULL) {
         return (u64)-1;
     }
+
+    clks_memcpy(&clks_syscall_last_frame, frame, sizeof(clks_syscall_last_frame));
+    clks_syscall_last_frame_valid = CLKS_TRUE;
 
     id = frame->rax;
     clks_syscall_trace_user_program(id);
@@ -1195,6 +1693,12 @@ u64 clks_syscall_dispatch(void *frame_ptr) {
             return clks_syscall_audio_play_tone(frame->rbx, frame->rcx);
         case CLKS_SYSCALL_AUDIO_STOP:
             return clks_syscall_audio_stop();
+        case CLKS_SYSCALL_KDBG_SYM:
+            return clks_syscall_kdbg_sym(frame->rbx, frame->rcx, frame->rdx);
+        case CLKS_SYSCALL_KDBG_BT:
+            return clks_syscall_kdbg_bt(frame->rbx);
+        case CLKS_SYSCALL_KDBG_REGS:
+            return clks_syscall_kdbg_regs(frame->rbx, frame->rcx);
         default:
             return (u64)-1;
     }

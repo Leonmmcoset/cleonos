@@ -12,6 +12,7 @@ set(USER_CC "cc" CACHE STRING "User-space C compiler")
 set(USER_LD "ld" CACHE STRING "User-space linker")
 set(RUSTC "rustc" CACHE STRING "Rust compiler")
 set(NM "nm" CACHE STRING "nm executable")
+set(ADDR2LINE "addr2line" CACHE STRING "addr2line executable")
 
 set(XORRISO "xorriso" CACHE STRING "xorriso executable")
 set(TAR "tar" CACHE STRING "tar executable")
@@ -102,6 +103,7 @@ resolve_tool_with_fallback(LD ld.lld ld)
 resolve_tool_with_fallback(USER_CC cc gcc clang)
 resolve_tool_with_fallback(USER_LD ld.lld ld)
 resolve_tool_with_fallback(NM llvm-nm x86_64-elf-nm nm)
+resolve_tool_with_fallback(ADDR2LINE llvm-addr2line x86_64-elf-addr2line addr2line)
 resolve_tool_with_fallback(OBJCOPY_FOR_TARGET llvm-objcopy x86_64-linux-gnu-objcopy objcopy)
 resolve_tool_with_fallback(OBJDUMP_FOR_TARGET llvm-objdump x86_64-linux-gnu-objdump objdump)
 resolve_tool_with_fallback(READELF_FOR_TARGET llvm-readelf x86_64-linux-gnu-readelf readelf)
@@ -121,6 +123,7 @@ set(CFLAGS_COMMON
     -ffreestanding
     -fno-stack-protector
     -fno-builtin
+    -g
     -Wall
     -Wextra
     -Werror
@@ -339,6 +342,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${BUILD_ROOT}"
     COMMAND ${CMAKE_COMMAND}
         "-DNM_TOOL=${NM}"
+        "-DADDR2LINE_TOOL=${ADDR2LINE}"
         "-DKERNEL_ELF=${KERNEL_ELF}"
         "-DOUT_SYMBOL_FILE=${KERNEL_SYMBOLS_FILE}"
         -P "${CMAKE_SOURCE_DIR}/cmake/gen_kernel_symbols.cmake"
@@ -382,7 +386,7 @@ set(USER_SHELL_COMMAND_APPS
     help args ls cat grep head tail wc cut uniq sort pwd cd exec pid spawn wait sleep yield
     bg fg jobs kill ps top
     shutdown restart exit clear ansi ansitest wavplay fastfetch memstat fsstat taskstat userstat
-    shstat stats tty dmesg kbdstat mkdir touch write append cp mv rm
+    shstat stats tty dmesg kbdstat mkdir touch write append cp mv rm kdbg
 )
 
 foreach(SRC IN LISTS USER_APP_MAIN_SOURCES)
@@ -546,6 +550,7 @@ add_custom_target(setup-tools
         "-DOBJDUMP_TOOL=${OBJDUMP_FOR_TARGET}"
         "-DREADELF_TOOL=${READELF_FOR_TARGET}"
         "-DNM_TOOL=${NM}"
+        "-DADDR2LINE_TOOL=${ADDR2LINE}"
         "-DUSER_CC_TOOL=${USER_CC}"
         "-DUSER_LD_TOOL=${USER_LD}"
         "-DRUSTC_TOOL=${RUSTC}"

@@ -5,6 +5,29 @@ typedef unsigned long long u64;
 typedef unsigned long long usize;
 
 #define CLEONOS_FS_NAME_MAX 96ULL
+#define CLEONOS_PROC_PATH_MAX 192ULL
+
+#define CLEONOS_PROC_STATE_UNUSED  0ULL
+#define CLEONOS_PROC_STATE_PENDING 1ULL
+#define CLEONOS_PROC_STATE_RUNNING 2ULL
+#define CLEONOS_PROC_STATE_EXITED  3ULL
+
+typedef struct cleonos_proc_snapshot {
+    u64 pid;
+    u64 ppid;
+    u64 state;
+    u64 started_tick;
+    u64 exited_tick;
+    u64 exit_status;
+    u64 runtime_ticks;
+    u64 mem_bytes;
+    u64 tty_index;
+    u64 last_signal;
+    u64 last_fault_vector;
+    u64 last_fault_error;
+    u64 last_fault_rip;
+    char path[CLEONOS_PROC_PATH_MAX];
+} cleonos_proc_snapshot;
 
 #define CLEONOS_SYSCALL_LOG_WRITE           0ULL
 #define CLEONOS_SYSCALL_TIMER_TICKS         1ULL
@@ -67,6 +90,10 @@ typedef unsigned long long usize;
 #define CLEONOS_SYSCALL_PROC_FAULT_VECTOR   58ULL
 #define CLEONOS_SYSCALL_PROC_FAULT_ERROR    59ULL
 #define CLEONOS_SYSCALL_PROC_FAULT_RIP      60ULL
+#define CLEONOS_SYSCALL_PROC_COUNT          61ULL
+#define CLEONOS_SYSCALL_PROC_PID_AT         62ULL
+#define CLEONOS_SYSCALL_PROC_SNAPSHOT       63ULL
+#define CLEONOS_SYSCALL_PROC_KILL           64ULL
 
 u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 u64 cleonos_sys_log_write(const char *message, u64 length);
@@ -129,5 +156,9 @@ u64 cleonos_sys_proc_last_signal(void);
 u64 cleonos_sys_proc_fault_vector(void);
 u64 cleonos_sys_proc_fault_error(void);
 u64 cleonos_sys_proc_fault_rip(void);
+u64 cleonos_sys_proc_count(void);
+u64 cleonos_sys_proc_pid_at(u64 index, u64 *out_pid);
+u64 cleonos_sys_proc_snapshot(u64 pid, cleonos_proc_snapshot *out_snapshot, u64 out_size);
+u64 cleonos_sys_proc_kill(u64 pid, u64 signal);
 
 #endif

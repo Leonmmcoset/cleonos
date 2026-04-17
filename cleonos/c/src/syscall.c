@@ -252,3 +252,19 @@ u64 cleonos_sys_proc_fault_error(void) {
 u64 cleonos_sys_proc_fault_rip(void) {
     return cleonos_syscall(CLEONOS_SYSCALL_PROC_FAULT_RIP, 0ULL, 0ULL, 0ULL);
 }
+
+u64 cleonos_sys_proc_count(void) {
+    return cleonos_syscall(CLEONOS_SYSCALL_PROC_COUNT, 0ULL, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_proc_pid_at(u64 index, u64 *out_pid) {
+    return cleonos_syscall(CLEONOS_SYSCALL_PROC_PID_AT, index, (u64)out_pid, 0ULL);
+}
+
+u64 cleonos_sys_proc_snapshot(u64 pid, cleonos_proc_snapshot *out_snapshot, u64 out_size) {
+    return cleonos_syscall(CLEONOS_SYSCALL_PROC_SNAPSHOT, pid, (u64)out_snapshot, out_size);
+}
+
+u64 cleonos_sys_proc_kill(u64 pid, u64 signal) {
+    return cleonos_syscall(CLEONOS_SYSCALL_PROC_KILL, pid, signal, 0ULL);
+}

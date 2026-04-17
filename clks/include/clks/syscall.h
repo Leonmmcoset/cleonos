@@ -64,6 +64,10 @@
 #define CLKS_SYSCALL_PROC_FAULT_VECTOR   58ULL
 #define CLKS_SYSCALL_PROC_FAULT_ERROR    59ULL
 #define CLKS_SYSCALL_PROC_FAULT_RIP      60ULL
+#define CLKS_SYSCALL_PROC_COUNT          61ULL
+#define CLKS_SYSCALL_PROC_PID_AT         62ULL
+#define CLKS_SYSCALL_PROC_SNAPSHOT       63ULL
+#define CLKS_SYSCALL_PROC_KILL           64ULL
 
 void clks_syscall_init(void);
 u64 clks_syscall_dispatch(void *frame_ptr);

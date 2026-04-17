@@ -152,8 +152,10 @@ static int ush_cmd_help(void) {
     ush_writeln("  mv <src> <dst>   (/temp only)");
     ush_writeln("  rm <path>        (/temp only)");
     ush_writeln("  pid");
-    ush_writeln("  spawn <path|name> [args...]");
-    ush_writeln("  wait <pid>");
+    ush_writeln("  spawn <path|name> [args...] / bg <path|name> [args...]");
+    ush_writeln("  wait <pid> / fg [pid]");
+    ush_writeln("  kill <pid> [signal]");
+    ush_writeln("  jobs [-a] / ps [-a] [-u] / top [--once] [-n loops] [-d ticks]");
     ush_writeln("  sleep <ticks>");
     ush_writeln("  yield");
     ush_writeln("  shutdown / restart");

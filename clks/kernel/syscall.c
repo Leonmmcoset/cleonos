@@ -362,6 +362,44 @@ static u64 clks_syscall_proc_fault_rip(void) {
     return clks_exec_current_fault_rip();
 }
 
+static u64 clks_syscall_proc_count(void) {
+    return clks_exec_proc_count();
+}
+
+static u64 clks_syscall_proc_pid_at(u64 arg0, u64 arg1) {
+    u64 pid = 0ULL;
+
+    if (arg1 == 0ULL) {
+        return 0ULL;
+    }
+
+    if (clks_exec_proc_pid_at(arg0, &pid) == CLKS_FALSE) {
+        return 0ULL;
+    }
+
+    clks_memcpy((void *)arg1, &pid, sizeof(pid));
+    return 1ULL;
+}
+
+static u64 clks_syscall_proc_snapshot(u64 arg0, u64 arg1, u64 arg2) {
+    struct clks_exec_proc_snapshot snap;
+
+    if (arg1 == 0ULL || arg2 < (u64)sizeof(snap)) {
+        return 0ULL;
+    }
+
+    if (clks_exec_proc_snapshot(arg0, &snap) == CLKS_FALSE) {
+        return 0ULL;
+    }
+
+    clks_memcpy((void *)arg1, &snap, sizeof(snap));
+    return 1ULL;
+}
+
+static u64 clks_syscall_proc_kill(u64 arg0, u64 arg1) {
+    return clks_exec_proc_kill(arg0, arg1);
+}
+
 static u64 clks_syscall_exit(u64 arg0) {
     return (clks_exec_request_exit(arg0) == CLKS_TRUE) ? 1ULL : 0ULL;
 }
@@ -723,6 +761,14 @@ u64 clks_syscall_dispatch(void *frame_ptr) {
             return clks_syscall_proc_fault_error();
         case CLKS_SYSCALL_PROC_FAULT_RIP:
             return clks_syscall_proc_fault_rip();
+        case CLKS_SYSCALL_PROC_COUNT:
+            return clks_syscall_proc_count();
+        case CLKS_SYSCALL_PROC_PID_AT:
+            return clks_syscall_proc_pid_at(frame->rbx, frame->rcx);
+        case CLKS_SYSCALL_PROC_SNAPSHOT:
+            return clks_syscall_proc_snapshot(frame->rbx, frame->rcx, frame->rdx);
+        case CLKS_SYSCALL_PROC_KILL:
+            return clks_syscall_proc_kill(frame->rbx, frame->rcx);
         case CLKS_SYSCALL_EXIT:
             return clks_syscall_exit(frame->rbx);
         case CLKS_SYSCALL_SLEEP_TICKS:

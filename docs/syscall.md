@@ -60,7 +60,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 
 - `FS_MKDIR` / `FS_WRITE` / `FS_APPEND` / `FS_REMOVE` 仅允许 `/temp` 树下路径。
 
-## 4. Syscall 列表（0~60）
+## 4. Syscall 列表（0~64）
 
 ### 0 `CLEONOS_SYSCALL_LOG_WRITE`
 
@@ -446,6 +446,38 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - 参数：无
 - 返回：当前进程最近一次 CPU 异常 RIP（无则 `0`）
 
+### 61 `CLEONOS_SYSCALL_PROC_COUNT`
+
+- 参数：无
+- 返回：当前进程表中已使用槽位数量
+
+### 62 `CLEONOS_SYSCALL_PROC_PID_AT`
+
+- 参数：
+- `arg0`: `u64 index`
+- `arg1`: `u64 *out_pid`
+- 返回：成功 `1`，失败 `0`
+- 说明：用于枚举进程；`index` 超出范围返回 `0`。
+
+### 63 `CLEONOS_SYSCALL_PROC_SNAPSHOT`
+
+- 参数：
+- `arg0`: `u64 pid`
+- `arg1`: `struct cleonos_proc_snapshot *out_snapshot`
+- `arg2`: `u64 out_size`（需 `>= sizeof(cleonos_proc_snapshot)`）
+- 返回：成功 `1`，失败 `0`
+- 说明：返回 PID/PPID/状态/运行 tick/内存估算/TTY/路径等快照信息。
+
+### 64 `CLEONOS_SYSCALL_PROC_KILL`
+
+- 参数：
+- `arg0`: `u64 pid`
+- `arg1`: `u64 signal`（`0` 时按 `SIGTERM(15)` 处理）
+- 返回：
+- `1`：请求成功
+- `0`：当前不可终止（例如非当前上下文中的 running 进程）
+- `-1`：PID 不存在
+
 ## 5. 用户态封装函数
 
 用户态封装位于：
@@ -467,6 +499,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `cleonos_sys_audio_available()` / `cleonos_sys_audio_play_tone()` / `cleonos_sys_audio_stop()`
 - `cleonos_sys_proc_argc()` / `cleonos_sys_proc_argv()` / `cleonos_sys_proc_envc()` / `cleonos_sys_proc_env()`
 - `cleonos_sys_proc_last_signal()` / `cleonos_sys_proc_fault_vector()` / `cleonos_sys_proc_fault_error()` / `cleonos_sys_proc_fault_rip()`
+- `cleonos_sys_proc_count()` / `cleonos_sys_proc_pid_at()` / `cleonos_sys_proc_snapshot()` / `cleonos_sys_proc_kill()`
 
 ## 6. 开发注意事项
 

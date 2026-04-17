@@ -6,6 +6,8 @@
 #define CLKS_LOG_LINE_MAX 256
 #define CLKS_LOG_JOURNAL_CAP 256
 
+#define CLKS_LOG_ANSI_RESET "\x1B[0m"
+
 static char clks_log_journal[CLKS_LOG_JOURNAL_CAP][CLKS_LOG_LINE_MAX];
 static u32 clks_log_journal_head = 0U;
 static u32 clks_log_journal_count_live = 0U;
@@ -36,6 +38,10 @@ static void clks_log_append_char(char *buffer, usize *cursor, char ch) {
 
 static void clks_log_append_text(char *buffer, usize *cursor, const char *text) {
     usize i = 0;
+
+    if (text == CLKS_NULL) {
+        return;
+    }
 
     while (text[i] != '\0') {
         clks_log_append_char(buffer, cursor, text[i]);
@@ -83,51 +89,121 @@ static void clks_log_journal_push(const char *line) {
     }
 }
 
-static void clks_log_emit_line(const char *line) {
+static const char *clks_log_level_ansi(enum clks_log_level level) {
+    switch (level) {
+        case CLKS_LOG_DEBUG:
+            return "\x1B[38;5;110m";
+        case CLKS_LOG_INFO:
+            return "\x1B[38;5;120m";
+        case CLKS_LOG_WARN:
+            return "\x1B[1;38;5;220m";
+        case CLKS_LOG_ERROR:
+            return "\x1B[1;38;5;203m";
+        default:
+            return "\x1B[38;5;250m";
+    }
+}
+
+static const char *clks_log_tag_ansi(const char *tag) {
+    static const char *palette[] = {
+        "\x1B[38;5;81m",
+        "\x1B[38;5;117m",
+        "\x1B[38;5;159m",
+        "\x1B[38;5;45m",
+        "\x1B[38;5;75m",
+        "\x1B[38;5;141m",
+        "\x1B[38;5;214m",
+        "\x1B[38;5;168m",
+    };
+    u32 hash = 5381U;
+    usize i = 0U;
+    usize palette_count = sizeof(palette) / sizeof(palette[0]);
+
+    if (tag == CLKS_NULL || tag[0] == '\0') {
+        return palette[0];
+    }
+
+    while (tag[i] != '\0') {
+        hash = ((hash << 5U) + hash) ^ (u32)(u8)tag[i];
+        i++;
+    }
+
+    return palette[hash % (u32)palette_count];
+}
+
+static void clks_log_emit_tty_colored(enum clks_log_level level, const char *tag, const char *message) {
+    const char *safe_tag = (tag == CLKS_NULL) ? "LOG" : tag;
+    const char *safe_message = (message == CLKS_NULL) ? "" : message;
+
+    clks_tty_write(clks_log_level_ansi(level));
+    clks_tty_write("[");
+    clks_tty_write(clks_log_level_name(level));
+    clks_tty_write("]");
+
+    clks_tty_write(clks_log_tag_ansi(safe_tag));
+    clks_tty_write("[");
+    clks_tty_write(safe_tag);
+    clks_tty_write("]");
+
+    clks_tty_write(CLKS_LOG_ANSI_RESET);
+    clks_tty_write(" ");
+    clks_tty_write(safe_message);
+    clks_tty_write("\n");
+}
+
+static void clks_log_build_line(enum clks_log_level level, const char *tag, const char *message, char *line) {
+    const char *safe_tag = (tag == CLKS_NULL) ? "LOG" : tag;
+    const char *safe_message = (message == CLKS_NULL) ? "" : message;
+    usize cursor = 0U;
+
+    if (line == CLKS_NULL) {
+        return;
+    }
+
+    clks_log_append_char(line, &cursor, '[');
+    clks_log_append_text(line, &cursor, clks_log_level_name(level));
+    clks_log_append_char(line, &cursor, ']');
+    clks_log_append_char(line, &cursor, '[');
+    clks_log_append_text(line, &cursor, safe_tag);
+    clks_log_append_char(line, &cursor, ']');
+    clks_log_append_char(line, &cursor, ' ');
+    clks_log_append_text(line, &cursor, safe_message);
+    line[cursor] = '\0';
+}
+
+static void clks_log_emit_line(enum clks_log_level level, const char *tag, const char *message, const char *line) {
+    if (line == CLKS_NULL) {
+        return;
+    }
+
     clks_log_journal_push(line);
 
     clks_serial_write(line);
     clks_serial_write("\n");
 
-    clks_tty_write(line);
-    clks_tty_write("\n");
+    clks_log_emit_tty_colored(level, tag, message);
 }
 
 void clks_log(enum clks_log_level level, const char *tag, const char *message) {
     char line[CLKS_LOG_LINE_MAX];
-    usize cursor = 0;
 
-    clks_log_append_char(line, &cursor, '[');
-    clks_log_append_text(line, &cursor, clks_log_level_name(level));
-    clks_log_append_char(line, &cursor, ']');
-    clks_log_append_char(line, &cursor, '[');
-    clks_log_append_text(line, &cursor, tag);
-    clks_log_append_char(line, &cursor, ']');
-    clks_log_append_char(line, &cursor, ' ');
-    clks_log_append_text(line, &cursor, message);
-    line[cursor] = '\0';
-
-    clks_log_emit_line(line);
+    clks_log_build_line(level, tag, message, line);
+    clks_log_emit_line(level, tag, message, line);
 }
 
 void clks_log_hex(enum clks_log_level level, const char *tag, const char *label, u64 value) {
+    char message[CLKS_LOG_LINE_MAX];
     char line[CLKS_LOG_LINE_MAX];
-    usize cursor = 0;
+    usize cursor = 0U;
 
-    clks_log_append_char(line, &cursor, '[');
-    clks_log_append_text(line, &cursor, clks_log_level_name(level));
-    clks_log_append_char(line, &cursor, ']');
-    clks_log_append_char(line, &cursor, '[');
-    clks_log_append_text(line, &cursor, tag);
-    clks_log_append_char(line, &cursor, ']');
-    clks_log_append_char(line, &cursor, ' ');
-    clks_log_append_text(line, &cursor, label);
-    clks_log_append_char(line, &cursor, ':');
-    clks_log_append_char(line, &cursor, ' ');
-    clks_log_append_hex_u64(line, &cursor, value);
-    line[cursor] = '\0';
+    clks_log_append_text(message, &cursor, (label == CLKS_NULL) ? "VALUE" : label);
+    clks_log_append_char(message, &cursor, ':');
+    clks_log_append_char(message, &cursor, ' ');
+    clks_log_append_hex_u64(message, &cursor, value);
+    message[cursor] = '\0';
 
-    clks_log_emit_line(line);
+    clks_log_build_line(level, tag, message, line);
+    clks_log_emit_line(level, tag, message, line);
 }
 
 u64 clks_log_journal_count(void) {

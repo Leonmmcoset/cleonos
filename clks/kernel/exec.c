@@ -22,6 +22,7 @@ typedef u64 (*clks_exec_entry_fn)(void);
 #define CLKS_EXEC_MAX_ENVS         24U
 #define CLKS_EXEC_ITEM_MAX        128U
 #define CLKS_EXEC_STATUS_SIGNAL_FLAG (1ULL << 63)
+#define CLKS_EXEC_DEFAULT_KILL_SIGNAL 15ULL
 
 enum clks_exec_proc_state {
     CLKS_EXEC_PROC_UNUSED = 0,
@@ -39,6 +40,7 @@ struct clks_exec_proc_record {
     u64 exited_tick;
     u64 exit_status;
     u32 tty_index;
+    u64 image_mem_bytes;
     char path[CLKS_EXEC_PATH_MAX];
     char argv_line[CLKS_EXEC_ARG_LINE_MAX];
     char env_line[CLKS_EXEC_ENV_LINE_MAX];
@@ -413,6 +415,7 @@ static struct clks_exec_proc_record *clks_exec_prepare_proc_record(i32 slot,
     proc->exited_tick = 0ULL;
     proc->exit_status = (u64)-1;
     proc->tty_index = clks_tty_active();
+    proc->image_mem_bytes = 0ULL;
     clks_exec_copy_path(proc->path, sizeof(proc->path), path);
     clks_exec_copy_line(proc->argv_line, sizeof(proc->argv_line), argv_line);
     clks_exec_copy_line(proc->env_line, sizeof(proc->env_line), env_line);
@@ -543,6 +546,8 @@ static clks_bool clks_exec_run_proc_slot(i32 slot, u64 *out_status) {
         clks_log(CLKS_LOG_WARN, "EXEC", proc->path);
         goto fail;
     }
+
+    proc->image_mem_bytes = info.total_load_memsz;
 
     if (clks_elf64_load(image, image_size, &loaded) == CLKS_FALSE) {
         clks_log(CLKS_LOG_WARN, "EXEC", "EXEC ELF LOAD FAILED");
@@ -956,6 +961,190 @@ u64 clks_exec_current_fault_error(void) {
 u64 clks_exec_current_fault_rip(void) {
     const struct clks_exec_proc_record *proc = clks_exec_current_proc();
     return (proc != CLKS_NULL) ? proc->last_fault_rip : 0ULL;
+}
+
+static u64 clks_exec_proc_runtime_ticks(const struct clks_exec_proc_record *proc, u64 now_tick) {
+    if (proc == CLKS_NULL || proc->started_tick == 0ULL) {
+        return 0ULL;
+    }
+
+    if (proc->state == CLKS_EXEC_PROC_RUNNING) {
+        if (now_tick <= proc->started_tick) {
+            return 0ULL;
+        }
+
+        return now_tick - proc->started_tick;
+    }
+
+    if (proc->state == CLKS_EXEC_PROC_EXITED) {
+        if (proc->exited_tick <= proc->started_tick) {
+            return 0ULL;
+        }
+
+        return proc->exited_tick - proc->started_tick;
+    }
+
+    return 0ULL;
+}
+
+static u64 clks_exec_proc_memory_bytes(const struct clks_exec_proc_record *proc) {
+    u64 mem = 0ULL;
+
+    if (proc == CLKS_NULL) {
+        return 0ULL;
+    }
+
+    mem += proc->image_mem_bytes;
+
+    if (proc->state == CLKS_EXEC_PROC_RUNNING) {
+        mem += CLKS_EXEC_RUN_STACK_BYTES;
+    }
+
+    return mem;
+}
+
+u64 clks_exec_proc_count(void) {
+    u64 count = 0ULL;
+    u32 i;
+
+    for (i = 0U; i < CLKS_EXEC_MAX_PROCS; i++) {
+        if (clks_exec_proc_table[i].used == CLKS_TRUE) {
+            count++;
+        }
+    }
+
+    return count;
+}
+
+clks_bool clks_exec_proc_pid_at(u64 index, u64 *out_pid) {
+    u64 pos = 0ULL;
+    u32 i;
+
+    if (out_pid != CLKS_NULL) {
+        *out_pid = 0ULL;
+    }
+
+    if (out_pid == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    for (i = 0U; i < CLKS_EXEC_MAX_PROCS; i++) {
+        if (clks_exec_proc_table[i].used != CLKS_TRUE) {
+            continue;
+        }
+
+        if (pos == index) {
+            *out_pid = clks_exec_proc_table[i].pid;
+            return CLKS_TRUE;
+        }
+
+        pos++;
+    }
+
+    return CLKS_FALSE;
+}
+
+clks_bool clks_exec_proc_snapshot(u64 pid, struct clks_exec_proc_snapshot *out_snapshot) {
+    i32 slot;
+    const struct clks_exec_proc_record *proc;
+    u64 now_tick;
+
+    if (out_snapshot == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    slot = clks_exec_proc_find_slot_by_pid(pid);
+
+    if (slot < 0) {
+        return CLKS_FALSE;
+    }
+
+    proc = &clks_exec_proc_table[(u32)slot];
+
+    if (proc->used != CLKS_TRUE) {
+        return CLKS_FALSE;
+    }
+
+    now_tick = clks_interrupts_timer_ticks();
+    clks_memset(out_snapshot, 0, sizeof(*out_snapshot));
+
+    out_snapshot->pid = proc->pid;
+    out_snapshot->ppid = proc->ppid;
+    out_snapshot->state = (u64)proc->state;
+    out_snapshot->started_tick = proc->started_tick;
+    out_snapshot->exited_tick = proc->exited_tick;
+    out_snapshot->exit_status = proc->exit_status;
+    out_snapshot->runtime_ticks = clks_exec_proc_runtime_ticks(proc, now_tick);
+    out_snapshot->mem_bytes = clks_exec_proc_memory_bytes(proc);
+    out_snapshot->tty_index = (u64)proc->tty_index;
+    out_snapshot->last_signal = proc->last_signal;
+    out_snapshot->last_fault_vector = proc->last_fault_vector;
+    out_snapshot->last_fault_error = proc->last_fault_error;
+    out_snapshot->last_fault_rip = proc->last_fault_rip;
+    clks_exec_copy_path(out_snapshot->path, sizeof(out_snapshot->path), proc->path);
+
+    return CLKS_TRUE;
+}
+
+u64 clks_exec_proc_kill(u64 pid, u64 signal) {
+    i32 slot;
+    struct clks_exec_proc_record *proc;
+    u64 effective_signal;
+    u64 status;
+    u64 now_tick;
+
+    if (pid == 0ULL) {
+        return (u64)-1;
+    }
+
+    slot = clks_exec_proc_find_slot_by_pid(pid);
+
+    if (slot < 0) {
+        return (u64)-1;
+    }
+
+    proc = &clks_exec_proc_table[(u32)slot];
+
+    if (proc->used != CLKS_TRUE) {
+        return (u64)-1;
+    }
+
+    effective_signal = (signal == 0ULL) ? CLKS_EXEC_DEFAULT_KILL_SIGNAL : (signal & 0xFFULL);
+    status = clks_exec_encode_signal_status(effective_signal, 0ULL, 0ULL);
+    now_tick = clks_interrupts_timer_ticks();
+
+    if (proc->state == CLKS_EXEC_PROC_EXITED) {
+        return 1ULL;
+    }
+
+    if (proc->state == CLKS_EXEC_PROC_PENDING) {
+        proc->state = CLKS_EXEC_PROC_EXITED;
+        proc->exit_status = status;
+        proc->exited_tick = now_tick;
+        proc->last_signal = effective_signal;
+        proc->last_fault_vector = 0ULL;
+        proc->last_fault_error = 0ULL;
+        proc->last_fault_rip = 0ULL;
+        return 1ULL;
+    }
+
+    if (proc->state == CLKS_EXEC_PROC_RUNNING) {
+        i32 depth_index = clks_exec_current_depth_index();
+
+        if (depth_index < 0 || clks_exec_current_pid() != pid) {
+            return 0ULL;
+        }
+
+        proc->last_signal = effective_signal;
+        proc->last_fault_vector = 0ULL;
+        proc->last_fault_error = 0ULL;
+        proc->last_fault_rip = 0ULL;
+        clks_exec_exit_requested_stack[(u32)depth_index] = CLKS_TRUE;
+        clks_exec_exit_status_stack[(u32)depth_index] = status;
+        return 1ULL;
+    }
+
+    return 0ULL;
 }
 
 clks_bool clks_exec_handle_exception(u64 vector,

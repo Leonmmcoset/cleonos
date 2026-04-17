@@ -11,6 +11,7 @@ set(LD "x86_64-elf-ld" CACHE STRING "Kernel linker")
 set(USER_CC "cc" CACHE STRING "User-space C compiler")
 set(USER_LD "ld" CACHE STRING "User-space linker")
 set(RUSTC "rustc" CACHE STRING "Rust compiler")
+set(NM "nm" CACHE STRING "nm executable")
 
 set(XORRISO "xorriso" CACHE STRING "xorriso executable")
 set(TAR "tar" CACHE STRING "tar executable")
@@ -87,6 +88,7 @@ set(RAMDISK_ROOT "${BUILD_ROOT}/ramdisk_root")
 set(KERNEL_ELF "${BUILD_ROOT}/clks_kernel.elf")
 set(RAMDISK_IMAGE "${BUILD_ROOT}/cleonos_ramdisk.tar")
 set(ISO_IMAGE "${CMAKE_SOURCE_DIR}/build/CLeonOS-x86_64.iso")
+set(KERNEL_SYMBOLS_FILE "${BUILD_ROOT}/kernel.sym")
 
 set(USER_BUILD_ROOT "${BUILD_ROOT}/user")
 set(USER_OBJ_ROOT "${USER_BUILD_ROOT}/obj")
@@ -99,6 +101,7 @@ resolve_tool_with_fallback(CC gcc cc clang)
 resolve_tool_with_fallback(LD ld.lld ld)
 resolve_tool_with_fallback(USER_CC cc gcc clang)
 resolve_tool_with_fallback(USER_LD ld.lld ld)
+resolve_tool_with_fallback(NM llvm-nm x86_64-elf-nm nm)
 resolve_tool_with_fallback(OBJCOPY_FOR_TARGET llvm-objcopy x86_64-linux-gnu-objcopy objcopy)
 resolve_tool_with_fallback(OBJDUMP_FOR_TARGET llvm-objdump x86_64-linux-gnu-objdump objdump)
 resolve_tool_with_fallback(READELF_FOR_TARGET llvm-readelf x86_64-linux-gnu-readelf readelf)
@@ -331,6 +334,21 @@ add_custom_command(
 
 add_custom_target(kernel DEPENDS "${KERNEL_ELF}")
 
+add_custom_command(
+    OUTPUT "${KERNEL_SYMBOLS_FILE}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${BUILD_ROOT}"
+    COMMAND ${CMAKE_COMMAND}
+        "-DNM_TOOL=${NM}"
+        "-DKERNEL_ELF=${KERNEL_ELF}"
+        "-DOUT_SYMBOL_FILE=${KERNEL_SYMBOLS_FILE}"
+        -P "${CMAKE_SOURCE_DIR}/cmake/gen_kernel_symbols.cmake"
+    DEPENDS "${KERNEL_ELF}" "${CMAKE_SOURCE_DIR}/cmake/gen_kernel_symbols.cmake"
+    VERBATIM
+)
+
+add_custom_target(kernel-symbols DEPENDS "${KERNEL_SYMBOLS_FILE}")
+add_dependencies(kernel-symbols kernel)
+
 set(USER_COMMON_OBJECTS)
 foreach(SRC IN LISTS USER_COMMON_SOURCES)
     add_user_c_object("${SRC}" OBJ_OUT)
@@ -496,9 +514,10 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E make_directory "${RAMDISK_ROOT}"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/ramdisk" "${RAMDISK_ROOT}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${RAMDISK_ROOT}/system" "${RAMDISK_ROOT}/shell" "${RAMDISK_ROOT}/driver"
+    COMMAND ${CMAKE_COMMAND} -E copy "${KERNEL_SYMBOLS_FILE}" "${RAMDISK_ROOT}/system/kernel.sym"
     ${RAMDISK_COPY_COMMANDS}
     COMMAND ${CMAKE_COMMAND} -E touch "${RAMDISK_ROOT_STAMP}"
-    DEPENDS ${RAMDISK_FILES} ${USER_APP_OUTPUTS}
+    DEPENDS ${RAMDISK_FILES} ${USER_APP_OUTPUTS} "${KERNEL_SYMBOLS_FILE}"
     VERBATIM
 )
 
@@ -526,6 +545,7 @@ add_custom_target(setup-tools
         "-DOBJCOPY_TOOL=${OBJCOPY_FOR_TARGET}"
         "-DOBJDUMP_TOOL=${OBJDUMP_FOR_TARGET}"
         "-DREADELF_TOOL=${READELF_FOR_TARGET}"
+        "-DNM_TOOL=${NM}"
         "-DUSER_CC_TOOL=${USER_CC}"
         "-DUSER_LD_TOOL=${USER_LD}"
         "-DRUSTC_TOOL=${RUSTC}"

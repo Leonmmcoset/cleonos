@@ -1,5 +1,6 @@
 #include <clks/cpu.h>
 #include <clks/framebuffer.h>
+#include <clks/fs.h>
 #include <clks/panic.h>
 #include <clks/serial.h>
 #include <clks/string.h>
@@ -7,6 +8,11 @@
 
 #define CLKS_PANIC_BG 0x00200000U
 #define CLKS_PANIC_FG 0x00FFE0E0U
+
+#define CLKS_PANIC_BACKTRACE_MAX        20U
+#define CLKS_PANIC_STACK_WINDOW_BYTES   (128ULL * 1024ULL)
+#define CLKS_PANIC_SYMBOL_FILE          "/system/kernel.sym"
+#define CLKS_PANIC_KERNEL_ADDR_BASE     0xFFFF800000000000ULL
 
 struct clks_panic_console {
     u32 cols;
@@ -18,6 +24,9 @@ struct clks_panic_console {
 };
 
 static clks_bool clks_panic_active = CLKS_FALSE;
+static clks_bool clks_panic_symbols_checked = CLKS_FALSE;
+static const char *clks_panic_symbols_data = CLKS_NULL;
+static u64 clks_panic_symbols_size = 0ULL;
 
 static inline void clks_panic_disable_interrupts(void) {
 #if defined(CLKS_ARCH_X86_64)
@@ -39,6 +48,41 @@ static void clks_panic_u64_to_hex(u64 value, char out[19]) {
     }
 
     out[18] = '\0';
+}
+
+static void clks_panic_u32_to_dec(u32 value, char *out, usize out_size) {
+    char tmp[11];
+    usize len = 0U;
+    usize i;
+
+    if (out == CLKS_NULL || out_size == 0U) {
+        return;
+    }
+
+    if (value == 0U) {
+        if (out_size >= 2U) {
+            out[0] = '0';
+            out[1] = '\0';
+        } else {
+            out[0] = '\0';
+        }
+        return;
+    }
+
+    while (value != 0U && len < sizeof(tmp)) {
+        tmp[len++] = (char)('0' + (value % 10U));
+        value /= 10U;
+    }
+
+    if (len + 1U > out_size) {
+        len = out_size - 1U;
+    }
+
+    for (i = 0U; i < len; i++) {
+        out[i] = tmp[len - 1U - i];
+    }
+
+    out[len] = '\0';
 }
 
 static clks_bool clks_panic_console_init(struct clks_panic_console *console) {
@@ -118,15 +162,36 @@ static void clks_panic_console_put_char(struct clks_panic_console *console, char
     }
 }
 
-static void clks_panic_console_write(struct clks_panic_console *console, const char *text) {
+static void clks_panic_console_write_n(struct clks_panic_console *console, const char *text, usize len) {
     usize i = 0U;
 
     if (console == CLKS_NULL || text == CLKS_NULL) {
         return;
     }
 
-    while (text[i] != '\0') {
+    while (i < len) {
         clks_panic_console_put_char(console, text[i]);
+        i++;
+    }
+}
+
+static void clks_panic_console_write(struct clks_panic_console *console, const char *text) {
+    if (console == CLKS_NULL || text == CLKS_NULL) {
+        return;
+    }
+
+    clks_panic_console_write_n(console, text, clks_strlen(text));
+}
+
+static void clks_panic_serial_write_n(const char *text, usize len) {
+    usize i = 0U;
+
+    if (text == CLKS_NULL) {
+        return;
+    }
+
+    while (i < len) {
+        clks_serial_write_char(text[i]);
         i++;
     }
 }
@@ -140,12 +205,343 @@ static void clks_panic_serial_write_line(const char *line) {
     clks_serial_write("\n");
 }
 
+static clks_bool clks_panic_is_hex(char ch) {
+    if ((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F')) {
+        return CLKS_TRUE;
+    }
+
+    return CLKS_FALSE;
+}
+
+static u8 clks_panic_hex_value(char ch) {
+    if (ch >= '0' && ch <= '9') {
+        return (u8)(ch - '0');
+    }
+
+    if (ch >= 'a' && ch <= 'f') {
+        return (u8)(10 + (ch - 'a'));
+    }
+
+    return (u8)(10 + (ch - 'A'));
+}
+
+static clks_bool clks_panic_parse_symbol_line(const char *line,
+                                              usize len,
+                                              u64 *out_addr,
+                                              const char **out_name,
+                                              usize *out_name_len) {
+    usize i = 0U;
+    u64 addr = 0ULL;
+    u32 digits = 0U;
+    usize name_start;
+    usize name_end;
+
+    if (line == CLKS_NULL || out_addr == CLKS_NULL || out_name == CLKS_NULL || out_name_len == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    if (len == 0U) {
+        return CLKS_FALSE;
+    }
+
+    if (len >= 2U && line[0] == '0' && (line[1] == 'X' || line[1] == 'x')) {
+        i = 2U;
+    }
+
+    while (i < len && clks_panic_is_hex(line[i]) == CLKS_TRUE) {
+        addr = (addr << 4) | (u64)clks_panic_hex_value(line[i]);
+        digits++;
+        i++;
+    }
+
+    if (digits == 0U) {
+        return CLKS_FALSE;
+    }
+
+    while (i < len && (line[i] == ' ' || line[i] == '\t')) {
+        i++;
+    }
+
+    if (i >= len) {
+        return CLKS_FALSE;
+    }
+
+    name_start = i;
+    name_end = len;
+
+    while (name_end > name_start &&
+           (line[name_end - 1U] == ' ' || line[name_end - 1U] == '\t' || line[name_end - 1U] == '\r')) {
+        name_end--;
+    }
+
+    if (name_end <= name_start) {
+        return CLKS_FALSE;
+    }
+
+    *out_addr = addr;
+    *out_name = &line[name_start];
+    *out_name_len = name_end - name_start;
+    return CLKS_TRUE;
+}
+
+static clks_bool clks_panic_symbols_ready(void) {
+    u64 size = 0ULL;
+    const void *data;
+
+    if (clks_panic_symbols_checked == CLKS_TRUE) {
+        return (clks_panic_symbols_data != CLKS_NULL && clks_panic_symbols_size > 0ULL) ? CLKS_TRUE : CLKS_FALSE;
+    }
+
+    clks_panic_symbols_checked = CLKS_TRUE;
+
+    if (clks_fs_is_ready() == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    data = clks_fs_read_all(CLKS_PANIC_SYMBOL_FILE, &size);
+
+    if (data == CLKS_NULL || size == 0ULL) {
+        return CLKS_FALSE;
+    }
+
+    clks_panic_symbols_data = (const char *)data;
+    clks_panic_symbols_size = size;
+    return CLKS_TRUE;
+}
+
+static clks_bool clks_panic_lookup_symbol(u64 addr, const char **out_name, usize *out_name_len, u64 *out_base) {
+    const char *data;
+    const char *end;
+    const char *line;
+    const char *best_name = CLKS_NULL;
+    usize best_len = 0U;
+    u64 best_addr = 0ULL;
+    clks_bool found = CLKS_FALSE;
+
+    if (out_name == CLKS_NULL || out_name_len == CLKS_NULL || out_base == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    *out_name = CLKS_NULL;
+    *out_name_len = 0U;
+    *out_base = 0ULL;
+
+    if (clks_panic_symbols_ready() == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    data = clks_panic_symbols_data;
+    end = clks_panic_symbols_data + clks_panic_symbols_size;
+
+    while (data < end) {
+        u64 line_addr;
+        const char *line_name;
+        usize line_name_len;
+        usize line_len = 0U;
+
+        line = data;
+
+        while (data < end && *data != '\n') {
+            data++;
+            line_len++;
+        }
+
+        if (data < end && *data == '\n') {
+            data++;
+        }
+
+        if (clks_panic_parse_symbol_line(line, line_len, &line_addr, &line_name, &line_name_len) == CLKS_FALSE) {
+            continue;
+        }
+
+        if (line_addr <= addr && (found == CLKS_FALSE || line_addr >= best_addr)) {
+            best_addr = line_addr;
+            best_name = line_name;
+            best_len = line_name_len;
+            found = CLKS_TRUE;
+        }
+    }
+
+    if (found == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    *out_name = best_name;
+    *out_name_len = best_len;
+    *out_base = best_addr;
+    return CLKS_TRUE;
+}
+
+static void clks_panic_emit_bt_entry(struct clks_panic_console *console, u32 index, u64 rip) {
+    char index_dec[12];
+    char rip_hex[19];
+    const char *sym_name = CLKS_NULL;
+    usize sym_name_len = 0U;
+    u64 sym_base = 0ULL;
+    clks_bool has_symbol;
+
+    clks_panic_u32_to_dec(index, index_dec, sizeof(index_dec));
+    clks_panic_u64_to_hex(rip, rip_hex);
+    has_symbol = clks_panic_lookup_symbol(rip, &sym_name, &sym_name_len, &sym_base);
+
+    clks_serial_write("[PANIC][BT] #");
+    clks_serial_write(index_dec);
+    clks_serial_write(" ");
+    clks_serial_write(rip_hex);
+
+    if (has_symbol == CLKS_TRUE) {
+        char off_hex[19];
+        u64 off = rip - sym_base;
+
+        clks_panic_u64_to_hex(off, off_hex);
+        clks_serial_write(" ");
+        clks_panic_serial_write_n(sym_name, sym_name_len);
+        clks_serial_write("+");
+        clks_serial_write(off_hex);
+    }
+
+    clks_serial_write("\n");
+
+    if (console == CLKS_NULL) {
+        return;
+    }
+
+    clks_panic_console_write(console, "BT#");
+    clks_panic_console_write(console, index_dec);
+    clks_panic_console_write(console, " ");
+    clks_panic_console_write(console, rip_hex);
+
+    if (has_symbol == CLKS_TRUE) {
+        char off_hex[19];
+        u64 off = rip - sym_base;
+
+        clks_panic_u64_to_hex(off, off_hex);
+        clks_panic_console_write(console, " ");
+        clks_panic_console_write_n(console, sym_name, sym_name_len);
+        clks_panic_console_write(console, "+");
+        clks_panic_console_write(console, off_hex);
+    }
+
+    clks_panic_console_write(console, "\n");
+}
+
+static clks_bool clks_panic_stack_ptr_valid(u64 ptr, u64 stack_low, u64 stack_high) {
+    if ((ptr & 0x7ULL) != 0ULL) {
+        return CLKS_FALSE;
+    }
+
+    if (ptr < stack_low || ptr + 16ULL > stack_high) {
+        return CLKS_FALSE;
+    }
+
+    if (ptr < CLKS_PANIC_KERNEL_ADDR_BASE) {
+        return CLKS_FALSE;
+    }
+
+    return CLKS_TRUE;
+}
+
+static void clks_panic_emit_backtrace(struct clks_panic_console *console, u64 rip, u64 rbp, u64 rsp) {
+    u64 current_rbp;
+    u64 stack_low;
+    u64 stack_high;
+    u32 frame = 0U;
+
+    if (rip == 0ULL) {
+        return;
+    }
+
+    clks_panic_serial_write_line("[PANIC][BT] BEGIN");
+
+    if (console != CLKS_NULL) {
+        clks_panic_console_write(console, "\nBACKTRACE:\n");
+    }
+
+    clks_panic_emit_bt_entry(console, frame, rip);
+    frame++;
+
+    if (rbp == 0ULL || rsp == 0ULL || frame >= CLKS_PANIC_BACKTRACE_MAX) {
+        clks_panic_serial_write_line("[PANIC][BT] END");
+        return;
+    }
+
+    stack_low = rsp;
+    stack_high = rsp + CLKS_PANIC_STACK_WINDOW_BYTES;
+
+    if (stack_high <= stack_low) {
+        clks_panic_serial_write_line("[PANIC][BT] END");
+        return;
+    }
+
+    current_rbp = rbp;
+
+    while (frame < CLKS_PANIC_BACKTRACE_MAX) {
+        const u64 *frame_ptr;
+        u64 next_rbp;
+        u64 ret_rip;
+
+        if (clks_panic_stack_ptr_valid(current_rbp, stack_low, stack_high) == CLKS_FALSE) {
+            break;
+        }
+
+        frame_ptr = (const u64 *)(usize)current_rbp;
+        next_rbp = frame_ptr[0];
+        ret_rip = frame_ptr[1];
+
+        if (ret_rip == 0ULL) {
+            break;
+        }
+
+        clks_panic_emit_bt_entry(console, frame, ret_rip);
+        frame++;
+
+        if (next_rbp <= current_rbp) {
+            break;
+        }
+
+        current_rbp = next_rbp;
+    }
+
+    clks_panic_serial_write_line("[PANIC][BT] END");
+}
+
+static void clks_panic_capture_context(u64 *out_rip, u64 *out_rbp, u64 *out_rsp) {
+    if (out_rip != CLKS_NULL) {
+        *out_rip = 0ULL;
+    }
+
+    if (out_rbp != CLKS_NULL) {
+        *out_rbp = 0ULL;
+    }
+
+    if (out_rsp != CLKS_NULL) {
+        *out_rsp = 0ULL;
+    }
+
+#if defined(CLKS_ARCH_X86_64)
+    if (out_rbp != CLKS_NULL) {
+        __asm__ volatile("mov %%rbp, %0" : "=r"(*out_rbp));
+    }
+
+    if (out_rsp != CLKS_NULL) {
+        __asm__ volatile("mov %%rsp, %0" : "=r"(*out_rsp));
+    }
+
+    if (out_rip != CLKS_NULL) {
+        *out_rip = (u64)(usize)__builtin_return_address(0);
+    }
+#endif
+}
+
 static CLKS_NORETURN void clks_panic_halt_loop(void) {
     clks_cpu_halt_forever();
 }
 
 CLKS_NORETURN void clks_panic(const char *reason) {
     struct clks_panic_console console;
+    u64 rip = 0ULL;
+    u64 rbp = 0ULL;
+    u64 rsp = 0ULL;
 
     clks_panic_disable_interrupts();
 
@@ -154,6 +550,7 @@ CLKS_NORETURN void clks_panic(const char *reason) {
     }
 
     clks_panic_active = CLKS_TRUE;
+    clks_panic_capture_context(&rip, &rbp, &rsp);
 
     clks_panic_serial_write_line("[PANIC] CLeonOS KERNEL PANIC");
 
@@ -173,13 +570,21 @@ CLKS_NORETURN void clks_panic(const char *reason) {
             clks_panic_console_write(&console, "\n");
         }
 
+        clks_panic_emit_backtrace(&console, rip, rbp, rsp);
         clks_panic_console_write(&console, "\nSystem halted. Please reboot the VM.\n");
+    } else {
+        clks_panic_emit_backtrace(CLKS_NULL, rip, rbp, rsp);
     }
 
     clks_panic_halt_loop();
 }
 
-CLKS_NORETURN void clks_panic_exception(const char *name, u64 vector, u64 error_code, u64 rip) {
+CLKS_NORETURN void clks_panic_exception(const char *name,
+                                        u64 vector,
+                                        u64 error_code,
+                                        u64 rip,
+                                        u64 rbp,
+                                        u64 rsp) {
     struct clks_panic_console console;
     char hex_buf[19];
 
@@ -230,9 +635,12 @@ CLKS_NORETURN void clks_panic_exception(const char *name, u64 vector, u64 error_
         clks_panic_u64_to_hex(rip, hex_buf);
         clks_panic_console_write(&console, "RIP:    ");
         clks_panic_console_write(&console, hex_buf);
-        clks_panic_console_write(&console, "\n\n");
+        clks_panic_console_write(&console, "\n");
 
-        clks_panic_console_write(&console, "System halted. Please reboot the VM.\n");
+        clks_panic_emit_backtrace(&console, rip, rbp, rsp);
+        clks_panic_console_write(&console, "\nSystem halted. Please reboot the VM.\n");
+    } else {
+        clks_panic_emit_backtrace(CLKS_NULL, rip, rbp, rsp);
     }
 
     clks_panic_halt_loop();

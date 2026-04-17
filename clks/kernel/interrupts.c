@@ -260,7 +260,12 @@ void clks_interrupt_dispatch(struct clks_interrupt_frame *frame) {
             return;
         }
 
-        clks_panic_exception(clks_exception_names[vector], vector, frame->error_code, frame->rip);
+        clks_panic_exception(clks_exception_names[vector],
+                             vector,
+                             frame->error_code,
+                             frame->rip,
+                             frame->rbp,
+                             frame->rsp);
     }
 
     if (vector == CLKS_IRQ_TIMER) {

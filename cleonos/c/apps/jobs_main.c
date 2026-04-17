@@ -25,6 +25,9 @@ static const char *ush_jobs_state_name(u64 state) {
     if (state == CLEONOS_PROC_STATE_RUNNING) {
         return "RUNNING";
     }
+    if (state == CLEONOS_PROC_STATE_STOPPED) {
+        return "STOPPED";
+    }
     if (state == CLEONOS_PROC_STATE_EXITED) {
         return "EXITED ";
     }

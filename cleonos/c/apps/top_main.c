@@ -7,6 +7,9 @@ static const char *ush_top_state_name(u64 state) {
     if (state == CLEONOS_PROC_STATE_RUNNING) {
         return "RUN ";
     }
+    if (state == CLEONOS_PROC_STATE_STOPPED) {
+        return "STOP";
+    }
     if (state == CLEONOS_PROC_STATE_EXITED) {
         return "EXIT";
     }
@@ -114,7 +117,9 @@ static void ush_top_render_frame(u64 frame_index, u64 delay_ticks) {
             continue;
         }
 
-        if (snap.state != CLEONOS_PROC_STATE_PENDING && snap.state != CLEONOS_PROC_STATE_RUNNING) {
+        if (snap.state != CLEONOS_PROC_STATE_PENDING &&
+            snap.state != CLEONOS_PROC_STATE_RUNNING &&
+            snap.state != CLEONOS_PROC_STATE_STOPPED) {
             continue;
         }
 

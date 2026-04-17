@@ -1,19 +1,105 @@
 #include "cmd_runtime.h"
 
+static void ush_kill_upper_copy(char *dst, u64 dst_size, const char *src) {
+    u64 i = 0ULL;
+
+    if (dst == (char *)0 || dst_size == 0ULL) {
+        return;
+    }
+
+    dst[0] = '\0';
+
+    if (src == (const char *)0) {
+        return;
+    }
+
+    while (src[i] != '\0' && i + 1ULL < dst_size) {
+        char ch = src[i];
+        if (ch >= 'a' && ch <= 'z') {
+            ch = (char)(ch - ('a' - 'A'));
+        }
+        dst[i] = ch;
+        i++;
+    }
+
+    dst[i] = '\0';
+}
+
+static int ush_kill_parse_signal_name(const char *text, u64 *out_signal) {
+    char name[32];
+    u64 start = 0ULL;
+
+    if (text == (const char *)0 || out_signal == (u64 *)0 || text[0] == '\0') {
+        return 0;
+    }
+
+    ush_kill_upper_copy(name, (u64)sizeof(name), text);
+
+    if (name[0] == '-') {
+        start = 1ULL;
+    }
+
+    if (name[start] == 'S' && name[start + 1ULL] == 'I' && name[start + 2ULL] == 'G') {
+        start += 3ULL;
+    }
+
+    if (name[start] == '\0') {
+        return 0;
+    }
+
+    if (ush_streq(&name[start], "TERM") != 0) {
+        *out_signal = CLEONOS_SIGTERM;
+        return 1;
+    }
+
+    if (ush_streq(&name[start], "KILL") != 0) {
+        *out_signal = CLEONOS_SIGKILL;
+        return 1;
+    }
+
+    if (ush_streq(&name[start], "STOP") != 0) {
+        *out_signal = CLEONOS_SIGSTOP;
+        return 1;
+    }
+
+    if (ush_streq(&name[start], "CONT") != 0) {
+        *out_signal = CLEONOS_SIGCONT;
+        return 1;
+    }
+
+    return 0;
+}
+
+static int ush_kill_parse_signal(const char *text, u64 *out_signal) {
+    u64 parsed = 0ULL;
+
+    if (text == (const char *)0 || out_signal == (u64 *)0 || text[0] == '\0') {
+        return 0;
+    }
+
+    if (ush_parse_u64_dec(text, &parsed) != 0 && parsed <= 255ULL) {
+        *out_signal = parsed;
+        return 1;
+    }
+
+    return ush_kill_parse_signal_name(text, out_signal);
+}
+
 static int ush_cmd_kill(const char *arg) {
     char pid_text[USH_PATH_MAX];
+    char signal_text[USH_PATH_MAX];
     const char *rest = "";
     u64 pid;
-    u64 signal = 15ULL;
+    u64 signal = CLEONOS_SIGTERM;
     u64 ret;
 
     if (arg == (const char *)0 || arg[0] == '\0') {
-        ush_writeln("kill: usage kill <pid> [signal]");
+        ush_writeln("kill: usage kill <pid> [TERM|KILL|STOP|CONT|signal]");
         return 0;
     }
 
     if (ush_split_first_and_rest(arg, pid_text, (u64)sizeof(pid_text), &rest) == 0) {
-        ush_writeln("kill: usage kill <pid> [signal]");
+        ush_writeln("kill: usage kill <pid> [TERM|KILL|STOP|CONT|signal]");
         return 0;
     }
 
@@ -23,7 +109,9 @@ static int ush_cmd_kill(const char *arg) {
     }
 
     if (rest != (const char *)0 && rest[0] != '\0') {
-        if (ush_parse_u64_dec(rest, &signal) == 0 || signal > 255ULL) {
+        ush_copy(signal_text, (u64)sizeof(signal_text), rest);
+        ush_trim_line(signal_text);
+        if (ush_kill_parse_signal(signal_text, &signal) == 0) {
             ush_writeln("kill: invalid signal");
             return 0;
         }

@@ -44,6 +44,21 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - bits `15:8` = CPU exception vector
 - bits `31:16` = exception error code 低 16 位
 
+进程状态值（`proc_snapshot.state`）：
+
+- `0` = `UNUSED`
+- `1` = `PENDING`
+- `2` = `RUNNING`
+- `3` = `EXITED`
+- `4` = `STOPPED`
+
+常用信号值（`PROC_KILL`）：
+
+- `SIGKILL` = `9`
+- `SIGTERM` = `15`
+- `SIGCONT` = `18`
+- `SIGSTOP` = `19`
+
 ## 3. 当前实现中的长度/路径限制
 
 以下限制由内核 `clks/kernel/syscall.c` 当前实现决定：
@@ -59,6 +74,14 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 文件系统写入类 syscall 的权限限制：
 
 - `FS_MKDIR` / `FS_WRITE` / `FS_APPEND` / `FS_REMOVE` 仅允许 `/temp` 树下路径。
+
+`/proc` 虚拟目录（由 syscall 层动态导出）：
+
+- `/proc`：目录（children = `self`、`list`、以及全部 PID 名称）
+- `/proc/self`：当前进程快照文本
+- `/proc/list`：所有进程列表文本
+- `/proc/<pid>`：指定 PID 快照文本
+- `/proc` 为只读；写入类 syscall 不支持。
 
 ## 4. Syscall 列表（0~64）
 
@@ -120,6 +143,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - 参数：
 - `arg0`: `const char *dir_path`
 - 返回：子节点数量
+- 说明：当 `dir_path=/proc` 时，返回 `2 + proc_count`（`self`、`list`、PID 子项）。
 
 ### 11 `CLEONOS_SYSCALL_FS_GET_CHILD_NAME`
 
@@ -129,6 +153,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `arg2`: `char *out_name`
 - 返回：成功 `1`，失败 `0`
 - 说明：最多写入 96 字节（含终止符）。
+- 说明：当 `dir_path=/proc` 时，`index=0/1` 分别为 `self/list`，后续索引为 PID 文本。
 
 ### 12 `CLEONOS_SYSCALL_FS_READ`
 
@@ -138,6 +163,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `arg2`: `u64 buffer_size`
 - 返回：实际读取字节数，失败/文件空返回 `0`
 - 说明：不会自动追加 `\0`，调用方应自行处理文本终止。
+- 说明：支持读取 `/proc/self`、`/proc/list`、`/proc/<pid>`。
 
 ### 13 `CLEONOS_SYSCALL_EXEC_PATH`
 
@@ -224,12 +250,14 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - 参数：
 - `arg0`: `const char *path`
 - 返回：`1=FILE`，`2=DIR`，失败 `-1`
+- 说明：`/proc` 返回目录，`/proc/self`、`/proc/list`、`/proc/<pid>` 返回文件。
 
 ### 28 `CLEONOS_SYSCALL_FS_STAT_SIZE`
 
 - 参数：
 - `arg0`: `const char *path`
 - 返回：文件大小；目录通常为 `0`；失败 `-1`
+- 说明：`/proc/*` 文件大小按生成文本长度返回。
 
 ### 29 `CLEONOS_SYSCALL_FS_MKDIR`
 
@@ -323,7 +351,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `arg1`: `u64 *out_status`（可为 `0`）
 - 返回：
 - `-1`：PID 不存在
-- `0`：目标进程仍在运行
+- `0`：目标进程仍未退出（`PENDING` / `RUNNING` / `STOPPED`）
 - `1`：目标进程已退出
 - 说明：当返回 `1` 且 `arg1!=0` 时，会写入退出码。
 
@@ -466,7 +494,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `arg1`: `struct cleonos_proc_snapshot *out_snapshot`
 - `arg2`: `u64 out_size`（需 `>= sizeof(cleonos_proc_snapshot)`）
 - 返回：成功 `1`，失败 `0`
-- 说明：返回 PID/PPID/状态/运行 tick/内存估算/TTY/路径等快照信息。
+- 说明：返回 PID/PPID/状态（含 `STOPPED`）/运行 tick/内存估算/TTY/路径等快照信息。
 
 ### 64 `CLEONOS_SYSCALL_PROC_KILL`
 
@@ -477,6 +505,10 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `1`：请求成功
 - `0`：当前不可终止（例如非当前上下文中的 running 进程）
 - `-1`：PID 不存在
+- 语义：
+- `SIGTERM`/`SIGKILL`（以及其它非 STOP/CONT 信号）：终止目标进程。
+- `SIGSTOP`：将 `PENDING` 进程置为 `STOPPED`；对已 `STOPPED` 目标返回成功。
+- `SIGCONT`：将 `STOPPED` 进程恢复为 `PENDING`。
 
 ## 5. 用户态封装函数
 
@@ -506,6 +538,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - 传入的字符串/缓冲指针目前按“同地址空间可直接访问”模型处理，后续若引入严格用户态地址隔离，需要补充用户内存校验。
 - `FS_READ` 不保证文本终止符；读取文本请预留 1 字节并手动 `buf[n] = '\0'`。
 - `FS_WRITE`/`FS_APPEND` 仅允许 `/temp`，并有单次长度上限。
+- `/proc` 由 syscall 层虚拟导出，不占用 RAMDISK 节点，也不能通过写入类 syscall 修改。
 
 ## 7. Wine 兼容说明
 

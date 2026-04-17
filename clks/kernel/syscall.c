@@ -25,6 +25,7 @@
 #define CLKS_SYSCALL_ARG_LINE_MAX     256U
 #define CLKS_SYSCALL_ENV_LINE_MAX     512U
 #define CLKS_SYSCALL_ITEM_MAX         128U
+#define CLKS_SYSCALL_PROCFS_TEXT_MAX 2048U
 #define CLKS_SYSCALL_USER_TRACE_BUDGET 128ULL
 
 struct clks_syscall_frame {
@@ -166,11 +167,342 @@ static u64 clks_syscall_kbd_get_char(void) {
     return (u64)(u8)ch;
 }
 
+static clks_bool clks_syscall_procfs_is_root(const char *path) {
+    return (path != CLKS_NULL && clks_strcmp(path, "/proc") == 0) ? CLKS_TRUE : CLKS_FALSE;
+}
+
+static clks_bool clks_syscall_procfs_is_self(const char *path) {
+    return (path != CLKS_NULL && clks_strcmp(path, "/proc/self") == 0) ? CLKS_TRUE : CLKS_FALSE;
+}
+
+static clks_bool clks_syscall_procfs_is_list(const char *path) {
+    return (path != CLKS_NULL && clks_strcmp(path, "/proc/list") == 0) ? CLKS_TRUE : CLKS_FALSE;
+}
+
+static clks_bool clks_syscall_parse_u64_dec(const char *text, u64 *out_value) {
+    u64 value = 0ULL;
+    usize i = 0U;
+
+    if (text == CLKS_NULL || out_value == CLKS_NULL || text[0] == '\0') {
+        return CLKS_FALSE;
+    }
+
+    while (text[i] != '\0') {
+        u64 digit;
+
+        if (text[i] < '0' || text[i] > '9') {
+            return CLKS_FALSE;
+        }
+
+        digit = (u64)(text[i] - '0');
+
+        if (value > ((0xFFFFFFFFFFFFFFFFULL - digit) / 10ULL)) {
+            return CLKS_FALSE;
+        }
+
+        value = (value * 10ULL) + digit;
+        i++;
+    }
+
+    *out_value = value;
+    return CLKS_TRUE;
+}
+
+static clks_bool clks_syscall_procfs_parse_pid(const char *path, u64 *out_pid) {
+    const char *part;
+    usize i = 0U;
+    char pid_text[32];
+    u64 pid;
+
+    if (path == CLKS_NULL || out_pid == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    if (path[0] != '/' || path[1] != 'p' || path[2] != 'r' || path[3] != 'o' || path[4] != 'c' || path[5] != '/') {
+        return CLKS_FALSE;
+    }
+
+    part = &path[6];
+
+    if (part[0] == '\0' || clks_strcmp(part, "self") == 0 || clks_strcmp(part, "list") == 0) {
+        return CLKS_FALSE;
+    }
+
+    while (part[i] != '\0') {
+        if (i + 1U >= sizeof(pid_text)) {
+            return CLKS_FALSE;
+        }
+
+        if (part[i] < '0' || part[i] > '9') {
+            return CLKS_FALSE;
+        }
+
+        pid_text[i] = part[i];
+        i++;
+    }
+
+    pid_text[i] = '\0';
+
+    if (clks_syscall_parse_u64_dec(pid_text, &pid) == CLKS_FALSE || pid == 0ULL) {
+        return CLKS_FALSE;
+    }
+
+    *out_pid = pid;
+    return CLKS_TRUE;
+}
+
+static const char *clks_syscall_proc_state_name(u64 state) {
+    if (state == CLKS_EXEC_PROC_STATE_PENDING) {
+        return "PENDING";
+    }
+
+    if (state == CLKS_EXEC_PROC_STATE_RUNNING) {
+        return "RUNNING";
+    }
+
+    if (state == CLKS_EXEC_PROC_STATE_STOPPED) {
+        return "STOPPED";
+    }
+
+    if (state == CLKS_EXEC_PROC_STATE_EXITED) {
+        return "EXITED";
+    }
+
+    return "UNUSED";
+}
+
+static usize clks_syscall_procfs_append_char(char *out, usize out_size, usize pos, char ch) {
+    if (out == CLKS_NULL || out_size == 0U) {
+        return pos;
+    }
+
+    if (pos + 1U < out_size) {
+        out[pos] = ch;
+        out[pos + 1U] = '\0';
+        return pos + 1U;
+    }
+
+    out[out_size - 1U] = '\0';
+    return pos;
+}
+
+static usize clks_syscall_procfs_append_text(char *out, usize out_size, usize pos, const char *text) {
+    usize i = 0U;
+
+    if (text == CLKS_NULL) {
+        return pos;
+    }
+
+    while (text[i] != '\0') {
+        pos = clks_syscall_procfs_append_char(out, out_size, pos, text[i]);
+        i++;
+    }
+
+    return pos;
+}
+
+static usize clks_syscall_procfs_append_u64_dec(char *out, usize out_size, usize pos, u64 value) {
+    char temp[32];
+    usize len = 0U;
+    usize i;
+
+    if (value == 0ULL) {
+        return clks_syscall_procfs_append_char(out, out_size, pos, '0');
+    }
+
+    while (value != 0ULL && len + 1U < sizeof(temp)) {
+        temp[len++] = (char)('0' + (value % 10ULL));
+        value /= 10ULL;
+    }
+
+    for (i = 0U; i < len; i++) {
+        pos = clks_syscall_procfs_append_char(out, out_size, pos, temp[len - 1U - i]);
+    }
+
+    return pos;
+}
+
+static usize clks_syscall_procfs_append_u64_hex(char *out, usize out_size, usize pos, u64 value) {
+    i32 nibble;
+
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "0X");
+
+    for (nibble = 15; nibble >= 0; nibble--) {
+        u64 current = (value >> (u64)(nibble * 4)) & 0x0FULL;
+        char ch = (current < 10ULL) ? (char)('0' + current) : (char)('A' + (current - 10ULL));
+        pos = clks_syscall_procfs_append_char(out, out_size, pos, ch);
+    }
+
+    return pos;
+}
+
+static clks_bool clks_syscall_procfs_snapshot_for_path(const char *path, struct clks_exec_proc_snapshot *out_snap) {
+    u64 pid;
+
+    if (path == CLKS_NULL || out_snap == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    if (clks_syscall_procfs_is_self(path) == CLKS_TRUE) {
+        pid = clks_exec_current_pid();
+
+        if (pid == 0ULL) {
+            return CLKS_FALSE;
+        }
+
+        return clks_exec_proc_snapshot(pid, out_snap);
+    }
+
+    if (clks_syscall_procfs_parse_pid(path, &pid) == CLKS_TRUE) {
+        return clks_exec_proc_snapshot(pid, out_snap);
+    }
+
+    return CLKS_FALSE;
+}
+
+static usize clks_syscall_procfs_render_snapshot(char *out,
+                                                 usize out_size,
+                                                 const struct clks_exec_proc_snapshot *snap) {
+    usize pos = 0U;
+
+    if (out == CLKS_NULL || out_size == 0U || snap == CLKS_NULL) {
+        return 0U;
+    }
+
+    out[0] = '\0';
+
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "pid=");
+    pos = clks_syscall_procfs_append_u64_dec(out, out_size, pos, snap->pid);
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "ppid=");
+    pos = clks_syscall_procfs_append_u64_dec(out, out_size, pos, snap->ppid);
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "state=");
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, clks_syscall_proc_state_name(snap->state));
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "state_id=");
+    pos = clks_syscall_procfs_append_u64_dec(out, out_size, pos, snap->state);
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "tty=");
+    pos = clks_syscall_procfs_append_u64_dec(out, out_size, pos, snap->tty_index);
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "runtime_ticks=");
+    pos = clks_syscall_procfs_append_u64_dec(out, out_size, pos, snap->runtime_ticks);
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "mem_bytes=");
+    pos = clks_syscall_procfs_append_u64_dec(out, out_size, pos, snap->mem_bytes);
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "exit_status=");
+    pos = clks_syscall_procfs_append_u64_hex(out, out_size, pos, snap->exit_status);
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "last_signal=");
+    pos = clks_syscall_procfs_append_u64_dec(out, out_size, pos, snap->last_signal);
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "last_fault_vector=");
+    pos = clks_syscall_procfs_append_u64_dec(out, out_size, pos, snap->last_fault_vector);
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "last_fault_error=");
+    pos = clks_syscall_procfs_append_u64_hex(out, out_size, pos, snap->last_fault_error);
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "last_fault_rip=");
+    pos = clks_syscall_procfs_append_u64_hex(out, out_size, pos, snap->last_fault_rip);
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "path=");
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, snap->path);
+    pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+
+    return pos;
+}
+
+static usize clks_syscall_procfs_render_list(char *out, usize out_size) {
+    usize pos = 0U;
+    u64 proc_count = clks_exec_proc_count();
+    u64 i;
+
+    if (out == CLKS_NULL || out_size == 0U) {
+        return 0U;
+    }
+
+    out[0] = '\0';
+    pos = clks_syscall_procfs_append_text(out, out_size, pos, "pid state tty runtime mem path\n");
+
+    for (i = 0ULL; i < proc_count; i++) {
+        u64 pid = 0ULL;
+        struct clks_exec_proc_snapshot snap;
+
+        if (clks_exec_proc_pid_at(i, &pid) == CLKS_FALSE || pid == 0ULL) {
+            continue;
+        }
+
+        if (clks_exec_proc_snapshot(pid, &snap) == CLKS_FALSE) {
+            continue;
+        }
+
+        pos = clks_syscall_procfs_append_u64_dec(out, out_size, pos, snap.pid);
+        pos = clks_syscall_procfs_append_char(out, out_size, pos, ' ');
+        pos = clks_syscall_procfs_append_text(out, out_size, pos, clks_syscall_proc_state_name(snap.state));
+        pos = clks_syscall_procfs_append_char(out, out_size, pos, ' ');
+        pos = clks_syscall_procfs_append_u64_dec(out, out_size, pos, snap.tty_index);
+        pos = clks_syscall_procfs_append_char(out, out_size, pos, ' ');
+        pos = clks_syscall_procfs_append_u64_dec(out, out_size, pos, snap.runtime_ticks);
+        pos = clks_syscall_procfs_append_char(out, out_size, pos, ' ');
+        pos = clks_syscall_procfs_append_u64_dec(out, out_size, pos, snap.mem_bytes);
+        pos = clks_syscall_procfs_append_char(out, out_size, pos, ' ');
+        pos = clks_syscall_procfs_append_text(out, out_size, pos, snap.path);
+        pos = clks_syscall_procfs_append_char(out, out_size, pos, '\n');
+    }
+
+    return pos;
+}
+
+static clks_bool clks_syscall_procfs_render_file(const char *path,
+                                                 char *out,
+                                                 usize out_size,
+                                                 usize *out_len) {
+    struct clks_exec_proc_snapshot snap;
+
+    if (out_len != CLKS_NULL) {
+        *out_len = 0U;
+    }
+
+    if (path == CLKS_NULL || out == CLKS_NULL || out_size == 0U || out_len == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    if (clks_syscall_procfs_is_list(path) == CLKS_TRUE) {
+        *out_len = clks_syscall_procfs_render_list(out, out_size);
+        return CLKS_TRUE;
+    }
+
+    if (clks_syscall_procfs_snapshot_for_path(path, &snap) == CLKS_TRUE) {
+        *out_len = clks_syscall_procfs_render_snapshot(out, out_size, &snap);
+        return CLKS_TRUE;
+    }
+
+    return CLKS_FALSE;
+}
+
 static u64 clks_syscall_fs_child_count(u64 arg0) {
     char path[CLKS_SYSCALL_PATH_MAX];
 
     if (clks_syscall_copy_user_string(arg0, path, sizeof(path)) == CLKS_FALSE) {
         return (u64)-1;
+    }
+
+    if (clks_syscall_procfs_is_root(path) == CLKS_TRUE) {
+        return 2ULL + clks_exec_proc_count();
     }
 
     return clks_fs_count_children(path);
@@ -185,6 +517,41 @@ static u64 clks_syscall_fs_get_child_name(u64 arg0, u64 arg1, u64 arg2) {
 
     if (clks_syscall_copy_user_string(arg0, path, sizeof(path)) == CLKS_FALSE) {
         return 0ULL;
+    }
+
+    if (clks_syscall_procfs_is_root(path) == CLKS_TRUE) {
+        if (arg1 == 0ULL) {
+            clks_memset((void *)arg2, 0, CLKS_SYSCALL_NAME_MAX);
+            clks_memcpy((void *)arg2, "self", 5U);
+            return 1ULL;
+        }
+
+        if (arg1 == 1ULL) {
+            clks_memset((void *)arg2, 0, CLKS_SYSCALL_NAME_MAX);
+            clks_memcpy((void *)arg2, "list", 5U);
+            return 1ULL;
+        }
+
+        {
+            u64 pid = 0ULL;
+            char pid_text[32];
+            usize len;
+
+            if (clks_exec_proc_pid_at(arg1 - 2ULL, &pid) == CLKS_FALSE || pid == 0ULL) {
+                return 0ULL;
+            }
+
+            clks_memset(pid_text, 0, sizeof(pid_text));
+            len = clks_syscall_procfs_append_u64_dec(pid_text, sizeof(pid_text), 0U, pid);
+
+            if (len + 1U > CLKS_SYSCALL_NAME_MAX) {
+                return 0ULL;
+            }
+
+            clks_memset((void *)arg2, 0, CLKS_SYSCALL_NAME_MAX);
+            clks_memcpy((void *)arg2, pid_text, len + 1U);
+            return 1ULL;
+        }
     }
 
     if (clks_fs_get_child_name(path, arg1, (char *)arg2, (usize)CLKS_SYSCALL_NAME_MAX) == CLKS_FALSE) {
@@ -206,6 +573,26 @@ static u64 clks_syscall_fs_read(u64 arg0, u64 arg1, u64 arg2) {
 
     if (clks_syscall_copy_user_string(arg0, path, sizeof(path)) == CLKS_FALSE) {
         return 0ULL;
+    }
+
+    if (clks_syscall_procfs_is_list(path) == CLKS_TRUE ||
+        clks_syscall_procfs_is_self(path) == CLKS_TRUE ||
+        clks_syscall_procfs_parse_pid(path, &file_size) == CLKS_TRUE) {
+        char proc_text[CLKS_SYSCALL_PROCFS_TEXT_MAX];
+        usize proc_len = 0U;
+
+        if (clks_syscall_procfs_render_file(path, proc_text, sizeof(proc_text), &proc_len) == CLKS_FALSE) {
+            return 0ULL;
+        }
+
+        copy_len = ((u64)proc_len < arg2) ? (u64)proc_len : arg2;
+
+        if (copy_len == 0ULL) {
+            return 0ULL;
+        }
+
+        clks_memcpy((void *)arg1, proc_text, (usize)copy_len);
+        return copy_len;
     }
 
     data = clks_fs_read_all(path, &file_size);
@@ -452,9 +839,22 @@ static u64 clks_syscall_audio_stop(void) {
 static u64 clks_syscall_fs_stat_type(u64 arg0) {
     char path[CLKS_SYSCALL_PATH_MAX];
     struct clks_fs_node_info info;
+    struct clks_exec_proc_snapshot snap;
 
     if (clks_syscall_copy_user_string(arg0, path, sizeof(path)) == CLKS_FALSE) {
         return (u64)-1;
+    }
+
+    if (clks_syscall_procfs_is_root(path) == CLKS_TRUE) {
+        return (u64)CLKS_FS_NODE_DIR;
+    }
+
+    if (clks_syscall_procfs_is_list(path) == CLKS_TRUE || clks_syscall_procfs_is_self(path) == CLKS_TRUE) {
+        return (u64)CLKS_FS_NODE_FILE;
+    }
+
+    if (clks_syscall_procfs_snapshot_for_path(path, &snap) == CLKS_TRUE) {
+        return (u64)CLKS_FS_NODE_FILE;
     }
 
     if (clks_fs_stat(path, &info) == CLKS_FALSE) {
@@ -467,9 +867,19 @@ static u64 clks_syscall_fs_stat_type(u64 arg0) {
 static u64 clks_syscall_fs_stat_size(u64 arg0) {
     char path[CLKS_SYSCALL_PATH_MAX];
     struct clks_fs_node_info info;
+    char proc_text[CLKS_SYSCALL_PROCFS_TEXT_MAX];
+    usize proc_len = 0U;
 
     if (clks_syscall_copy_user_string(arg0, path, sizeof(path)) == CLKS_FALSE) {
         return (u64)-1;
+    }
+
+    if (clks_syscall_procfs_is_root(path) == CLKS_TRUE) {
+        return 0ULL;
+    }
+
+    if (clks_syscall_procfs_render_file(path, proc_text, sizeof(proc_text), &proc_len) == CLKS_TRUE) {
+        return (u64)proc_len;
     }
 
     if (clks_fs_stat(path, &info) == CLKS_FALSE) {

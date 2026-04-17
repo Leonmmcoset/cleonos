@@ -52,7 +52,9 @@ static int ush_fg_pick_latest_job(u64 *out_pid) {
             continue;
         }
 
-        if (snap.state != CLEONOS_PROC_STATE_PENDING && snap.state != CLEONOS_PROC_STATE_RUNNING) {
+        if (snap.state != CLEONOS_PROC_STATE_PENDING &&
+            snap.state != CLEONOS_PROC_STATE_RUNNING &&
+            snap.state != CLEONOS_PROC_STATE_STOPPED) {
             continue;
         }
 
@@ -99,6 +101,7 @@ static int ush_fg_wait_pid(u64 pid) {
 
 static int ush_cmd_fg(const char *arg) {
     u64 pid = 0ULL;
+    cleonos_proc_snapshot snap;
 
     if (arg != (const char *)0 && arg[0] != '\0') {
         if (ush_parse_u64_dec(arg, &pid) == 0 || pid == 0ULL) {
@@ -108,6 +111,25 @@ static int ush_cmd_fg(const char *arg) {
     } else {
         if (ush_fg_pick_latest_job(&pid) == 0) {
             ush_writeln("fg: no active background job");
+            return 0;
+        }
+    }
+
+    if (cleonos_sys_proc_snapshot(pid, &snap, (u64)sizeof(snap)) == 0ULL) {
+        ush_writeln("fg: pid not found");
+        return 0;
+    }
+
+    if (snap.state == CLEONOS_PROC_STATE_STOPPED) {
+        u64 ret = cleonos_sys_proc_kill(pid, CLEONOS_SIGCONT);
+
+        if (ret == (u64)-1) {
+            ush_writeln("fg: pid not found");
+            return 0;
+        }
+
+        if (ret == 0ULL) {
+            ush_writeln("fg: failed to continue job");
             return 0;
         }
     }

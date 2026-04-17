@@ -22,13 +22,14 @@ typedef u64 (*clks_exec_entry_fn)(void);
 #define CLKS_EXEC_MAX_ENVS         24U
 #define CLKS_EXEC_ITEM_MAX        128U
 #define CLKS_EXEC_STATUS_SIGNAL_FLAG (1ULL << 63)
-#define CLKS_EXEC_DEFAULT_KILL_SIGNAL 15ULL
+#define CLKS_EXEC_DEFAULT_KILL_SIGNAL CLKS_EXEC_SIGNAL_TERM
 
 enum clks_exec_proc_state {
     CLKS_EXEC_PROC_UNUSED = 0,
     CLKS_EXEC_PROC_PENDING = 1,
     CLKS_EXEC_PROC_RUNNING = 2,
     CLKS_EXEC_PROC_EXITED = 3,
+    CLKS_EXEC_PROC_STOPPED = 4,
 };
 
 struct clks_exec_proc_record {
@@ -38,6 +39,8 @@ struct clks_exec_proc_record {
     u64 ppid;
     u64 started_tick;
     u64 exited_tick;
+    u64 run_started_tick;
+    u64 runtime_ticks_accum;
     u64 exit_status;
     u32 tty_index;
     u64 image_mem_bytes;
@@ -413,6 +416,8 @@ static struct clks_exec_proc_record *clks_exec_prepare_proc_record(i32 slot,
     proc->ppid = clks_exec_current_pid();
     proc->started_tick = 0ULL;
     proc->exited_tick = 0ULL;
+    proc->run_started_tick = 0ULL;
+    proc->runtime_ticks_accum = 0ULL;
     proc->exit_status = (u64)-1;
     proc->tty_index = clks_tty_active();
     proc->image_mem_bytes = 0ULL;
@@ -444,6 +449,42 @@ static struct clks_exec_proc_record *clks_exec_prepare_proc_record(i32 slot,
     }
 
     return proc;
+}
+
+static void clks_exec_proc_mark_running(struct clks_exec_proc_record *proc, u64 now_tick) {
+    if (proc == CLKS_NULL) {
+        return;
+    }
+
+    if (proc->started_tick == 0ULL) {
+        proc->started_tick = now_tick;
+    }
+
+    proc->run_started_tick = now_tick;
+    proc->state = CLKS_EXEC_PROC_RUNNING;
+}
+
+static void clks_exec_proc_pause_runtime(struct clks_exec_proc_record *proc, u64 now_tick) {
+    if (proc == CLKS_NULL) {
+        return;
+    }
+
+    if (proc->run_started_tick != 0ULL && now_tick > proc->run_started_tick) {
+        proc->runtime_ticks_accum += (now_tick - proc->run_started_tick);
+    }
+
+    proc->run_started_tick = 0ULL;
+}
+
+static void clks_exec_proc_mark_exited(struct clks_exec_proc_record *proc, u64 now_tick, u64 status) {
+    if (proc == CLKS_NULL) {
+        return;
+    }
+
+    clks_exec_proc_pause_runtime(proc, now_tick);
+    proc->state = CLKS_EXEC_PROC_EXITED;
+    proc->exit_status = status;
+    proc->exited_tick = now_tick;
 }
 
 static clks_bool clks_exec_invoke_entry(void *entry_ptr, u32 depth_index, u64 *out_ret) {
@@ -509,22 +550,17 @@ static clks_bool clks_exec_run_proc_slot(i32 slot, u64 *out_status) {
     }
 
     if (proc->path[0] != '/') {
-        proc->state = CLKS_EXEC_PROC_EXITED;
-        proc->exit_status = (u64)-1;
-        proc->exited_tick = clks_interrupts_timer_ticks();
+        clks_exec_proc_mark_exited(proc, clks_interrupts_timer_ticks(), (u64)-1);
         return CLKS_FALSE;
     }
 
     if (clks_exec_pid_stack_depth >= CLKS_EXEC_MAX_DEPTH) {
         clks_log(CLKS_LOG_WARN, "EXEC", "PROCESS STACK DEPTH EXCEEDED");
-        proc->state = CLKS_EXEC_PROC_EXITED;
-        proc->exit_status = (u64)-1;
-        proc->exited_tick = clks_interrupts_timer_ticks();
+        clks_exec_proc_mark_exited(proc, clks_interrupts_timer_ticks(), (u64)-1);
         return CLKS_FALSE;
     }
 
-    proc->state = CLKS_EXEC_PROC_RUNNING;
-    proc->started_tick = clks_interrupts_timer_ticks();
+    clks_exec_proc_mark_running(proc, clks_interrupts_timer_ticks());
 
     depth_index = (i32)clks_exec_pid_stack_depth;
     clks_exec_pid_stack[(u32)depth_index] = proc->pid;
@@ -593,9 +629,7 @@ static clks_bool clks_exec_run_proc_slot(i32 slot, u64 *out_status) {
 
     clks_exec_success++;
 
-    proc->state = CLKS_EXEC_PROC_EXITED;
-    proc->exit_status = run_ret;
-    proc->exited_tick = clks_interrupts_timer_ticks();
+    clks_exec_proc_mark_exited(proc, clks_interrupts_timer_ticks(), run_ret);
 
     if (depth_pushed == CLKS_TRUE && clks_exec_pid_stack_depth > 0U) {
         clks_exec_pid_stack_depth--;
@@ -617,9 +651,7 @@ fail:
         clks_exec_running_depth--;
     }
 
-    proc->state = CLKS_EXEC_PROC_EXITED;
-    proc->exit_status = (u64)-1;
-    proc->exited_tick = clks_interrupts_timer_ticks();
+    clks_exec_proc_mark_exited(proc, clks_interrupts_timer_ticks(), (u64)-1);
 
     if (depth_pushed == CLKS_TRUE && clks_exec_pid_stack_depth > 0U) {
         clks_exec_pid_stack_depth--;
@@ -805,7 +837,9 @@ u64 clks_exec_wait_pid(u64 pid, u64 *out_status) {
         clks_exec_pending_dispatch_active = CLKS_FALSE;
     }
 
-    if (proc->state == CLKS_EXEC_PROC_PENDING || proc->state == CLKS_EXEC_PROC_RUNNING) {
+    if (proc->state == CLKS_EXEC_PROC_PENDING ||
+        proc->state == CLKS_EXEC_PROC_RUNNING ||
+        proc->state == CLKS_EXEC_PROC_STOPPED) {
         return 0ULL;
     }
 
@@ -964,27 +998,21 @@ u64 clks_exec_current_fault_rip(void) {
 }
 
 static u64 clks_exec_proc_runtime_ticks(const struct clks_exec_proc_record *proc, u64 now_tick) {
+    u64 runtime;
+
     if (proc == CLKS_NULL || proc->started_tick == 0ULL) {
         return 0ULL;
     }
 
-    if (proc->state == CLKS_EXEC_PROC_RUNNING) {
-        if (now_tick <= proc->started_tick) {
-            return 0ULL;
-        }
+    runtime = proc->runtime_ticks_accum;
 
-        return now_tick - proc->started_tick;
+    if (proc->state == CLKS_EXEC_PROC_RUNNING &&
+        proc->run_started_tick != 0ULL &&
+        now_tick > proc->run_started_tick) {
+        runtime += (now_tick - proc->run_started_tick);
     }
 
-    if (proc->state == CLKS_EXEC_PROC_EXITED) {
-        if (proc->exited_tick <= proc->started_tick) {
-            return 0ULL;
-        }
-
-        return proc->exited_tick - proc->started_tick;
-    }
-
-    return 0ULL;
+    return runtime;
 }
 
 static u64 clks_exec_proc_memory_bytes(const struct clks_exec_proc_record *proc) {
@@ -1117,14 +1145,33 @@ u64 clks_exec_proc_kill(u64 pid, u64 signal) {
         return 1ULL;
     }
 
-    if (proc->state == CLKS_EXEC_PROC_PENDING) {
-        proc->state = CLKS_EXEC_PROC_EXITED;
-        proc->exit_status = status;
-        proc->exited_tick = now_tick;
-        proc->last_signal = effective_signal;
-        proc->last_fault_vector = 0ULL;
-        proc->last_fault_error = 0ULL;
-        proc->last_fault_rip = 0ULL;
+    proc->last_signal = effective_signal;
+    proc->last_fault_vector = 0ULL;
+    proc->last_fault_error = 0ULL;
+    proc->last_fault_rip = 0ULL;
+
+    if (effective_signal == CLKS_EXEC_SIGNAL_CONT) {
+        if (proc->state == CLKS_EXEC_PROC_STOPPED) {
+            proc->state = CLKS_EXEC_PROC_PENDING;
+        }
+        return 1ULL;
+    }
+
+    if (effective_signal == CLKS_EXEC_SIGNAL_STOP) {
+        if (proc->state == CLKS_EXEC_PROC_PENDING) {
+            proc->state = CLKS_EXEC_PROC_STOPPED;
+            return 1ULL;
+        }
+
+        if (proc->state == CLKS_EXEC_PROC_STOPPED) {
+            return 1ULL;
+        }
+
+        return 0ULL;
+    }
+
+    if (proc->state == CLKS_EXEC_PROC_PENDING || proc->state == CLKS_EXEC_PROC_STOPPED) {
+        clks_exec_proc_mark_exited(proc, now_tick, status);
         return 1ULL;
     }
 
@@ -1135,10 +1182,6 @@ u64 clks_exec_proc_kill(u64 pid, u64 signal) {
             return 0ULL;
         }
 
-        proc->last_signal = effective_signal;
-        proc->last_fault_vector = 0ULL;
-        proc->last_fault_error = 0ULL;
-        proc->last_fault_rip = 0ULL;
         clks_exec_exit_requested_stack[(u32)depth_index] = CLKS_TRUE;
         clks_exec_exit_status_stack[(u32)depth_index] = status;
         return 1ULL;

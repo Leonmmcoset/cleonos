@@ -1,5 +1,31 @@
 #include "cmd_runtime.h"
 
+static int ush_bg_resume_pid(const char *pid_text) {
+    u64 pid = 0ULL;
+    u64 ret;
+
+    if (pid_text == (const char *)0 || ush_parse_u64_dec(pid_text, &pid) == 0 || pid == 0ULL) {
+        return 0;
+    }
+
+    ret = cleonos_sys_proc_kill(pid, CLEONOS_SIGCONT);
+
+    if (ret == (u64)-1) {
+        ush_writeln("bg: pid not found");
+        return 1;
+    }
+
+    if (ret == 0ULL) {
+        ush_writeln("bg: target cannot be resumed right now");
+        return 1;
+    }
+
+    ush_write("bg: resumed [");
+    ush_write_hex_u64(pid);
+    ush_writeln("]");
+    return 1;
+}
+
 static int ush_cmd_bg(const ush_state *sh, const char *arg) {
     char target[USH_PATH_MAX];
     char argv_line[USH_ARG_MAX];
@@ -21,6 +47,10 @@ static int ush_cmd_bg(const ush_state *sh, const char *arg) {
     argv_line[0] = '\0';
     if (rest != (const char *)0 && rest[0] != '\0') {
         ush_copy(argv_line, (u64)sizeof(argv_line), rest);
+    }
+
+    if (argv_line[0] == '\0' && ush_bg_resume_pid(target) != 0) {
+        return 1;
     }
 
     if (ush_resolve_exec_path(sh, target, path, (u64)sizeof(path)) == 0) {

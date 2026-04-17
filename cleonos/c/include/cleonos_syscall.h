@@ -11,6 +11,12 @@ typedef unsigned long long usize;
 #define CLEONOS_PROC_STATE_PENDING 1ULL
 #define CLEONOS_PROC_STATE_RUNNING 2ULL
 #define CLEONOS_PROC_STATE_EXITED  3ULL
+#define CLEONOS_PROC_STATE_STOPPED 4ULL
+
+#define CLEONOS_SIGKILL  9ULL
+#define CLEONOS_SIGTERM 15ULL
+#define CLEONOS_SIGCONT 18ULL
+#define CLEONOS_SIGSTOP 19ULL
 
 typedef struct cleonos_proc_snapshot {
     u64 pid;

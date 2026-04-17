@@ -25,6 +25,9 @@ static const char *ush_ps_state_name(u64 state) {
     if (state == CLEONOS_PROC_STATE_RUNNING) {
         return "RUN ";
     }
+    if (state == CLEONOS_PROC_STATE_STOPPED) {
+        return "STOP";
+    }
     if (state == CLEONOS_PROC_STATE_EXITED) {
         return "EXIT";
     }

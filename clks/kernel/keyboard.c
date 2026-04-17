@@ -13,6 +13,7 @@
 #define CLKS_SC_F2               0x3CU
 #define CLKS_SC_F3               0x3DU
 #define CLKS_SC_F4               0x3EU
+#define CLKS_SC_C                0x2EU
 #define CLKS_SC_EXT_PREFIX       0xE0U
 
 #define CLKS_SC_EXT_HOME         0x47U
@@ -62,6 +63,7 @@ static clks_bool clks_kbd_rshift_down = CLKS_FALSE;
 static clks_bool clks_kbd_lctrl_down = CLKS_FALSE;
 static clks_bool clks_kbd_rctrl_down = CLKS_FALSE;
 static clks_bool clks_kbd_e0_prefix = CLKS_FALSE;
+static clks_bool clks_kbd_force_stop_latch = CLKS_FALSE;
 static u64 clks_kbd_hotkey_switches = 0ULL;
 
 static u64 clks_kbd_push_count = 0ULL;
@@ -202,6 +204,35 @@ static clks_bool clks_keyboard_try_emit_ctrl_shortcut(u8 code, u32 tty_index) {
     return CLKS_TRUE;
 }
 
+static clks_bool clks_keyboard_try_force_stop_hotkey(u8 code) {
+    u64 pid = 0ULL;
+    u64 stop_ret;
+
+    if (code != CLKS_SC_C) {
+        return CLKS_FALSE;
+    }
+
+    if (clks_kbd_alt_down != CLKS_TRUE || clks_keyboard_ctrl_active() == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    if (clks_kbd_force_stop_latch == CLKS_TRUE) {
+        return CLKS_TRUE;
+    }
+
+    clks_kbd_force_stop_latch = CLKS_TRUE;
+    stop_ret = clks_exec_force_stop_tty_running_process(clks_tty_active(), &pid);
+
+    if (stop_ret == 1ULL) {
+        clks_log(CLKS_LOG_WARN, "KBD", "HOTKEY CTRL+ALT+C FORCE STOP");
+        clks_log_hex(CLKS_LOG_WARN, "KBD", "PID", pid);
+    } else {
+        clks_log(CLKS_LOG_WARN, "KBD", "HOTKEY CTRL+ALT+C NO RUNNING USER PROC");
+    }
+
+    return CLKS_TRUE;
+}
+
 void clks_keyboard_init(void) {
     u32 tty;
 
@@ -217,6 +248,7 @@ void clks_keyboard_init(void) {
     clks_kbd_lctrl_down = CLKS_FALSE;
     clks_kbd_rctrl_down = CLKS_FALSE;
     clks_kbd_e0_prefix = CLKS_FALSE;
+    clks_kbd_force_stop_latch = CLKS_FALSE;
     clks_kbd_hotkey_switches = 0ULL;
     clks_kbd_push_count = 0ULL;
     clks_kbd_pop_count = 0ULL;
@@ -242,16 +274,25 @@ void clks_keyboard_handle_scancode(u8 scancode) {
     if (code == CLKS_SC_CTRL) {
         if (clks_kbd_e0_prefix == CLKS_TRUE) {
             clks_kbd_rctrl_down = (released == CLKS_FALSE) ? CLKS_TRUE : CLKS_FALSE;
+            if (released == CLKS_TRUE) {
+                clks_kbd_force_stop_latch = CLKS_FALSE;
+            }
             clks_kbd_e0_prefix = CLKS_FALSE;
             return;
         }
 
         clks_kbd_lctrl_down = (released == CLKS_FALSE) ? CLKS_TRUE : CLKS_FALSE;
+        if (released == CLKS_TRUE) {
+            clks_kbd_force_stop_latch = CLKS_FALSE;
+        }
         return;
     }
 
     if (code == CLKS_SC_ALT) {
         clks_kbd_alt_down = (released == CLKS_FALSE) ? CLKS_TRUE : CLKS_FALSE;
+        if (released == CLKS_TRUE) {
+            clks_kbd_force_stop_latch = CLKS_FALSE;
+        }
 
         if (clks_kbd_e0_prefix == CLKS_TRUE) {
             clks_kbd_e0_prefix = CLKS_FALSE;
@@ -271,6 +312,10 @@ void clks_keyboard_handle_scancode(u8 scancode) {
     }
 
     if (released == CLKS_TRUE) {
+        if (code == CLKS_SC_C) {
+            clks_kbd_force_stop_latch = CLKS_FALSE;
+        }
+
         if (clks_kbd_e0_prefix == CLKS_TRUE) {
             clks_kbd_e0_prefix = CLKS_FALSE;
         }
@@ -326,6 +371,10 @@ void clks_keyboard_handle_scancode(u8 scancode) {
     {
         u32 active_tty = clks_tty_active();
         char translated;
+
+        if (clks_keyboard_try_force_stop_hotkey(code) == CLKS_TRUE) {
+            return;
+        }
 
         if (clks_keyboard_try_emit_ctrl_shortcut(code, active_tty) == CLKS_TRUE) {
             return;

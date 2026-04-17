@@ -32,6 +32,7 @@ static int ush_cmd_help(void) {
     ush_writeln("  kill <pid> [signal]");
     ush_writeln("  jobs [-a] / ps [-a] [-u] / top [--once] [-n loops] [-d ticks]");
     ush_writeln("  sleep <ticks>");
+    ush_writeln("  spin               (busy loop test for Alt+Ctrl+C)");
     ush_writeln("  yield");
     ush_writeln("  shutdown / restart");
     ush_writeln("  exit [code]");

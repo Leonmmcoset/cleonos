@@ -279,6 +279,7 @@ void clks_interrupt_dispatch(struct clks_interrupt_frame *frame) {
     }
 
     if (vector >= CLKS_IRQ_BASE && vector <= CLKS_IRQ_LAST) {
+        (void)clks_exec_try_unwind_signaled_process(frame->rip, &frame->rip, &frame->rdi, &frame->rsi);
         clks_pic_send_eoi(vector);
     }
 }

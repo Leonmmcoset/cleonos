@@ -23,6 +23,8 @@ typedef u64 (*clks_exec_entry_fn)(void);
 #define CLKS_EXEC_ITEM_MAX        128U
 #define CLKS_EXEC_STATUS_SIGNAL_FLAG (1ULL << 63)
 #define CLKS_EXEC_DEFAULT_KILL_SIGNAL CLKS_EXEC_SIGNAL_TERM
+#define CLKS_EXEC_KERNEL_ADDR_BASE 0xFFFF800000000000ULL
+#define CLKS_EXEC_UNWIND_CTX_BYTES 56ULL
 
 enum clks_exec_proc_state {
     CLKS_EXEC_PROC_UNUSED = 0,
@@ -72,8 +74,11 @@ static u64 clks_exec_next_pid = 1ULL;
 static u64 clks_exec_pid_stack[CLKS_EXEC_MAX_DEPTH];
 static clks_bool clks_exec_exit_requested_stack[CLKS_EXEC_MAX_DEPTH];
 static u64 clks_exec_exit_status_stack[CLKS_EXEC_MAX_DEPTH];
+static clks_bool clks_exec_stop_requested_stack[CLKS_EXEC_MAX_DEPTH];
 static u64 clks_exec_unwind_slot_stack[CLKS_EXEC_MAX_DEPTH];
 static clks_bool clks_exec_unwind_slot_valid_stack[CLKS_EXEC_MAX_DEPTH];
+static u64 clks_exec_image_begin_stack[CLKS_EXEC_MAX_DEPTH];
+static u64 clks_exec_image_end_stack[CLKS_EXEC_MAX_DEPTH];
 static u32 clks_exec_pid_stack_depth = 0U;
 
 static void clks_exec_serial_write_hex64(u64 value) {
@@ -170,6 +175,30 @@ static clks_bool clks_exec_path_is_user_program(const char *path) {
     }
 
     return clks_exec_has_suffix(path, ".elf");
+}
+
+static clks_bool clks_exec_rip_is_current_user_context(u64 rip) {
+    i32 depth_index;
+    u64 image_begin;
+    u64 image_end;
+
+    if (rip < CLKS_EXEC_KERNEL_ADDR_BASE) {
+        return CLKS_TRUE;
+    }
+
+    if (clks_exec_pid_stack_depth == 0U) {
+        return CLKS_FALSE;
+    }
+
+    depth_index = (i32)(clks_exec_pid_stack_depth - 1U);
+    image_begin = clks_exec_image_begin_stack[(u32)depth_index];
+    image_end = clks_exec_image_end_stack[(u32)depth_index];
+
+    if (image_begin == 0ULL || image_end <= image_begin) {
+        return CLKS_FALSE;
+    }
+
+    return (rip >= image_begin && rip < image_end) ? CLKS_TRUE : CLKS_FALSE;
 }
 
 static void clks_exec_copy_path(char *dst, usize dst_size, const char *src) {
@@ -487,6 +516,29 @@ static void clks_exec_proc_mark_exited(struct clks_exec_proc_record *proc, u64 n
     proc->exited_tick = now_tick;
 }
 
+#if defined(CLKS_ARCH_X86_64)
+static u64 clks_exec_read_rflags(void) {
+    u64 flags = 0ULL;
+    __asm__ volatile("pushfq; popq %0" : "=r"(flags) : : "memory");
+    return flags;
+}
+
+static clks_bool clks_exec_enable_interrupt_window(void) {
+    if ((clks_exec_read_rflags() & (1ULL << 9)) != 0ULL) {
+        return CLKS_FALSE;
+    }
+
+    __asm__ volatile("sti" : : : "memory");
+    return CLKS_TRUE;
+}
+
+static void clks_exec_restore_interrupt_window(clks_bool need_disable) {
+    if (need_disable == CLKS_TRUE) {
+        __asm__ volatile("cli" : : : "memory");
+    }
+}
+#endif
+
 static clks_bool clks_exec_invoke_entry(void *entry_ptr, u32 depth_index, u64 *out_ret) {
     if (entry_ptr == CLKS_NULL || out_ret == CLKS_NULL) {
         return CLKS_FALSE;
@@ -497,6 +549,8 @@ static clks_bool clks_exec_invoke_entry(void *entry_ptr, u32 depth_index, u64 *o
         void *stack_base = clks_kmalloc((usize)CLKS_EXEC_RUN_STACK_BYTES);
         void *stack_top;
         u64 unwind_slot;
+        u64 call_ret = (u64)-1;
+        clks_bool restore_irq_disable = CLKS_FALSE;
 
         if (stack_base == CLKS_NULL) {
             clks_log(CLKS_LOG_WARN, "EXEC", "RUN STACK ALLOC FAILED");
@@ -504,12 +558,22 @@ static clks_bool clks_exec_invoke_entry(void *entry_ptr, u32 depth_index, u64 *o
         }
 
         stack_top = (void *)((u8 *)stack_base + (usize)CLKS_EXEC_RUN_STACK_BYTES);
-        unwind_slot = (((u64)stack_top) & ~0xFULL) - 8ULL;
+        unwind_slot = (((u64)stack_top) & ~0xFULL) - CLKS_EXEC_UNWIND_CTX_BYTES;
         clks_exec_unwind_slot_stack[depth_index] = unwind_slot;
         clks_exec_unwind_slot_valid_stack[depth_index] = CLKS_TRUE;
-        *out_ret = clks_exec_call_on_stack_x86_64(entry_ptr, stack_top);
+
+        if (clks_exec_pending_dispatch_active == CLKS_FALSE) {
+            restore_irq_disable = clks_exec_enable_interrupt_window();
+        }
+
+        call_ret = clks_exec_call_on_stack_x86_64(entry_ptr, stack_top);
+
+        /* Close unwind window immediately after call returns to avoid IRQ race. */
         clks_exec_unwind_slot_valid_stack[depth_index] = CLKS_FALSE;
         clks_exec_unwind_slot_stack[depth_index] = 0ULL;
+
+        clks_exec_restore_interrupt_window(restore_irq_disable);
+        *out_ret = call_ret;
         clks_kfree(stack_base);
         return CLKS_TRUE;
     }
@@ -566,6 +630,9 @@ static clks_bool clks_exec_run_proc_slot(i32 slot, u64 *out_status) {
     clks_exec_pid_stack[(u32)depth_index] = proc->pid;
     clks_exec_exit_requested_stack[(u32)depth_index] = CLKS_FALSE;
     clks_exec_exit_status_stack[(u32)depth_index] = 0ULL;
+    clks_exec_stop_requested_stack[(u32)depth_index] = CLKS_FALSE;
+    clks_exec_image_begin_stack[(u32)depth_index] = 0ULL;
+    clks_exec_image_end_stack[(u32)depth_index] = 0ULL;
     clks_exec_pid_stack_depth++;
     depth_pushed = CLKS_TRUE;
 
@@ -600,6 +667,20 @@ static clks_bool clks_exec_run_proc_slot(i32 slot, u64 *out_status) {
         goto fail;
     }
 
+    {
+        u64 image_begin = (u64)loaded.image_base;
+        u64 image_end = image_begin + loaded.image_size;
+
+        if (loaded.image_base == CLKS_NULL || loaded.image_size == 0ULL || image_end <= image_begin) {
+            clks_log(CLKS_LOG_WARN, "EXEC", "EXEC IMAGE WINDOW INVALID");
+            clks_log(CLKS_LOG_WARN, "EXEC", proc->path);
+            goto fail;
+        }
+
+        clks_exec_image_begin_stack[(u32)depth_index] = image_begin;
+        clks_exec_image_end_stack[(u32)depth_index] = image_end;
+    }
+
     clks_exec_log_info_serial("EXEC RUN START");
     clks_exec_log_info_serial(proc->path);
     clks_exec_log_hex_serial("ENTRY", info.entry);
@@ -628,10 +709,22 @@ static clks_bool clks_exec_run_proc_slot(i32 slot, u64 *out_status) {
     clks_exec_log_hex_serial("RET", run_ret);
 
     clks_exec_success++;
-
-    clks_exec_proc_mark_exited(proc, clks_interrupts_timer_ticks(), run_ret);
+    if (clks_exec_stop_requested_stack[(u32)depth_index] == CLKS_TRUE) {
+        u64 now_tick = clks_interrupts_timer_ticks();
+        clks_exec_proc_pause_runtime(proc, now_tick);
+        proc->state = CLKS_EXEC_PROC_STOPPED;
+        proc->exit_status = run_ret;
+        proc->exited_tick = 0ULL;
+        clks_exec_log_info_serial("RUN STOPPED");
+        clks_exec_log_info_serial(proc->path);
+    } else {
+        clks_exec_proc_mark_exited(proc, clks_interrupts_timer_ticks(), run_ret);
+    }
 
     if (depth_pushed == CLKS_TRUE && clks_exec_pid_stack_depth > 0U) {
+        clks_exec_stop_requested_stack[(u32)depth_index] = CLKS_FALSE;
+        clks_exec_image_begin_stack[(u32)depth_index] = 0ULL;
+        clks_exec_image_end_stack[(u32)depth_index] = 0ULL;
         clks_exec_pid_stack_depth--;
         depth_pushed = CLKS_FALSE;
     }
@@ -654,6 +747,9 @@ fail:
     clks_exec_proc_mark_exited(proc, clks_interrupts_timer_ticks(), (u64)-1);
 
     if (depth_pushed == CLKS_TRUE && clks_exec_pid_stack_depth > 0U) {
+        clks_exec_stop_requested_stack[(u32)depth_index] = CLKS_FALSE;
+        clks_exec_image_begin_stack[(u32)depth_index] = 0ULL;
+        clks_exec_image_end_stack[(u32)depth_index] = 0ULL;
         clks_exec_pid_stack_depth--;
     }
 
@@ -754,8 +850,11 @@ void clks_exec_init(void) {
     clks_memset(clks_exec_pid_stack, 0, sizeof(clks_exec_pid_stack));
     clks_memset(clks_exec_exit_requested_stack, 0, sizeof(clks_exec_exit_requested_stack));
     clks_memset(clks_exec_exit_status_stack, 0, sizeof(clks_exec_exit_status_stack));
+    clks_memset(clks_exec_stop_requested_stack, 0, sizeof(clks_exec_stop_requested_stack));
     clks_memset(clks_exec_unwind_slot_stack, 0, sizeof(clks_exec_unwind_slot_stack));
     clks_memset(clks_exec_unwind_slot_valid_stack, 0, sizeof(clks_exec_unwind_slot_valid_stack));
+    clks_memset(clks_exec_image_begin_stack, 0, sizeof(clks_exec_image_begin_stack));
+    clks_memset(clks_exec_image_end_stack, 0, sizeof(clks_exec_image_end_stack));
     clks_memset(clks_exec_proc_table, 0, sizeof(clks_exec_proc_table));
     clks_exec_log_info_serial("PATH EXEC FRAMEWORK ONLINE");
 }
@@ -1166,8 +1265,6 @@ u64 clks_exec_proc_kill(u64 pid, u64 signal) {
         if (proc->state == CLKS_EXEC_PROC_STOPPED) {
             return 1ULL;
         }
-
-        return 0ULL;
     }
 
     if (proc->state == CLKS_EXEC_PROC_PENDING || proc->state == CLKS_EXEC_PROC_STOPPED) {
@@ -1182,12 +1279,127 @@ u64 clks_exec_proc_kill(u64 pid, u64 signal) {
             return 0ULL;
         }
 
+        if (effective_signal == CLKS_EXEC_SIGNAL_STOP) {
+            clks_exec_exit_requested_stack[(u32)depth_index] = CLKS_TRUE;
+            clks_exec_exit_status_stack[(u32)depth_index] = status;
+            clks_exec_stop_requested_stack[(u32)depth_index] = CLKS_TRUE;
+            return 1ULL;
+        }
+
         clks_exec_exit_requested_stack[(u32)depth_index] = CLKS_TRUE;
         clks_exec_exit_status_stack[(u32)depth_index] = status;
         return 1ULL;
     }
 
     return 0ULL;
+}
+
+u64 clks_exec_force_stop_tty_running_process(u32 tty_index, u64 *out_pid) {
+    u32 tty_count = clks_tty_count();
+    u64 current_pid;
+    i32 slot;
+    u32 i;
+
+    if (out_pid != CLKS_NULL) {
+        *out_pid = 0ULL;
+    }
+
+    if (tty_count == 0U) {
+        tty_count = 1U;
+    }
+
+    if (tty_index >= tty_count) {
+        tty_index = 0U;
+    }
+
+    current_pid = clks_exec_current_pid();
+
+    if (current_pid != 0ULL) {
+        slot = clks_exec_proc_find_slot_by_pid(current_pid);
+
+        if (slot >= 0) {
+            const struct clks_exec_proc_record *proc = &clks_exec_proc_table[(u32)slot];
+
+            if (proc->used == CLKS_TRUE &&
+                proc->state == CLKS_EXEC_PROC_RUNNING &&
+                proc->tty_index == tty_index &&
+                clks_exec_path_is_user_program(proc->path) == CLKS_TRUE) {
+                u64 ret = clks_exec_proc_kill(current_pid, CLKS_EXEC_SIGNAL_STOP);
+
+                if (ret == 1ULL && out_pid != CLKS_NULL) {
+                    *out_pid = current_pid;
+                }
+
+                return ret;
+            }
+        }
+    }
+
+    for (i = 0U; i < CLKS_EXEC_MAX_PROCS; i++) {
+        u64 ret;
+
+        if (clks_exec_proc_table[i].used != CLKS_TRUE ||
+            clks_exec_proc_table[i].state != CLKS_EXEC_PROC_RUNNING ||
+            clks_exec_proc_table[i].tty_index != tty_index ||
+            clks_exec_path_is_user_program(clks_exec_proc_table[i].path) == CLKS_FALSE) {
+            continue;
+        }
+
+        if (out_pid != CLKS_NULL) {
+            *out_pid = clks_exec_proc_table[i].pid;
+        }
+
+        ret = clks_exec_proc_kill(clks_exec_proc_table[i].pid, CLKS_EXEC_SIGNAL_STOP);
+
+        if (ret == 1ULL) {
+            return 1ULL;
+        }
+    }
+
+    return 0ULL;
+}
+
+clks_bool clks_exec_try_unwind_signaled_process(u64 interrupted_rip,
+                                                u64 *io_rip,
+                                                u64 *io_rdi,
+                                                u64 *io_rsi) {
+    i32 depth_index;
+
+    if (io_rip == CLKS_NULL || io_rdi == CLKS_NULL || io_rsi == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    if (clks_exec_is_running() == CLKS_FALSE || clks_exec_current_path_is_user() == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    if (clks_exec_rip_is_current_user_context(interrupted_rip) == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    depth_index = clks_exec_current_depth_index();
+
+    if (depth_index < 0) {
+        return CLKS_FALSE;
+    }
+
+    if (clks_exec_stop_requested_stack[(u32)depth_index] == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+#if defined(CLKS_ARCH_X86_64)
+    if (clks_exec_unwind_slot_valid_stack[(u32)depth_index] == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    *io_rip = (u64)clks_exec_abort_to_caller_x86_64;
+    *io_rdi = clks_exec_unwind_slot_stack[(u32)depth_index];
+    *io_rsi = clks_exec_exit_status_stack[(u32)depth_index];
+    return CLKS_TRUE;
+#else
+    (void)depth_index;
+    return CLKS_FALSE;
+#endif
 }
 
 clks_bool clks_exec_handle_exception(u64 vector,
@@ -1202,6 +1414,10 @@ clks_bool clks_exec_handle_exception(u64 vector,
     u64 status;
 
     if (clks_exec_is_running() == CLKS_FALSE || clks_exec_current_path_is_user() == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    if (clks_exec_rip_is_current_user_context(rip) == CLKS_FALSE) {
         return CLKS_FALSE;
     }
 

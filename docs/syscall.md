@@ -83,7 +83,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `/proc/<pid>`：指定 PID 快照文本
 - `/proc` 为只读；写入类 syscall 不支持。
 
-## 4. Syscall 列表（0~64）
+## 4. Syscall 列表（0~71）
 
 ### 0 `CLEONOS_SYSCALL_LOG_WRITE`
 
@@ -510,6 +510,53 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `SIGSTOP`：将 `PENDING` 进程置为 `STOPPED`；对已 `STOPPED` 目标返回成功。
 - `SIGCONT`：将 `STOPPED` 进程恢复为 `PENDING`。
 
+### 65 `CLEONOS_SYSCALL_KDBG_SYM`
+
+- 参数：
+- `arg0`: `u64 addr`
+- `arg1`: `char *out_line`
+- `arg2`: `u64 out_size`
+- 返回：写入字节数（含截断）
+- 说明：将地址符号化为文本（含偏移与可选源码位置）。
+
+### 66 `CLEONOS_SYSCALL_KDBG_BT`
+
+- 参数：
+- `arg0`: `struct { u64 rbp; u64 rip; u64 out_ptr; u64 out_size; } *req`
+- 返回：写入字节数
+- 说明：输出回溯文本；x86_64 下会尝试沿帧指针遍历。
+
+### 67 `CLEONOS_SYSCALL_KDBG_REGS`
+
+- 参数：
+- `arg0`: `char *out_text`
+- `arg1`: `u64 out_size`
+- 返回：写入字节数
+- 说明：输出最近一次 syscall 进入内核时的寄存器快照。
+
+### 68 `CLEONOS_SYSCALL_STATS_TOTAL`
+
+- 参数：无
+- 返回：自启动以来的 syscall 总调用次数
+
+### 69 `CLEONOS_SYSCALL_STATS_ID_COUNT`
+
+- 参数：
+- `arg0`: `u64 id`
+- 返回：指定 syscall ID 的累计调用次数（ID 越界返回 `0`）
+
+### 70 `CLEONOS_SYSCALL_STATS_RECENT_WINDOW`
+
+- 参数：无
+- 返回：最近窗口内样本数量
+- 说明：当前内核实现窗口大小为 `256` 次 syscall。
+
+### 71 `CLEONOS_SYSCALL_STATS_RECENT_ID`
+
+- 参数：
+- `arg0`: `u64 id`
+- 返回：指定 syscall ID 在“最近窗口”中的出现次数（ID 越界返回 `0`）
+
 ## 5. 用户态封装函数
 
 用户态封装位于：
@@ -532,6 +579,8 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `cleonos_sys_proc_argc()` / `cleonos_sys_proc_argv()` / `cleonos_sys_proc_envc()` / `cleonos_sys_proc_env()`
 - `cleonos_sys_proc_last_signal()` / `cleonos_sys_proc_fault_vector()` / `cleonos_sys_proc_fault_error()` / `cleonos_sys_proc_fault_rip()`
 - `cleonos_sys_proc_count()` / `cleonos_sys_proc_pid_at()` / `cleonos_sys_proc_snapshot()` / `cleonos_sys_proc_kill()`
+- `cleonos_sys_kdbg_sym()` / `cleonos_sys_kdbg_bt()` / `cleonos_sys_kdbg_regs()`
+- `cleonos_sys_stats_total()` / `cleonos_sys_stats_id_count()` / `cleonos_sys_stats_recent_window()` / `cleonos_sys_stats_recent_id()`
 
 ## 6. 开发注意事项
 
@@ -542,6 +591,6 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 
 ## 7. Wine 兼容说明
 
-- `wine/cleonos_wine_lib/runner.py` 已适配 syscall `0..60`，包含 `EXEC_PATHV` / `SPAWN_PATHV` 与 `PROC_*` 系列。
+- `wine/cleonos_wine_lib/runner.py` 目前以 syscall `0..67` 为主，新增 ID 需同步适配后才能完整观测统计类接口。
 - Wine 在运行时崩溃场景下会生成与内核一致格式的“信号编码退出状态”，可通过 `WAITPID` 读取。
 - Wine 当前音频 syscall 为占位实现：`AUDIO_AVAILABLE=0`，`AUDIO_PLAY_TONE=0`，`AUDIO_STOP=1`。

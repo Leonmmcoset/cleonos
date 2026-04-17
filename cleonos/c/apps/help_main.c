@@ -30,7 +30,8 @@ static int ush_cmd_help(void) {
     ush_writeln("  spawn <path|name> [args...] / bg <path|name> [args...]");
     ush_writeln("  wait <pid> / fg [pid]");
     ush_writeln("  kill <pid> [signal]");
-    ush_writeln("  jobs [-a] / ps [-a] [-u] / top [--once] [-n loops] [-d ticks]");
+    ush_writeln("  jobs [-a] / ps [-a] [-u] / procstat [pid|self] [-a]");
+    ush_writeln("  top [--once] [-n loops] [-d ticks] / sysstat [-a] [-n N]");
     ush_writeln("  kdbg sym <addr> / kdbg bt <rbp> <rip> / kdbg regs");
     ush_writeln("  sleep <ticks>");
     ush_writeln("  spin               (busy loop test for Alt+Ctrl+C)");

@@ -103,6 +103,10 @@ typedef struct cleonos_proc_snapshot {
 #define CLEONOS_SYSCALL_KDBG_SYM            65ULL
 #define CLEONOS_SYSCALL_KDBG_BT             66ULL
 #define CLEONOS_SYSCALL_KDBG_REGS           67ULL
+#define CLEONOS_SYSCALL_STATS_TOTAL         68ULL
+#define CLEONOS_SYSCALL_STATS_ID_COUNT      69ULL
+#define CLEONOS_SYSCALL_STATS_RECENT_WINDOW 70ULL
+#define CLEONOS_SYSCALL_STATS_RECENT_ID     71ULL
 
 u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 u64 cleonos_sys_log_write(const char *message, u64 length);
@@ -172,5 +176,9 @@ u64 cleonos_sys_proc_kill(u64 pid, u64 signal);
 u64 cleonos_sys_kdbg_sym(u64 addr, char *out_line, u64 out_size);
 u64 cleonos_sys_kdbg_bt(u64 rbp, u64 rip, char *out_text, u64 out_size);
 u64 cleonos_sys_kdbg_regs(char *out_text, u64 out_size);
+u64 cleonos_sys_stats_total(void);
+u64 cleonos_sys_stats_id_count(u64 id);
+u64 cleonos_sys_stats_recent_window(void);
+u64 cleonos_sys_stats_recent_id(u64 id);
 
 #endif

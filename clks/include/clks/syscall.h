@@ -71,6 +71,10 @@
 #define CLKS_SYSCALL_KDBG_SYM            65ULL
 #define CLKS_SYSCALL_KDBG_BT             66ULL
 #define CLKS_SYSCALL_KDBG_REGS           67ULL
+#define CLKS_SYSCALL_STATS_TOTAL         68ULL
+#define CLKS_SYSCALL_STATS_ID_COUNT      69ULL
+#define CLKS_SYSCALL_STATS_RECENT_WINDOW 70ULL
+#define CLKS_SYSCALL_STATS_RECENT_ID     71ULL
 
 void clks_syscall_init(void);
 u64 clks_syscall_dispatch(void *frame_ptr);

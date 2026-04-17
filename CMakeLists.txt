@@ -385,6 +385,7 @@ set(RAMDISK_ROOT_APPS)
 set(USER_SHELL_COMMAND_APPS
     help args ls cat grep head tail wc cut uniq sort pwd cd exec pid spawn wait sleep yield
     bg fg jobs kill ps top
+    procstat sysstat
     shutdown restart exit clear ansi ansitest wavplay fastfetch memstat fsstat taskstat userstat
     shstat stats tty dmesg kbdstat mkdir touch write append cp mv rm kdbg
 )

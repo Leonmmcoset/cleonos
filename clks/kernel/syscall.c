@@ -32,6 +32,8 @@
 #define CLKS_SYSCALL_KDBG_STACK_WINDOW_BYTES (128ULL * 1024ULL)
 #define CLKS_SYSCALL_KERNEL_SYMBOL_FILE "/system/kernel.sym"
 #define CLKS_SYSCALL_KERNEL_ADDR_BASE 0xFFFF800000000000ULL
+#define CLKS_SYSCALL_STATS_MAX_ID     CLKS_SYSCALL_STATS_RECENT_ID
+#define CLKS_SYSCALL_STATS_RING_SIZE  256U
 
 struct clks_syscall_frame {
     u64 rax;
@@ -73,6 +75,12 @@ static clks_bool clks_syscall_last_frame_valid = CLKS_FALSE;
 static clks_bool clks_syscall_symbols_checked = CLKS_FALSE;
 static const char *clks_syscall_symbols_data = CLKS_NULL;
 static u64 clks_syscall_symbols_size = 0ULL;
+static u64 clks_syscall_stats_total = 0ULL;
+static u64 clks_syscall_stats_id_count[CLKS_SYSCALL_STATS_MAX_ID + 1ULL];
+static u64 clks_syscall_stats_recent_id_count[CLKS_SYSCALL_STATS_MAX_ID + 1ULL];
+static u16 clks_syscall_stats_recent_ring[CLKS_SYSCALL_STATS_RING_SIZE];
+static u32 clks_syscall_stats_recent_head = 0U;
+static u32 clks_syscall_stats_recent_size = 0U;
 
 #if defined(CLKS_ARCH_X86_64)
 static inline void clks_syscall_outb(u16 port, u8 value) {
@@ -1492,6 +1500,75 @@ static void clks_syscall_serial_write_hex64(u64 value) {
     }
 }
 
+static void clks_syscall_stats_reset(void) {
+    clks_syscall_stats_total = 0ULL;
+    clks_memset(clks_syscall_stats_id_count, 0, sizeof(clks_syscall_stats_id_count));
+    clks_memset(clks_syscall_stats_recent_id_count, 0, sizeof(clks_syscall_stats_recent_id_count));
+    clks_memset(clks_syscall_stats_recent_ring, 0, sizeof(clks_syscall_stats_recent_ring));
+    clks_syscall_stats_recent_head = 0U;
+    clks_syscall_stats_recent_size = 0U;
+}
+
+static void clks_syscall_stats_record(u64 id) {
+    u16 ring_id = 0xFFFFU;
+
+    clks_syscall_stats_total++;
+
+    if (id <= CLKS_SYSCALL_STATS_MAX_ID) {
+        clks_syscall_stats_id_count[id]++;
+    }
+
+    if (id <= 0xFFFFULL) {
+        ring_id = (u16)id;
+    }
+
+    if (clks_syscall_stats_recent_size >= CLKS_SYSCALL_STATS_RING_SIZE) {
+        u64 old_id = (u64)clks_syscall_stats_recent_ring[clks_syscall_stats_recent_head];
+
+        if (old_id <= CLKS_SYSCALL_STATS_MAX_ID && clks_syscall_stats_recent_id_count[old_id] > 0ULL) {
+            clks_syscall_stats_recent_id_count[old_id]--;
+        }
+    } else {
+        clks_syscall_stats_recent_size++;
+    }
+
+    clks_syscall_stats_recent_ring[clks_syscall_stats_recent_head] = ring_id;
+
+    if (id <= CLKS_SYSCALL_STATS_MAX_ID) {
+        clks_syscall_stats_recent_id_count[id]++;
+    }
+
+    clks_syscall_stats_recent_head++;
+
+    if (clks_syscall_stats_recent_head >= CLKS_SYSCALL_STATS_RING_SIZE) {
+        clks_syscall_stats_recent_head = 0U;
+    }
+}
+
+static u64 clks_syscall_stats_total_count(void) {
+    return clks_syscall_stats_total;
+}
+
+static u64 clks_syscall_stats_id(u64 id) {
+    if (id > CLKS_SYSCALL_STATS_MAX_ID) {
+        return 0ULL;
+    }
+
+    return clks_syscall_stats_id_count[id];
+}
+
+static u64 clks_syscall_stats_recent_window(void) {
+    return (u64)clks_syscall_stats_recent_size;
+}
+
+static u64 clks_syscall_stats_recent_id(u64 id) {
+    if (id > CLKS_SYSCALL_STATS_MAX_ID) {
+        return 0ULL;
+    }
+
+    return clks_syscall_stats_recent_id_count[id];
+}
+
 static void clks_syscall_trace_user_program(u64 id) {
     clks_bool user_program_running =
         (clks_exec_is_running() == CLKS_TRUE && clks_exec_current_path_is_user() == CLKS_TRUE)
@@ -1538,6 +1615,7 @@ void clks_syscall_init(void) {
     clks_syscall_symbols_checked = CLKS_FALSE;
     clks_syscall_symbols_data = CLKS_NULL;
     clks_syscall_symbols_size = 0ULL;
+    clks_syscall_stats_reset();
     clks_log(CLKS_LOG_INFO, "SYSCALL", "INT80 FRAMEWORK ONLINE");
 }
 
@@ -1553,6 +1631,7 @@ u64 clks_syscall_dispatch(void *frame_ptr) {
     clks_syscall_last_frame_valid = CLKS_TRUE;
 
     id = frame->rax;
+    clks_syscall_stats_record(id);
     clks_syscall_trace_user_program(id);
 
     switch (id) {
@@ -1699,6 +1778,14 @@ u64 clks_syscall_dispatch(void *frame_ptr) {
             return clks_syscall_kdbg_bt(frame->rbx);
         case CLKS_SYSCALL_KDBG_REGS:
             return clks_syscall_kdbg_regs(frame->rbx, frame->rcx);
+        case CLKS_SYSCALL_STATS_TOTAL:
+            return clks_syscall_stats_total_count();
+        case CLKS_SYSCALL_STATS_ID_COUNT:
+            return clks_syscall_stats_id(frame->rbx);
+        case CLKS_SYSCALL_STATS_RECENT_WINDOW:
+            return clks_syscall_stats_recent_window();
+        case CLKS_SYSCALL_STATS_RECENT_ID:
+            return clks_syscall_stats_recent_id(frame->rbx);
         default:
             return (u64)-1;
     }

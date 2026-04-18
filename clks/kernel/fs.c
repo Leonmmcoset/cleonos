@@ -535,8 +535,12 @@ void clks_fs_init(void) {
         return;
     }
 
+    if (clks_fs_require_directory("/dev") == CLKS_FALSE) {
+        return;
+    }
+
     clks_fs_ready = CLKS_TRUE;
-    clks_log(CLKS_LOG_INFO, "FS", "LAYOUT /SYSTEM /SHELL /TEMP /DRIVER OK");
+    clks_log(CLKS_LOG_INFO, "FS", "LAYOUT /SYSTEM /SHELL /TEMP /DRIVER /DEV OK");
 }
 
 clks_bool clks_fs_is_ready(void) {

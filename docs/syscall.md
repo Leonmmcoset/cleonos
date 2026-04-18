@@ -565,7 +565,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - `arg2`: `u64 mode`（当前保留）
 - 返回：成功返回 `fd`，失败返回 `-1`
 - 说明：
-- 当前支持普通文件与 `/dev/tty`。
+- 当前支持普通文件与设备文件：`/dev/tty`、`/dev/null`、`/dev/zero`、`/dev/random`、`/dev/urandom`。
 - 默认进程会预置 `fd 0/1/2`（stdin/stdout/stderr）。
 - 标志位兼容子集：`O_RDONLY/O_WRONLY/O_RDWR/O_CREAT/O_TRUNC/O_APPEND`。
 

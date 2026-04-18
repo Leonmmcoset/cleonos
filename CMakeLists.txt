@@ -636,7 +636,7 @@ add_custom_command(
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${RAMDISK_ROOT}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${RAMDISK_ROOT}"
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/ramdisk" "${RAMDISK_ROOT}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${RAMDISK_ROOT}/system" "${RAMDISK_ROOT}/shell" "${RAMDISK_ROOT}/driver"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${RAMDISK_ROOT}/system" "${RAMDISK_ROOT}/shell" "${RAMDISK_ROOT}/driver" "${RAMDISK_ROOT}/dev"
     COMMAND ${CMAKE_COMMAND} -E copy "${KERNEL_SYMBOLS_FILE}" "${RAMDISK_ROOT}/system/kernel.sym"
     ${RAMDISK_COPY_COMMANDS}
     COMMAND ${CMAKE_COMMAND} -E touch "${RAMDISK_ROOT_STAMP}"

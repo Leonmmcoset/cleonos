@@ -279,6 +279,20 @@ static clks_bool clks_syscall_procfs_is_root(const char *path) {
     return (path != CLKS_NULL && clks_strcmp(path, "/proc") == 0) ? CLKS_TRUE : CLKS_FALSE;
 }
 
+static clks_bool clks_syscall_fs_is_root(const char *path) {
+    return (path != CLKS_NULL && clks_strcmp(path, "/") == 0) ? CLKS_TRUE : CLKS_FALSE;
+}
+
+static clks_bool clks_syscall_fs_has_real_proc_dir(void) {
+    struct clks_fs_node_info info;
+
+    if (clks_fs_stat("/proc", &info) == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    return (info.type == CLKS_FS_NODE_DIR) ? CLKS_TRUE : CLKS_FALSE;
+}
+
 static clks_bool clks_syscall_procfs_is_self(const char *path) {
     return (path != CLKS_NULL && clks_strcmp(path, "/proc/self") == 0) ? CLKS_TRUE : CLKS_FALSE;
 }
@@ -1059,6 +1073,7 @@ static clks_bool clks_syscall_procfs_render_file(const char *path,
 
 static u64 clks_syscall_fs_child_count(u64 arg0) {
     char path[CLKS_SYSCALL_PATH_MAX];
+    u64 base_count;
 
     if (clks_syscall_copy_user_string(arg0, path, sizeof(path)) == CLKS_FALSE) {
         return (u64)-1;
@@ -1068,7 +1083,17 @@ static u64 clks_syscall_fs_child_count(u64 arg0) {
         return 2ULL + clks_exec_proc_count();
     }
 
-    return clks_fs_count_children(path);
+    base_count = clks_fs_count_children(path);
+
+    if (base_count == (u64)-1) {
+        return (u64)-1;
+    }
+
+    if (clks_syscall_fs_is_root(path) == CLKS_TRUE && clks_syscall_fs_has_real_proc_dir() == CLKS_FALSE) {
+        return base_count + 1ULL;
+    }
+
+    return base_count;
 }
 
 static u64 clks_syscall_fs_get_child_name(u64 arg0, u64 arg1, u64 arg2) {
@@ -1115,6 +1140,20 @@ static u64 clks_syscall_fs_get_child_name(u64 arg0, u64 arg1, u64 arg2) {
             clks_memcpy((void *)arg2, pid_text, len + 1U);
             return 1ULL;
         }
+    }
+
+    if (clks_syscall_fs_is_root(path) == CLKS_TRUE && clks_syscall_fs_has_real_proc_dir() == CLKS_FALSE) {
+        if (arg1 == 0ULL) {
+            clks_memset((void *)arg2, 0, CLKS_SYSCALL_NAME_MAX);
+            clks_memcpy((void *)arg2, "proc", 5U);
+            return 1ULL;
+        }
+
+        if (clks_fs_get_child_name(path, arg1 - 1ULL, (char *)arg2, (usize)CLKS_SYSCALL_NAME_MAX) == CLKS_FALSE) {
+            return 0ULL;
+        }
+
+        return 1ULL;
     }
 
     if (clks_fs_get_child_name(path, arg1, (char *)arg2, (usize)CLKS_SYSCALL_NAME_MAX) == CLKS_FALSE) {

@@ -2033,6 +2033,7 @@ static int ush_cmd_fsstat(void) {
     ush_print_kv_hex("  SHELL_CHILDREN", cleonos_sys_fs_child_count("/shell"));
     ush_print_kv_hex("  TEMP_CHILDREN", cleonos_sys_fs_child_count("/temp"));
     ush_print_kv_hex("  DRIVER_CHILDREN", cleonos_sys_fs_child_count("/driver"));
+    ush_print_kv_hex("  DEV_CHILDREN", cleonos_sys_fs_child_count("/dev"));
     return 1;
 }
 

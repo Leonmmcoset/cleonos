@@ -55,6 +55,9 @@ enum clks_exec_fd_kind {
     CLKS_EXEC_FD_KIND_NONE = 0,
     CLKS_EXEC_FD_KIND_TTY = 1,
     CLKS_EXEC_FD_KIND_FILE = 2,
+    CLKS_EXEC_FD_KIND_DEV_NULL = 3,
+    CLKS_EXEC_FD_KIND_DEV_ZERO = 4,
+    CLKS_EXEC_FD_KIND_DEV_RANDOM = 5,
 };
 
 enum clks_exec_proc_state {
@@ -159,6 +162,7 @@ static u64 clks_exec_requests = 0ULL;
 static u64 clks_exec_success = 0ULL;
 static u32 clks_exec_running_depth = 0U;
 static clks_bool clks_exec_pending_dispatch_active = CLKS_FALSE;
+static u64 clks_exec_random_state = 0xA5A55A5A12345678ULL;
 
 static struct clks_exec_proc_record clks_exec_proc_table[CLKS_EXEC_MAX_PROCS];
 static u64 clks_exec_next_pid = 1ULL;
@@ -798,6 +802,34 @@ static clks_bool clks_exec_fd_can_write(u64 flags) {
 
 static clks_bool clks_exec_path_is_dev_tty(const char *path) {
     return (path != CLKS_NULL && clks_strcmp(path, "/dev/tty") == 0) ? CLKS_TRUE : CLKS_FALSE;
+}
+
+static clks_bool clks_exec_path_is_dev_null(const char *path) {
+    return (path != CLKS_NULL && clks_strcmp(path, "/dev/null") == 0) ? CLKS_TRUE : CLKS_FALSE;
+}
+
+static clks_bool clks_exec_path_is_dev_zero(const char *path) {
+    return (path != CLKS_NULL && clks_strcmp(path, "/dev/zero") == 0) ? CLKS_TRUE : CLKS_FALSE;
+}
+
+static clks_bool clks_exec_path_is_dev_random(const char *path) {
+    if (path == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    if (clks_strcmp(path, "/dev/random") == 0) {
+        return CLKS_TRUE;
+    }
+
+    return (clks_strcmp(path, "/dev/urandom") == 0) ? CLKS_TRUE : CLKS_FALSE;
+}
+
+static u8 clks_exec_random_next_byte(void) {
+    clks_exec_random_state ^= (clks_interrupts_timer_ticks() + 0x9E3779B97F4A7C15ULL);
+    clks_exec_random_state ^= (clks_exec_random_state << 13);
+    clks_exec_random_state ^= (clks_exec_random_state >> 7);
+    clks_exec_random_state ^= (clks_exec_random_state << 17);
+    return (u8)(clks_exec_random_state & 0xFFULL);
 }
 
 static void clks_exec_fd_init_defaults(struct clks_exec_proc_record *proc) {
@@ -1457,6 +1489,7 @@ void clks_exec_init(void) {
     clks_exec_success = 0ULL;
     clks_exec_running_depth = 0U;
     clks_exec_pending_dispatch_active = CLKS_FALSE;
+    clks_exec_random_state = 0xA5A55A5A12345678ULL;
     clks_exec_next_pid = 1ULL;
     clks_exec_pid_stack_depth = 0U;
     clks_memset(clks_exec_pid_stack, 0, sizeof(clks_exec_pid_stack));
@@ -1647,6 +1680,29 @@ u64 clks_exec_fd_open(const char *path, u64 flags, u64 mode) {
         return (u64)fd_slot;
     }
 
+    if (clks_exec_path_is_dev_null(path) == CLKS_TRUE ||
+        clks_exec_path_is_dev_zero(path) == CLKS_TRUE ||
+        clks_exec_path_is_dev_random(path) == CLKS_TRUE) {
+        struct clks_exec_fd_entry *entry = &proc->fds[(u32)fd_slot];
+
+        clks_memset(entry, 0, sizeof(*entry));
+        entry->used = CLKS_TRUE;
+        entry->flags = flags;
+        entry->offset = 0ULL;
+        entry->tty_index = proc->tty_index;
+        entry->path[0] = '\0';
+
+        if (clks_exec_path_is_dev_null(path) == CLKS_TRUE) {
+            entry->kind = CLKS_EXEC_FD_KIND_DEV_NULL;
+        } else if (clks_exec_path_is_dev_zero(path) == CLKS_TRUE) {
+            entry->kind = CLKS_EXEC_FD_KIND_DEV_ZERO;
+        } else {
+            entry->kind = CLKS_EXEC_FD_KIND_DEV_RANDOM;
+        }
+
+        return (u64)fd_slot;
+    }
+
     if (clks_fs_stat(path, &info) == CLKS_FALSE) {
         if ((flags & CLKS_EXEC_O_CREAT) == 0ULL || clks_exec_fd_can_write(flags) == CLKS_FALSE) {
             return (u64)-1;
@@ -1722,6 +1778,28 @@ u64 clks_exec_fd_read(u64 fd, void *out_buffer, u64 size) {
         return count;
     }
 
+    if (entry->kind == CLKS_EXEC_FD_KIND_DEV_NULL) {
+        return 0ULL;
+    }
+
+    if (entry->kind == CLKS_EXEC_FD_KIND_DEV_ZERO) {
+        clks_memset(out_buffer, 0, (usize)size);
+        entry->offset += size;
+        return size;
+    }
+
+    if (entry->kind == CLKS_EXEC_FD_KIND_DEV_RANDOM) {
+        u8 *dst = (u8 *)out_buffer;
+        u64 i;
+
+        for (i = 0ULL; i < size; i++) {
+            dst[(usize)i] = clks_exec_random_next_byte();
+        }
+
+        entry->offset += size;
+        return size;
+    }
+
     if (entry->kind == CLKS_EXEC_FD_KIND_FILE) {
         return clks_exec_fd_file_read(entry, out_buffer, size);
     }
@@ -1753,6 +1831,13 @@ u64 clks_exec_fd_write(u64 fd, const void *buffer, u64 size) {
 
     if (entry->kind == CLKS_EXEC_FD_KIND_TTY) {
         clks_tty_write_n((const char *)buffer, (usize)size);
+        return size;
+    }
+
+    if (entry->kind == CLKS_EXEC_FD_KIND_DEV_NULL ||
+        entry->kind == CLKS_EXEC_FD_KIND_DEV_ZERO ||
+        entry->kind == CLKS_EXEC_FD_KIND_DEV_RANDOM) {
+        entry->offset += size;
         return size;
     }
 

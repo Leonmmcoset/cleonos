@@ -1173,6 +1173,7 @@ static clks_bool clks_shell_cmd_fsstat(void) {
     clks_shell_print_kv_hex("  SHELL_CHILDREN", clks_fs_count_children("/shell"));
     clks_shell_print_kv_hex("  TEMP_CHILDREN", clks_fs_count_children("/temp"));
     clks_shell_print_kv_hex("  DRIVER_CHILDREN", clks_fs_count_children("/driver"));
+    clks_shell_print_kv_hex("  DEV_CHILDREN", clks_fs_count_children("/dev"));
     return CLKS_TRUE;
 }
 

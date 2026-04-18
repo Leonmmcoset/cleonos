@@ -1,0 +1,50 @@
+name: Code Style Check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Check C/C++ style
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mapfile -t files < <(
+            git ls-files \
+              '*.c' '*.h' '*.cc' '*.cpp' '*.cxx' '*.hpp' '*.hxx' \
+              | grep -Ev '^(limine/|third_party/|build/|build-cmake/)' || true
+          )
+
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "No C/C++ files to check."
+            exit 0
+          fi
+
+          for f in "${files[@]}"; do
+            clang-format -i "$f"
+          done
+
+          if ! git diff --quiet -- "${files[@]}"; then
+            echo "Code style check failed. Please run clang-format on changed files."
+            echo ""
+            git diff -- "${files[@]}"
+            exit 1
+          fi
+
+          echo "Code style check passed."

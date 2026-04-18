@@ -624,7 +624,7 @@ CLKS_NORETURN void clks_panic(const char *reason) {
         }
 
         clks_panic_emit_backtrace(&console, rip, rbp, rsp);
-        clks_panic_console_write(&console, "\nSystem halted. Please reboot the VM.\n");
+        clks_panic_console_write(&console, "\nSystem halted. Please reboot the computer.\n");
     } else {
         clks_panic_emit_backtrace(CLKS_NULL, rip, rbp, rsp);
     }
@@ -691,7 +691,7 @@ CLKS_NORETURN void clks_panic_exception(const char *name,
         clks_panic_console_write(&console, "\n");
 
         clks_panic_emit_backtrace(&console, rip, rbp, rsp);
-        clks_panic_console_write(&console, "\nSystem halted. Please reboot the VM.\n");
+        clks_panic_console_write(&console, "\nSystem halted. Please reboot the computer.\n");
     } else {
         clks_panic_emit_backtrace(CLKS_NULL, rip, rbp, rsp);
     }

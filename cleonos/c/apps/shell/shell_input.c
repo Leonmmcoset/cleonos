@@ -326,13 +326,19 @@ static void ush_render_emit(const char *buffer, u64 length) {
 
     while (offset < length) {
         u64 chunk = length - offset;
+        u64 written;
 
         if (chunk > USH_RENDER_EMIT_CHUNK) {
             chunk = USH_RENDER_EMIT_CHUNK;
         }
 
-        (void)cleonos_sys_tty_write(buffer + offset, chunk);
-        offset += chunk;
+        written = cleonos_sys_fd_write(1ULL, buffer + offset, chunk);
+
+        if (written == 0ULL || written == (u64)-1) {
+            break;
+        }
+
+        offset += written;
     }
 }
 
@@ -466,11 +472,11 @@ static void ush_history_down(ush_state *sh) {
 }
 
 static char ush_read_char_blocking(void) {
-    for (;;) {
-        u64 ch = cleonos_sys_kbd_get_char();
+    char ch = '\0';
 
-        if (ch != (u64)-1) {
-            return (char)(ch & 0xFFULL);
+    for (;;) {
+        if (cleonos_sys_fd_read(0ULL, &ch, 1ULL) == 1ULL) {
+            return ch;
         }
 
         __asm__ volatile("pause");

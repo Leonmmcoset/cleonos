@@ -221,6 +221,8 @@ void ush_parse_line(const char *line, char *out_cmd, u64 cmd_size, char *out_arg
 
 void ush_write(const char *text) {
     u64 len;
+    const char *cursor;
+    u64 left;
 
     if (text == (const char *)0) {
         return;
@@ -232,11 +234,23 @@ void ush_write(const char *text) {
         return;
     }
 
-    (void)cleonos_sys_tty_write(text, len);
+    cursor = text;
+    left = len;
+
+    while (left > 0ULL) {
+        u64 wrote = cleonos_sys_fd_write(1ULL, cursor, left);
+
+        if (wrote == 0ULL || wrote == (u64)-1) {
+            break;
+        }
+
+        cursor += wrote;
+        left -= wrote;
+    }
 }
 
 void ush_write_char(char ch) {
-    (void)cleonos_sys_tty_write_char(ch);
+    (void)cleonos_sys_fd_write(1ULL, &ch, 1ULL);
 }
 
 void ush_writeln(const char *text) {

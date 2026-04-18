@@ -147,18 +147,15 @@ static void ush_top_render_frame(u64 frame_index, u64 delay_ticks) {
 
 static int ush_top_sleep_or_quit(u64 delay_ticks) {
     u64 i;
+    char ch = '\0';
 
     if (delay_ticks == 0ULL) {
         delay_ticks = 1ULL;
     }
 
     for (i = 0ULL; i < delay_ticks; i++) {
-        u64 ch = cleonos_sys_kbd_get_char();
-
-        if (ch != (u64)-1) {
-            char c = (char)(ch & 0xFFULL);
-
-            if (c == 'q' || c == 'Q') {
+        if (cleonos_sys_fd_read(0ULL, &ch, 1ULL) == 1ULL) {
+            if (ch == 'q' || ch == 'Q') {
                 return 1;
             }
         }

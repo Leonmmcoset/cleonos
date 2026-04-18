@@ -5,7 +5,7 @@ int cleonos_app_main(void) {
         "spin: busy loop started (test Alt+Ctrl+C force stop)\n";
     volatile u64 noise = 0xC1E0C1E0ULL;
 
-    (void)cleonos_sys_tty_write(banner, (u64)(sizeof(banner) - 1U));
+    (void)cleonos_sys_fd_write(1ULL, banner, (u64)(sizeof(banner) - 1U));
 
     for (;;) {
         noise ^= (noise << 7);

@@ -131,6 +131,66 @@
       "title": "Idle Loop Debug Log",
       "description": "Print debug log before entering kernel idle loop.",
       "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_PROCFS",
+      "title": "Virtual /proc",
+      "description": "Enable virtual procfs paths (/proc, /proc/list, /proc/self, /proc/<pid>) in syscall FS layer.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_EXEC_SERIAL_LOG",
+      "title": "EXEC Serial Logs",
+      "description": "Print EXEC run/return/path logs to serial output.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_KBD_TTY_SWITCH_HOTKEY",
+      "title": "Keyboard TTY Switch Hotkey",
+      "description": "Enable ALT+F1..F4 keyboard hotkey for active TTY switching.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_KBD_CTRL_SHORTCUTS",
+      "title": "Keyboard Ctrl Shortcuts",
+      "description": "Enable Ctrl+A/C/V shortcuts for input selection/copy/paste.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_KBD_FORCE_STOP_HOTKEY",
+      "title": "Keyboard Force-Stop Hotkey",
+      "description": "Enable Ctrl+Alt+C force-stop for current running user process.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_USER_INIT_SCRIPT_PROBE",
+      "title": "User Init Script Probe",
+      "description": "Probe and log /shell/init.cmd presence during userland init.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_USER_SYSTEM_APP_PROBE",
+      "title": "User System App Probe",
+      "description": "Probe /system/elfrunner.elf and /system/memc.elf during userland init.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_SCHED_TASK_COUNT_LOG",
+      "title": "Scheduler Task Count Log",
+      "description": "Print scheduler task count after scheduler initialization.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_INTERRUPT_READY_LOG",
+      "title": "Interrupt Ready Log",
+      "description": "Print IDT/PIC initialized log after interrupt setup.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_SHELL_MODE_LOG",
+      "title": "Shell Mode Log",
+      "description": "Print whether boot default mode is user shell or kernel shell.",
+      "default": true
     }
   ]
 }

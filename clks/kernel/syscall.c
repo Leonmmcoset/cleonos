@@ -35,6 +35,10 @@
 #define CLKS_SYSCALL_STATS_MAX_ID     CLKS_SYSCALL_EXEC_PATHV_IO
 #define CLKS_SYSCALL_STATS_RING_SIZE  256U
 
+#ifndef CLKS_CFG_PROCFS
+#define CLKS_CFG_PROCFS 1
+#endif
+
 struct clks_syscall_frame {
     u64 rax;
     u64 rbx;
@@ -1079,7 +1083,7 @@ static u64 clks_syscall_fs_child_count(u64 arg0) {
         return (u64)-1;
     }
 
-    if (clks_syscall_procfs_is_root(path) == CLKS_TRUE) {
+    if (CLKS_CFG_PROCFS != 0 && clks_syscall_procfs_is_root(path) == CLKS_TRUE) {
         return 2ULL + clks_exec_proc_count();
     }
 
@@ -1089,7 +1093,9 @@ static u64 clks_syscall_fs_child_count(u64 arg0) {
         return (u64)-1;
     }
 
-    if (clks_syscall_fs_is_root(path) == CLKS_TRUE && clks_syscall_fs_has_real_proc_dir() == CLKS_FALSE) {
+    if (CLKS_CFG_PROCFS != 0 &&
+        clks_syscall_fs_is_root(path) == CLKS_TRUE &&
+        clks_syscall_fs_has_real_proc_dir() == CLKS_FALSE) {
         return base_count + 1ULL;
     }
 
@@ -1107,7 +1113,7 @@ static u64 clks_syscall_fs_get_child_name(u64 arg0, u64 arg1, u64 arg2) {
         return 0ULL;
     }
 
-    if (clks_syscall_procfs_is_root(path) == CLKS_TRUE) {
+    if (CLKS_CFG_PROCFS != 0 && clks_syscall_procfs_is_root(path) == CLKS_TRUE) {
         if (arg1 == 0ULL) {
             clks_memset((void *)arg2, 0, CLKS_SYSCALL_NAME_MAX);
             clks_memcpy((void *)arg2, "self", 5U);
@@ -1142,7 +1148,9 @@ static u64 clks_syscall_fs_get_child_name(u64 arg0, u64 arg1, u64 arg2) {
         }
     }
 
-    if (clks_syscall_fs_is_root(path) == CLKS_TRUE && clks_syscall_fs_has_real_proc_dir() == CLKS_FALSE) {
+    if (CLKS_CFG_PROCFS != 0 &&
+        clks_syscall_fs_is_root(path) == CLKS_TRUE &&
+        clks_syscall_fs_has_real_proc_dir() == CLKS_FALSE) {
         if (arg1 == 0ULL) {
             clks_memset((void *)arg2, 0, CLKS_SYSCALL_NAME_MAX);
             clks_memcpy((void *)arg2, "proc", 5U);
@@ -1177,9 +1185,10 @@ static u64 clks_syscall_fs_read(u64 arg0, u64 arg1, u64 arg2) {
         return 0ULL;
     }
 
-    if (clks_syscall_procfs_is_list(path) == CLKS_TRUE ||
-        clks_syscall_procfs_is_self(path) == CLKS_TRUE ||
-        clks_syscall_procfs_parse_pid(path, &file_size) == CLKS_TRUE) {
+    if (CLKS_CFG_PROCFS != 0 &&
+        (clks_syscall_procfs_is_list(path) == CLKS_TRUE ||
+         clks_syscall_procfs_is_self(path) == CLKS_TRUE ||
+         clks_syscall_procfs_parse_pid(path, &file_size) == CLKS_TRUE)) {
         char proc_text[CLKS_SYSCALL_PROCFS_TEXT_MAX];
         usize proc_len = 0U;
 
@@ -1479,15 +1488,16 @@ static u64 clks_syscall_fs_stat_type(u64 arg0) {
         return (u64)-1;
     }
 
-    if (clks_syscall_procfs_is_root(path) == CLKS_TRUE) {
+    if (CLKS_CFG_PROCFS != 0 && clks_syscall_procfs_is_root(path) == CLKS_TRUE) {
         return (u64)CLKS_FS_NODE_DIR;
     }
 
-    if (clks_syscall_procfs_is_list(path) == CLKS_TRUE || clks_syscall_procfs_is_self(path) == CLKS_TRUE) {
+    if (CLKS_CFG_PROCFS != 0 &&
+        (clks_syscall_procfs_is_list(path) == CLKS_TRUE || clks_syscall_procfs_is_self(path) == CLKS_TRUE)) {
         return (u64)CLKS_FS_NODE_FILE;
     }
 
-    if (clks_syscall_procfs_snapshot_for_path(path, &snap) == CLKS_TRUE) {
+    if (CLKS_CFG_PROCFS != 0 && clks_syscall_procfs_snapshot_for_path(path, &snap) == CLKS_TRUE) {
         return (u64)CLKS_FS_NODE_FILE;
     }
 
@@ -1508,11 +1518,12 @@ static u64 clks_syscall_fs_stat_size(u64 arg0) {
         return (u64)-1;
     }
 
-    if (clks_syscall_procfs_is_root(path) == CLKS_TRUE) {
+    if (CLKS_CFG_PROCFS != 0 && clks_syscall_procfs_is_root(path) == CLKS_TRUE) {
         return 0ULL;
     }
 
-    if (clks_syscall_procfs_render_file(path, proc_text, sizeof(proc_text), &proc_len) == CLKS_TRUE) {
+    if (CLKS_CFG_PROCFS != 0 &&
+        clks_syscall_procfs_render_file(path, proc_text, sizeof(proc_text), &proc_len) == CLKS_TRUE) {
         return (u64)proc_len;
     }
 

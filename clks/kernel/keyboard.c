@@ -30,6 +30,18 @@
 #define CLKS_KBD_TTY_MAX         8U
 #define CLKS_KBD_DROP_LOG_EVERY  64ULL
 
+#ifndef CLKS_CFG_KBD_TTY_SWITCH_HOTKEY
+#define CLKS_CFG_KBD_TTY_SWITCH_HOTKEY 1
+#endif
+
+#ifndef CLKS_CFG_KBD_CTRL_SHORTCUTS
+#define CLKS_CFG_KBD_CTRL_SHORTCUTS 1
+#endif
+
+#ifndef CLKS_CFG_KBD_FORCE_STOP_HOTKEY
+#define CLKS_CFG_KBD_FORCE_STOP_HOTKEY 1
+#endif
+
 static const char clks_kbd_map[128] = {
     [2] = '1', [3] = '2', [4] = '3', [5] = '4', [6] = '5', [7] = '6', [8] = '7', [9] = '8',
     [10] = '9', [11] = '0', [12] = '-', [13] = '=', [14] = '\b', [15] = '\t',
@@ -178,6 +190,10 @@ static clks_bool clks_keyboard_ctrl_active(void) {
 static clks_bool clks_keyboard_try_emit_ctrl_shortcut(u8 code, u32 tty_index) {
     char shortcut = '\0';
 
+    if (CLKS_CFG_KBD_CTRL_SHORTCUTS == 0) {
+        return CLKS_FALSE;
+    }
+
     if (clks_keyboard_ctrl_active() == CLKS_FALSE) {
         return CLKS_FALSE;
     }
@@ -207,6 +223,10 @@ static clks_bool clks_keyboard_try_emit_ctrl_shortcut(u8 code, u32 tty_index) {
 static clks_bool clks_keyboard_try_force_stop_hotkey(u8 code) {
     u64 pid = 0ULL;
     u64 stop_ret;
+
+    if (CLKS_CFG_KBD_FORCE_STOP_HOTKEY == 0) {
+        return CLKS_FALSE;
+    }
 
     if (code != CLKS_SC_C) {
         return CLKS_FALSE;
@@ -254,7 +274,20 @@ void clks_keyboard_init(void) {
     clks_kbd_pop_count = 0ULL;
     clks_kbd_drop_count = 0ULL;
 
-    clks_log(CLKS_LOG_INFO, "KBD", "ALT+F1..F4 TTY HOTKEY ONLINE");
+    if (CLKS_CFG_KBD_TTY_SWITCH_HOTKEY != 0) {
+        clks_log(CLKS_LOG_INFO, "KBD", "ALT+F1..F4 TTY HOTKEY ONLINE");
+    } else {
+        clks_log(CLKS_LOG_WARN, "KBD", "TTY SWITCH HOTKEY DISABLED BY MENUCONFIG");
+    }
+
+    if (CLKS_CFG_KBD_CTRL_SHORTCUTS == 0) {
+        clks_log(CLKS_LOG_WARN, "KBD", "CTRL SHORTCUTS DISABLED BY MENUCONFIG");
+    }
+
+    if (CLKS_CFG_KBD_FORCE_STOP_HOTKEY == 0) {
+        clks_log(CLKS_LOG_WARN, "KBD", "CTRL+ALT+C FORCE STOP DISABLED BY MENUCONFIG");
+    }
+
     clks_log(CLKS_LOG_INFO, "KBD", "PS2 INPUT QUEUE ONLINE");
     clks_log_hex(CLKS_LOG_INFO, "KBD", "QUEUE_CAP", CLKS_KBD_INPUT_CAP);
 }
@@ -350,7 +383,10 @@ void clks_keyboard_handle_scancode(u8 scancode) {
         return;
     }
 
-    if (clks_kbd_alt_down == CLKS_TRUE && code >= CLKS_SC_F1 && code <= CLKS_SC_F4) {
+    if (CLKS_CFG_KBD_TTY_SWITCH_HOTKEY != 0 &&
+        clks_kbd_alt_down == CLKS_TRUE &&
+        code >= CLKS_SC_F1 &&
+        code <= CLKS_SC_F4) {
         u32 target = (u32)(code - CLKS_SC_F1);
         u32 before = clks_tty_active();
         u32 after;

@@ -162,6 +162,16 @@ cl_set_bool_cache(CLEONOS_CLKS_ENABLE_ELFRUNNER_INIT ON "Initialize ELFRUNNER fr
 cl_set_bool_cache(CLEONOS_CLKS_ENABLE_SYSCALL_TICK_QUERY ON "Query syscall timer ticks at boot")
 cl_set_bool_cache(CLEONOS_CLKS_ENABLE_TTY_READY_LOG ON "Print TTY ready logs")
 cl_set_bool_cache(CLEONOS_CLKS_ENABLE_IDLE_DEBUG_LOG ON "Print idle loop debug log")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_PROCFS ON "Enable virtual /proc procfs syscall layer")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_EXEC_SERIAL_LOG ON "Enable EXEC info logs on serial output")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_KBD_TTY_SWITCH_HOTKEY ON "Enable ALT+F1..F4 TTY switch hotkey")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_KBD_CTRL_SHORTCUTS ON "Enable Ctrl+A/C/V keyboard shortcuts")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_KBD_FORCE_STOP_HOTKEY ON "Enable Ctrl+Alt+C force-stop hotkey")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_USER_INIT_SCRIPT_PROBE ON "Probe /shell/init.cmd during userland init")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_USER_SYSTEM_APP_PROBE ON "Probe /system apps (elfrunner/memc) during userland init")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_SCHED_TASK_COUNT_LOG ON "Print scheduler task count during boot")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_INTERRUPT_READY_LOG ON "Print interrupt ready log after IDT/PIC init")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_SHELL_MODE_LOG ON "Print default shell mode log during boot")
 
 cl_bool_to_int(CLEONOS_CLKS_ENABLE_AUDIO CLKS_CFG_AUDIO_INT)
 cl_bool_to_int(CLEONOS_CLKS_ENABLE_MOUSE CLKS_CFG_MOUSE_INT)
@@ -185,6 +195,16 @@ cl_bool_to_int(CLEONOS_CLKS_ENABLE_ELFRUNNER_INIT CLKS_CFG_ELFRUNNER_INIT_INT)
 cl_bool_to_int(CLEONOS_CLKS_ENABLE_SYSCALL_TICK_QUERY CLKS_CFG_SYSCALL_TICK_QUERY_INT)
 cl_bool_to_int(CLEONOS_CLKS_ENABLE_TTY_READY_LOG CLKS_CFG_TTY_READY_LOG_INT)
 cl_bool_to_int(CLEONOS_CLKS_ENABLE_IDLE_DEBUG_LOG CLKS_CFG_IDLE_DEBUG_LOG_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_PROCFS CLKS_CFG_PROCFS_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_EXEC_SERIAL_LOG CLKS_CFG_EXEC_SERIAL_LOG_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_KBD_TTY_SWITCH_HOTKEY CLKS_CFG_KBD_TTY_SWITCH_HOTKEY_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_KBD_CTRL_SHORTCUTS CLKS_CFG_KBD_CTRL_SHORTCUTS_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_KBD_FORCE_STOP_HOTKEY CLKS_CFG_KBD_FORCE_STOP_HOTKEY_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_USER_INIT_SCRIPT_PROBE CLKS_CFG_USER_INIT_SCRIPT_PROBE_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_USER_SYSTEM_APP_PROBE CLKS_CFG_USER_SYSTEM_APP_PROBE_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_SCHED_TASK_COUNT_LOG CLKS_CFG_SCHED_TASK_COUNT_LOG_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_INTERRUPT_READY_LOG CLKS_CFG_INTERRUPT_READY_LOG_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_SHELL_MODE_LOG CLKS_CFG_SHELL_MODE_LOG_INT)
 
 set(CFLAGS_COMMON
     -std=c11
@@ -222,6 +242,16 @@ set(ARCH_CFLAGS
     "-DCLKS_CFG_SYSCALL_TICK_QUERY=${CLKS_CFG_SYSCALL_TICK_QUERY_INT}"
     "-DCLKS_CFG_TTY_READY_LOG=${CLKS_CFG_TTY_READY_LOG_INT}"
     "-DCLKS_CFG_IDLE_DEBUG_LOG=${CLKS_CFG_IDLE_DEBUG_LOG_INT}"
+    "-DCLKS_CFG_PROCFS=${CLKS_CFG_PROCFS_INT}"
+    "-DCLKS_CFG_EXEC_SERIAL_LOG=${CLKS_CFG_EXEC_SERIAL_LOG_INT}"
+    "-DCLKS_CFG_KBD_TTY_SWITCH_HOTKEY=${CLKS_CFG_KBD_TTY_SWITCH_HOTKEY_INT}"
+    "-DCLKS_CFG_KBD_CTRL_SHORTCUTS=${CLKS_CFG_KBD_CTRL_SHORTCUTS_INT}"
+    "-DCLKS_CFG_KBD_FORCE_STOP_HOTKEY=${CLKS_CFG_KBD_FORCE_STOP_HOTKEY_INT}"
+    "-DCLKS_CFG_USER_INIT_SCRIPT_PROBE=${CLKS_CFG_USER_INIT_SCRIPT_PROBE_INT}"
+    "-DCLKS_CFG_USER_SYSTEM_APP_PROBE=${CLKS_CFG_USER_SYSTEM_APP_PROBE_INT}"
+    "-DCLKS_CFG_SCHED_TASK_COUNT_LOG=${CLKS_CFG_SCHED_TASK_COUNT_LOG_INT}"
+    "-DCLKS_CFG_INTERRUPT_READY_LOG=${CLKS_CFG_INTERRUPT_READY_LOG_INT}"
+    "-DCLKS_CFG_SHELL_MODE_LOG=${CLKS_CFG_SHELL_MODE_LOG_INT}"
     -m64
     -mno-red-zone
     -mcmodel=kernel
@@ -814,9 +844,17 @@ if(Python3_Interpreter_FOUND)
         COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/menuconfig.py"
         USES_TERMINAL
     )
+    add_custom_target(menuconfig-gui
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/menuconfig.py" --gui
+        USES_TERMINAL
+    )
 else()
     add_custom_target(menuconfig
         COMMAND ${CMAKE_COMMAND} -E echo "python3 not found; run scripts/menuconfig.py manually"
+        USES_TERMINAL
+    )
+    add_custom_target(menuconfig-gui
+        COMMAND ${CMAKE_COMMAND} -E echo "python3 not found; run scripts/menuconfig.py --gui manually"
         USES_TERMINAL
     )
 endif()
@@ -825,6 +863,7 @@ add_custom_target(cleonos-help
     COMMAND ${CMAKE_COMMAND} -E echo "CLeonOS CMake build system (x86_64 only)"
     COMMAND ${CMAKE_COMMAND} -E echo "  cmake -S . -B build-cmake"
     COMMAND ${CMAKE_COMMAND} -E echo "  cmake --build build-cmake --target menuconfig"
+    COMMAND ${CMAKE_COMMAND} -E echo "  cmake --build build-cmake --target menuconfig-gui"
     COMMAND ${CMAKE_COMMAND} -E echo "  cmake --build build-cmake --target setup"
     COMMAND ${CMAKE_COMMAND} -E echo "  cmake --build build-cmake --target userapps"
     COMMAND ${CMAKE_COMMAND} -E echo "  cmake --build build-cmake --target iso"

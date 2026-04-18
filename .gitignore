@@ -16,3 +16,5 @@ Testing/
 # menuconfig generated
 configs/menuconfig/.config.json
 configs/menuconfig/config.cmake
+
+venv/

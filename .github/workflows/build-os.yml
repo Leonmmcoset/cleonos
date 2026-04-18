@@ -3,6 +3,12 @@ name: Build CLeonOS
 on:
   push:
   pull_request:
+  workflow_dispatch:
+    inputs:
+      menuconfig_overrides:
+        description: "Optional extra menuconfig args, e.g. --set CLEONOS_CLKS_ENABLE_AUDIO=OFF"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -10,6 +16,8 @@ permissions:
 jobs:
   build-os:
     runs-on: ubuntu-latest
+    env:
+      MENUCONFIG_OVERRIDES: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.menuconfig_overrides || '' }}
 
     steps:
       - name: Checkout
@@ -38,6 +46,18 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Generate menuconfig (default all enabled)
+        shell: bash
+        run: |
+          set -euo pipefail
+          extra_args=()
+          if [[ -n "${MENUCONFIG_OVERRIDES}" ]]; then
+            # shellcheck disable=SC2206
+            extra_args=(${MENUCONFIG_OVERRIDES})
+          fi
+          python3 scripts/menuconfig.py --defaults --non-interactive "${extra_args[@]}"
+          echo "menuconfig generated with defaults=all-enabled"
 
       - name: Configure
         run: |

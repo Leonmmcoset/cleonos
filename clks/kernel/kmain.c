@@ -110,6 +110,18 @@
 #define CLKS_CFG_IDLE_DEBUG_LOG 1
 #endif
 
+#ifndef CLKS_CFG_SCHED_TASK_COUNT_LOG
+#define CLKS_CFG_SCHED_TASK_COUNT_LOG 1
+#endif
+
+#ifndef CLKS_CFG_INTERRUPT_READY_LOG
+#define CLKS_CFG_INTERRUPT_READY_LOG 1
+#endif
+
+#ifndef CLKS_CFG_SHELL_MODE_LOG
+#define CLKS_CFG_SHELL_MODE_LOG 1
+#endif
+
 #if CLKS_CFG_KLOGD_TASK
 static void clks_task_klogd(u64 tick) {
     static u64 last_emit = 0ULL;
@@ -173,7 +185,6 @@ void clks_kernel_main(void) {
     const struct limine_memmap_response *boot_memmap;
     struct clks_pmm_stats pmm_stats;
     struct clks_heap_stats heap_stats;
-    struct clks_scheduler_stats sched_stats;
     struct clks_fs_node_info fs_system_dir = {0};
     u64 syscall_ticks;
     u64 fs_root_children;
@@ -372,8 +383,14 @@ void clks_kernel_main(void) {
     clks_log(CLKS_LOG_WARN, "SCHED", "USRD TASK DISABLED BY MENUCONFIG");
 #endif
 
-    sched_stats = clks_scheduler_get_stats();
-    clks_log_hex(CLKS_LOG_INFO, "SCHED", "TASK_COUNT", sched_stats.task_count);
+#if CLKS_CFG_SCHED_TASK_COUNT_LOG
+    {
+        struct clks_scheduler_stats sched_stats = clks_scheduler_get_stats();
+        clks_log_hex(CLKS_LOG_INFO, "SCHED", "TASK_COUNT", sched_stats.task_count);
+    }
+#else
+    clks_log(CLKS_LOG_WARN, "CFG", "SCHED TASK COUNT LOG DISABLED BY MENUCONFIG");
+#endif
 
     clks_service_init();
 
@@ -398,7 +415,9 @@ void clks_kernel_main(void) {
     clks_syscall_init();
 
     clks_interrupts_init();
+#if CLKS_CFG_INTERRUPT_READY_LOG
     clks_log(CLKS_LOG_INFO, "INT", "IDT + PIC INITIALIZED");
+#endif
 
 #if CLKS_CFG_SYSCALL_TICK_QUERY
     syscall_ticks = clks_syscall_invoke_kernel(CLKS_SYSCALL_TIMER_TICKS, 0ULL, 0ULL, 0ULL);
@@ -411,13 +430,17 @@ void clks_kernel_main(void) {
     clks_shell_init();
 
 #if CLKS_CFG_USRD_TASK
+#if CLKS_CFG_SHELL_MODE_LOG
     if (clks_userland_shell_auto_exec_enabled() == CLKS_TRUE) {
         clks_log(CLKS_LOG_INFO, "SHELL", "DEFAULT ENTER USER SHELL MODE");
     } else {
         clks_log(CLKS_LOG_INFO, "SHELL", "KERNEL SHELL ACTIVE");
     }
+#endif
 #else
+#if CLKS_CFG_SHELL_MODE_LOG
     clks_log(CLKS_LOG_WARN, "SHELL", "USRD TASK DISABLED; INTERACTIVE SHELL TICK OFF");
+#endif
 #endif
 
 #if CLKS_CFG_TTY_READY_LOG

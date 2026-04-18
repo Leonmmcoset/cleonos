@@ -28,6 +28,15 @@ try:
 except Exception:
     curses = None
 
+try:
+    from PySide6 import QtCore, QtWidgets
+except Exception:
+    try:
+        from PySide2 import QtCore, QtWidgets
+    except Exception:
+        QtCore = None
+        QtWidgets = None
+
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 APPS_DIR = ROOT_DIR / "cleonos" / "c" / "apps"
@@ -652,6 +661,325 @@ def interactive_menu_ncurses(clks_options: List[OptionItem], user_options: List[
     return bool(curses.wrapper(lambda stdscr: _run_ncurses_main(stdscr, clks_options, user_options, values)))
 
 
+def interactive_menu_gui(clks_options: List[OptionItem], user_options: List[OptionItem], values: Dict[str, bool]) -> bool:
+    if QtWidgets is None or QtCore is None:
+        raise RuntimeError("python PySide unavailable (install PySide6, or use --plain)")
+
+    if os.name != "nt" and not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+        raise RuntimeError("GUI mode requires a desktop display (DISPLAY/WAYLAND_DISPLAY)")
+
+    app = QtWidgets.QApplication.instance()
+    owns_app = False
+
+    if app is None:
+        app = QtWidgets.QApplication(["menuconfig-gui"])
+        owns_app = True
+
+    qt_checked = getattr(QtCore.Qt, "Checked", QtCore.Qt.CheckState.Checked)
+    qt_unchecked = getattr(QtCore.Qt, "Unchecked", QtCore.Qt.CheckState.Unchecked)
+    qt_horizontal = getattr(QtCore.Qt, "Horizontal", QtCore.Qt.Orientation.Horizontal)
+    qt_item_enabled = getattr(QtCore.Qt, "ItemIsEnabled", QtCore.Qt.ItemFlag.ItemIsEnabled)
+    qt_item_selectable = getattr(QtCore.Qt, "ItemIsSelectable", QtCore.Qt.ItemFlag.ItemIsSelectable)
+    qt_item_checkable = getattr(QtCore.Qt, "ItemIsUserCheckable", QtCore.Qt.ItemFlag.ItemIsUserCheckable)
+
+    resize_to_contents = getattr(
+        QtWidgets.QHeaderView,
+        "ResizeToContents",
+        QtWidgets.QHeaderView.ResizeMode.ResizeToContents,
+    )
+    stretch_mode = getattr(
+        QtWidgets.QHeaderView,
+        "Stretch",
+        QtWidgets.QHeaderView.ResizeMode.Stretch,
+    )
+    select_rows = getattr(
+        QtWidgets.QAbstractItemView,
+        "SelectRows",
+        QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows,
+    )
+    extended_selection = getattr(
+        QtWidgets.QAbstractItemView,
+        "ExtendedSelection",
+        QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection,
+    )
+
+    result = {"save": False}
+
+    dialog = QtWidgets.QDialog()
+    dialog.setWindowTitle("CLeonOS menuconfig (PySide)")
+    dialog.resize(1180, 760)
+    dialog.setMinimumSize(920, 560)
+
+    if os.name == "nt":
+        dialog.setWindowState(dialog.windowState() | QtCore.Qt.WindowMaximized)
+
+    root_layout = QtWidgets.QVBoxLayout(dialog)
+    root_layout.setContentsMargins(12, 10, 12, 12)
+    root_layout.setSpacing(8)
+
+    header_title = QtWidgets.QLabel("CLeonOS menuconfig")
+    header_font = header_title.font()
+    header_font.setPointSize(header_font.pointSize() + 4)
+    header_font.setBold(True)
+    header_title.setFont(header_font)
+    root_layout.addWidget(header_title)
+
+    root_layout.addWidget(QtWidgets.QLabel("Window mode (PySide): configure CLKS features and user apps, then save."))
+
+    summary_label = QtWidgets.QLabel("")
+    root_layout.addWidget(summary_label)
+
+    tabs = QtWidgets.QTabWidget()
+    root_layout.addWidget(tabs, 1)
+
+    def update_summary() -> None:
+        clks_on = sum(1 for item in clks_options if values.get(item.key, item.default))
+        user_on = sum(1 for item in user_options if values.get(item.key, item.default))
+        total = len(clks_options) + len(user_options)
+        summary_label.setText(
+            f"CLKS: {clks_on}/{len(clks_options)} enabled    "
+            f"User: {user_on}/{len(user_options)} enabled    "
+            f"Total: {clks_on + user_on}/{total}"
+        )
+
+    class _SectionPanel(QtWidgets.QWidget):
+        def __init__(self, title: str, options: List[OptionItem]):
+            super().__init__()
+            self.options = options
+            self._updating = False
+
+            layout = QtWidgets.QVBoxLayout(self)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(8)
+
+            toolbar = QtWidgets.QHBoxLayout()
+            title_label = QtWidgets.QLabel(title)
+            title_font = title_label.font()
+            title_font.setBold(True)
+            title_label.setFont(title_font)
+            toolbar.addWidget(title_label)
+            toolbar.addStretch(1)
+
+            toggle_btn = QtWidgets.QPushButton("Toggle Selected")
+            enable_all_btn = QtWidgets.QPushButton("Enable All")
+            disable_all_btn = QtWidgets.QPushButton("Disable All")
+            toolbar.addWidget(enable_all_btn)
+            toolbar.addWidget(disable_all_btn)
+            toolbar.addWidget(toggle_btn)
+            layout.addLayout(toolbar)
+
+            splitter = QtWidgets.QSplitter(qt_horizontal)
+            layout.addWidget(splitter, 1)
+
+            left = QtWidgets.QWidget()
+            left_layout = QtWidgets.QVBoxLayout(left)
+            left_layout.setContentsMargins(0, 0, 0, 0)
+            self.table = QtWidgets.QTableWidget(len(options), 2)
+            self.table.setHorizontalHeaderLabels(["On", "Option"])
+            self.table.verticalHeader().setVisible(False)
+            self.table.horizontalHeader().setSectionResizeMode(0, resize_to_contents)
+            self.table.horizontalHeader().setSectionResizeMode(1, stretch_mode)
+            self.table.setSelectionBehavior(select_rows)
+            self.table.setSelectionMode(extended_selection)
+            self.table.setAlternatingRowColors(True)
+            left_layout.addWidget(self.table)
+            splitter.addWidget(left)
+
+            right = QtWidgets.QWidget()
+            right_layout = QtWidgets.QVBoxLayout(right)
+            right_layout.setContentsMargins(0, 0, 0, 0)
+            self.state_label = QtWidgets.QLabel("State: -")
+            self.key_label = QtWidgets.QLabel("Key: -")
+            self.detail_text = QtWidgets.QPlainTextEdit()
+            self.detail_text.setReadOnly(True)
+            right_layout.addWidget(self.state_label)
+            right_layout.addWidget(self.key_label)
+            right_layout.addWidget(self.detail_text, 1)
+            splitter.addWidget(right)
+            splitter.setStretchFactor(0, 3)
+            splitter.setStretchFactor(1, 2)
+
+            toggle_btn.clicked.connect(self.toggle_selected)
+            enable_all_btn.clicked.connect(self.enable_all)
+            disable_all_btn.clicked.connect(self.disable_all)
+            self.table.itemSelectionChanged.connect(self._on_selection_changed)
+            self.table.itemChanged.connect(self._on_item_changed)
+
+            self.refresh(keep_selection=False)
+            if self.options:
+                self.table.selectRow(0)
+                self._show_detail(0)
+
+        def _selected_rows(self) -> List[int]:
+            rows = []
+            model = self.table.selectionModel()
+
+            if model is None:
+                return rows
+
+            for idx in model.selectedRows():
+                row = idx.row()
+                if row not in rows:
+                    rows.append(row)
+
+            rows.sort()
+            return rows
+
+        def _show_detail(self, row: int) -> None:
+            if row < 0 or row >= len(self.options):
+                self.state_label.setText("State: -")
+                self.key_label.setText("Key: -")
+                self.detail_text.setPlainText("")
+                return
+
+            item = self.options[row]
+            enabled = values.get(item.key, item.default)
+            self.state_label.setText(f"State: {'ENABLED' if enabled else 'DISABLED'}")
+            self.key_label.setText(f"Key: {item.key}")
+            self.detail_text.setPlainText(f"{item.title}\n\n{item.description}")
+
+        def _on_selection_changed(self) -> None:
+            rows = self._selected_rows()
+
+            if len(rows) == 1:
+                self._show_detail(rows[0])
+                return
+
+            if len(rows) > 1:
+                self.state_label.setText(f"State: {len(rows)} items selected")
+                self.key_label.setText("Key: <multiple>")
+                self.detail_text.setPlainText("Multiple options selected.\nUse Toggle Selected to flip all selected entries.")
+                return
+
+            self._show_detail(-1)
+
+        def _on_item_changed(self, changed_item) -> None:
+            if self._updating or changed_item is None:
+                return
+
+            if changed_item.column() != 0:
+                return
+
+            row = changed_item.row()
+
+            if row < 0 or row >= len(self.options):
+                return
+
+            self.options[row]
+            values[self.options[row].key] = changed_item.checkState() == qt_checked
+            self._on_selection_changed()
+            update_summary()
+
+        def refresh(self, keep_selection: bool = True) -> None:
+            prev_rows = self._selected_rows() if keep_selection else []
+            self._updating = True
+
+            self.table.setRowCount(len(self.options))
+
+            for row, item in enumerate(self.options):
+                enabled = values.get(item.key, item.default)
+                check_item = self.table.item(row, 0)
+
+                if check_item is None:
+                    check_item = QtWidgets.QTableWidgetItem("")
+                    check_item.setFlags(qt_item_enabled | qt_item_selectable | qt_item_checkable)
+                    self.table.setItem(row, 0, check_item)
+
+                check_item.setCheckState(qt_checked if enabled else qt_unchecked)
+
+                title_item = self.table.item(row, 1)
+                if title_item is None:
+                    title_item = QtWidgets.QTableWidgetItem(item.title)
+                    title_item.setFlags(qt_item_enabled | qt_item_selectable)
+                    self.table.setItem(row, 1, title_item)
+                else:
+                    title_item.setText(item.title)
+
+            self._updating = False
+
+            self.table.clearSelection()
+            if keep_selection:
+                for row in prev_rows:
+                    if 0 <= row < len(self.options):
+                        self.table.selectRow(row)
+
+            self._on_selection_changed()
+            update_summary()
+
+        def toggle_selected(self) -> None:
+            rows = self._selected_rows()
+            if not rows:
+                return
+
+            self._updating = True
+            for row in rows:
+                item = self.options[row]
+                new_state = not values.get(item.key, item.default)
+                values[item.key] = new_state
+                check_item = self.table.item(row, 0)
+                if check_item is not None:
+                    check_item.setCheckState(qt_checked if new_state else qt_unchecked)
+            self._updating = False
+            self._on_selection_changed()
+            update_summary()
+
+        def enable_all(self) -> None:
+            self._updating = True
+            for row, item in enumerate(self.options):
+                values[item.key] = True
+                check_item = self.table.item(row, 0)
+                if check_item is not None:
+                    check_item.setCheckState(qt_checked)
+            self._updating = False
+            self._on_selection_changed()
+            update_summary()
+
+        def disable_all(self) -> None:
+            self._updating = True
+            for row, item in enumerate(self.options):
+                values[item.key] = False
+                check_item = self.table.item(row, 0)
+                if check_item is not None:
+                    check_item.setCheckState(qt_unchecked)
+            self._updating = False
+            self._on_selection_changed()
+            update_summary()
+
+    clks_panel = _SectionPanel("CLKS Features", clks_options)
+    user_panel = _SectionPanel("User Apps", user_options)
+    tabs.addTab(clks_panel, "CLKS")
+    tabs.addTab(user_panel, "USER")
+    update_summary()
+
+    footer = QtWidgets.QHBoxLayout()
+    footer.addWidget(QtWidgets.QLabel("Tip: select rows and click Toggle Selected."))
+    footer.addStretch(1)
+
+    save_btn = QtWidgets.QPushButton("Save and Exit")
+    quit_btn = QtWidgets.QPushButton("Quit without Saving")
+    footer.addWidget(save_btn)
+    footer.addWidget(quit_btn)
+    root_layout.addLayout(footer)
+
+    def _on_save() -> None:
+        result["save"] = True
+        dialog.accept()
+
+    def _on_quit() -> None:
+        result["save"] = False
+        dialog.reject()
+
+    save_btn.clicked.connect(_on_save)
+    quit_btn.clicked.connect(_on_quit)
+
+    dialog.exec()
+
+    if owns_app:
+        app.quit()
+
+    return result["save"]
+
+
 def write_outputs(all_values: Dict[str, bool], ordered_options: List[OptionItem]) -> None:
     MENUCONFIG_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -719,6 +1047,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--defaults", action="store_true", help="ignore previous .config and use defaults")
     parser.add_argument("--non-interactive", action="store_true", help="save config without opening interactive menu")
     parser.add_argument("--plain", action="store_true", help="use legacy plain-text menu instead of ncurses")
+    parser.add_argument("--gui", action="store_true", help="use GUI window mode (PySide)")
     parser.add_argument(
         "--set",
         action="append",
@@ -732,6 +1061,9 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
 
+    if args.gui and args.plain:
+        raise RuntimeError("--gui and --plain cannot be used together")
+
     clks_options = load_clks_options()
     user_options = discover_user_apps()
     all_options = clks_options + user_options
@@ -742,12 +1074,15 @@ def main() -> int:
 
     should_save = args.non_interactive
     if not args.non_interactive:
-        if not sys.stdin.isatty():
-            raise RuntimeError("menuconfig requires interactive tty (or use --non-interactive)")
-        if args.plain:
-            should_save = interactive_menu(clks_options, user_options, values)
+        if args.gui:
+            should_save = interactive_menu_gui(clks_options, user_options, values)
         else:
-            should_save = interactive_menu_ncurses(clks_options, user_options, values)
+            if not sys.stdin.isatty():
+                raise RuntimeError("menuconfig requires interactive tty (or use --non-interactive or --gui)")
+            if args.plain:
+                should_save = interactive_menu(clks_options, user_options, values)
+            else:
+                should_save = interactive_menu_ncurses(clks_options, user_options, values)
 
     if not should_save:
         print("menuconfig: no changes saved")

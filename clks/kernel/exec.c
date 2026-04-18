@@ -37,6 +37,10 @@ typedef u64 (*clks_exec_entry_fn)(void);
 #define CLKS_EXEC_FD_INHERIT     ((u64)-1)
 #define CLKS_EXEC_DYNLIB_MAX       32U
 
+#ifndef CLKS_CFG_EXEC_SERIAL_LOG
+#define CLKS_CFG_EXEC_SERIAL_LOG 1
+#endif
+
 #define CLKS_EXEC_ELF64_MAGIC_0 0x7FU
 #define CLKS_EXEC_ELF64_MAGIC_1 'E'
 #define CLKS_EXEC_ELF64_MAGIC_2 'L'
@@ -193,6 +197,11 @@ static void clks_exec_serial_write_hex64(u64 value) {
 }
 
 static void clks_exec_log_info_serial(const char *message) {
+    if (CLKS_CFG_EXEC_SERIAL_LOG == 0) {
+        (void)message;
+        return;
+    }
+
     clks_serial_write("[INFO][EXEC] ");
 
     if (message != CLKS_NULL) {
@@ -203,6 +212,12 @@ static void clks_exec_log_info_serial(const char *message) {
 }
 
 static void clks_exec_log_hex_serial(const char *label, u64 value) {
+    if (CLKS_CFG_EXEC_SERIAL_LOG == 0) {
+        (void)label;
+        (void)value;
+        return;
+    }
+
     clks_serial_write("[INFO][EXEC] ");
 
     if (label != CLKS_NULL) {

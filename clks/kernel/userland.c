@@ -11,6 +11,14 @@
 #define CLKS_CFG_USERLAND_AUTO_EXEC 1
 #endif
 
+#ifndef CLKS_CFG_USER_INIT_SCRIPT_PROBE
+#define CLKS_CFG_USER_INIT_SCRIPT_PROBE 1
+#endif
+
+#ifndef CLKS_CFG_USER_SYSTEM_APP_PROBE
+#define CLKS_CFG_USER_SYSTEM_APP_PROBE 1
+#endif
+
 static clks_bool clks_user_shell_ready = CLKS_FALSE;
 static clks_bool clks_user_shell_exec_requested_flag = CLKS_FALSE;
 static clks_bool clks_user_shell_exec_enabled = CLKS_FALSE;
@@ -101,8 +109,13 @@ clks_bool clks_userland_init(void) {
 
     clks_user_shell_ready = CLKS_TRUE;
     clks_log(CLKS_LOG_INFO, "USER", "SHELL COMMAND ABI READY");
+#if CLKS_CFG_USER_INIT_SCRIPT_PROBE
     clks_userland_probe_init_script();
+#else
+    clks_log(CLKS_LOG_WARN, "USER", "INIT SCRIPT PROBE DISABLED BY MENUCONFIG");
+#endif
 
+#if CLKS_CFG_USER_SYSTEM_APP_PROBE
     if (clks_userland_probe_elf("/system/elfrunner.elf", "ELFRUNNER ELF READY") == CLKS_FALSE) {
         return CLKS_FALSE;
     }
@@ -110,6 +123,9 @@ clks_bool clks_userland_init(void) {
     if (clks_userland_probe_elf("/system/memc.elf", "MEMC ELF READY") == CLKS_FALSE) {
         return CLKS_FALSE;
     }
+#else
+    clks_log(CLKS_LOG_WARN, "USER", "SYSTEM APP PROBE DISABLED BY MENUCONFIG");
+#endif
 
     if (clks_user_shell_exec_enabled == CLKS_TRUE) {
         clks_log(CLKS_LOG_INFO, "USER", "USER SHELL AUTO EXEC ENABLED");

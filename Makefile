@@ -51,7 +51,7 @@ ifneq ($(strip $(READELF_FOR_TARGET)),)
 CMAKE_PASSTHROUGH_ARGS += -DREADELF_FOR_TARGET=$(READELF_FOR_TARGET)
 endif
 
-.PHONY: all configure reconfigure menuconfig setup setup-tools setup-limine kernel userapps ramdisk-root ramdisk iso run debug clean clean-all help
+.PHONY: all configure reconfigure menuconfig menuconfig-gui setup setup-tools setup-limine kernel userapps ramdisk-root ramdisk iso run debug clean clean-all help
 
 all: iso
 
@@ -67,6 +67,17 @@ menuconfig:
 >     $(PYTHON) scripts/menuconfig.py $(MENUCONFIG_ARGS); \
 > elif command -v python >/dev/null 2>&1; then \
 >     python scripts/menuconfig.py $(MENUCONFIG_ARGS); \
+> else \
+>     echo "python3/python not found"; \
+>     exit 1; \
+> fi
+> @$(MAKE) configure CMAKE_BUILD_TYPE=$(CMAKE_BUILD_TYPE) CMAKE_GENERATOR="$(CMAKE_GENERATOR)" CMAKE_EXTRA_ARGS="$(CMAKE_EXTRA_ARGS)" NO_COLOR="$(NO_COLOR)" LIMINE_SKIP_CONFIGURE="$(LIMINE_SKIP_CONFIGURE)" LIMINE_REF="$(LIMINE_REF)" LIMINE_REPO="$(LIMINE_REPO)" LIMINE_DIR="$(LIMINE_DIR)" LIMINE_BIN_DIR="$(LIMINE_BIN_DIR)" OBJCOPY_FOR_TARGET="$(OBJCOPY_FOR_TARGET)" OBJDUMP_FOR_TARGET="$(OBJDUMP_FOR_TARGET)" READELF_FOR_TARGET="$(READELF_FOR_TARGET)"
+
+menuconfig-gui:
+> @if command -v $(PYTHON) >/dev/null 2>&1; then \
+>     $(PYTHON) scripts/menuconfig.py --gui $(MENUCONFIG_ARGS); \
+> elif command -v python >/dev/null 2>&1; then \
+>     python scripts/menuconfig.py --gui $(MENUCONFIG_ARGS); \
 > else \
 >     echo "python3/python not found"; \
 >     exit 1; \
@@ -121,6 +132,7 @@ help:
 > @echo "CLeonOS (CMake-backed wrapper)"
 > @echo "  make configure"
 > @echo "  make menuconfig"
+> @echo "  make menuconfig-gui"
 > @echo "  make setup"
 > @echo "  make userapps"
 > @echo "  make iso"

@@ -1215,11 +1215,11 @@ void clks_tty_write_char(char ch) {
     clks_tty_reset_blink_timer();
 }
 
-void clks_tty_write(const char *text) {
+void clks_tty_write_n(const char *text, usize len) {
     usize i = 0U;
     u32 tty_index;
 
-    if (clks_tty_is_ready == CLKS_FALSE || text == CLKS_NULL) {
+    if (clks_tty_is_ready == CLKS_FALSE || text == CLKS_NULL || len == 0U) {
         return;
     }
 
@@ -1231,7 +1231,7 @@ void clks_tty_write(const char *text) {
         clks_tty_redraw_active();
     }
 
-    while (text[i] != '\0') {
+    while (i < len) {
         if (clks_tty_ansi_process_byte(tty_index, text[i]) == CLKS_FALSE) {
             clks_tty_put_char_raw(tty_index, text[i]);
         }
@@ -1242,6 +1242,14 @@ void clks_tty_write(const char *text) {
     clks_tty_draw_cursor();
     clks_tty_draw_status_bar();
     clks_tty_reset_blink_timer();
+}
+
+void clks_tty_write(const char *text) {
+    if (text == CLKS_NULL) {
+        return;
+    }
+
+    clks_tty_write_n(text, clks_strlen(text));
 }
 
 void clks_tty_switch(u32 tty_index) {

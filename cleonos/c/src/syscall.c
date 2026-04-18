@@ -330,3 +330,15 @@ u64 cleonos_sys_fd_close(u64 fd) {
 u64 cleonos_sys_fd_dup(u64 fd) {
     return cleonos_syscall(CLEONOS_SYSCALL_FD_DUP, fd, 0ULL, 0ULL);
 }
+
+u64 cleonos_sys_dl_open(const char *path) {
+    return cleonos_syscall(CLEONOS_SYSCALL_DL_OPEN, (u64)path, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_dl_close(u64 handle) {
+    return cleonos_syscall(CLEONOS_SYSCALL_DL_CLOSE, handle, 0ULL, 0ULL);
+}
+
+u64 cleonos_sys_dl_sym(u64 handle, const char *symbol) {
+    return cleonos_syscall(CLEONOS_SYSCALL_DL_SYM, handle, (u64)symbol, 0ULL);
+}

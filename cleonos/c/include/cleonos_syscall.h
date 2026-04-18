@@ -119,6 +119,9 @@ typedef struct cleonos_proc_snapshot {
 #define CLEONOS_SYSCALL_FD_WRITE            74ULL
 #define CLEONOS_SYSCALL_FD_CLOSE            75ULL
 #define CLEONOS_SYSCALL_FD_DUP              76ULL
+#define CLEONOS_SYSCALL_DL_OPEN             77ULL
+#define CLEONOS_SYSCALL_DL_CLOSE            78ULL
+#define CLEONOS_SYSCALL_DL_SYM              79ULL
 
 u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 u64 cleonos_sys_log_write(const char *message, u64 length);
@@ -197,5 +200,8 @@ u64 cleonos_sys_fd_read(u64 fd, void *out_buffer, u64 size);
 u64 cleonos_sys_fd_write(u64 fd, const void *buffer, u64 size);
 u64 cleonos_sys_fd_close(u64 fd);
 u64 cleonos_sys_fd_dup(u64 fd);
+u64 cleonos_sys_dl_open(const char *path);
+u64 cleonos_sys_dl_close(u64 handle);
+u64 cleonos_sys_dl_sym(u64 handle, const char *symbol);
 
 #endif

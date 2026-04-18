@@ -32,7 +32,7 @@
 #define CLKS_SYSCALL_KDBG_STACK_WINDOW_BYTES (128ULL * 1024ULL)
 #define CLKS_SYSCALL_KERNEL_SYMBOL_FILE "/system/kernel.sym"
 #define CLKS_SYSCALL_KERNEL_ADDR_BASE 0xFFFF800000000000ULL
-#define CLKS_SYSCALL_STATS_MAX_ID     CLKS_SYSCALL_FD_DUP
+#define CLKS_SYSCALL_STATS_MAX_ID     CLKS_SYSCALL_DL_SYM
 #define CLKS_SYSCALL_STATS_RING_SIZE  256U
 
 struct clks_syscall_frame {
@@ -242,6 +242,30 @@ static u64 clks_syscall_fd_close(u64 arg0) {
 
 static u64 clks_syscall_fd_dup(u64 arg0) {
     return clks_exec_fd_dup(arg0);
+}
+
+static u64 clks_syscall_dl_open(u64 arg0) {
+    char path[CLKS_SYSCALL_PATH_MAX];
+
+    if (clks_syscall_copy_user_string(arg0, path, sizeof(path)) == CLKS_FALSE) {
+        return (u64)-1;
+    }
+
+    return clks_exec_dl_open(path);
+}
+
+static u64 clks_syscall_dl_close(u64 arg0) {
+    return clks_exec_dl_close(arg0);
+}
+
+static u64 clks_syscall_dl_sym(u64 arg0, u64 arg1) {
+    char symbol[CLKS_SYSCALL_NAME_MAX];
+
+    if (clks_syscall_copy_user_string(arg1, symbol, sizeof(symbol)) == CLKS_FALSE) {
+        return 0ULL;
+    }
+
+    return clks_exec_dl_sym(arg0, symbol);
 }
 
 static clks_bool clks_syscall_procfs_is_root(const char *path) {
@@ -1830,6 +1854,12 @@ u64 clks_syscall_dispatch(void *frame_ptr) {
             return clks_syscall_fd_close(frame->rbx);
         case CLKS_SYSCALL_FD_DUP:
             return clks_syscall_fd_dup(frame->rbx);
+        case CLKS_SYSCALL_DL_OPEN:
+            return clks_syscall_dl_open(frame->rbx);
+        case CLKS_SYSCALL_DL_CLOSE:
+            return clks_syscall_dl_close(frame->rbx);
+        case CLKS_SYSCALL_DL_SYM:
+            return clks_syscall_dl_sym(frame->rbx, frame->rcx);
         default:
             return (u64)-1;
     }

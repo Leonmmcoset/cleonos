@@ -80,6 +80,9 @@
 #define CLKS_SYSCALL_FD_WRITE            74ULL
 #define CLKS_SYSCALL_FD_CLOSE            75ULL
 #define CLKS_SYSCALL_FD_DUP              76ULL
+#define CLKS_SYSCALL_DL_OPEN             77ULL
+#define CLKS_SYSCALL_DL_CLOSE            78ULL
+#define CLKS_SYSCALL_DL_SYM              79ULL
 
 void clks_syscall_init(void);
 u64 clks_syscall_dispatch(void *frame_ptr);

@@ -1,4 +1,23 @@
 #include "cmd_runtime.h"
+#include <stdio.h>
+
+static void clio_write(const char *text) {
+    (void)fputs(text, 1);
+}
+
+static void clio_writeln(const char *text) {
+    (void)fputs(text, 1);
+    (void)putchar('\n');
+}
+
+static void clio_write_char(char ch) {
+    (void)putchar((unsigned char)ch);
+}
+
+static void clio_write_hex_u64(u64 value) {
+    (void)printf("0X%llX", (unsigned long long)value);
+}
+
 static int ush_ls_join_path(const char *dir_path, const char *name, char *out_path, u64 out_size) {
     u64 p = 0ULL;
     u64 i;
@@ -80,30 +99,30 @@ static int ush_ls_is_dot_entry(const char *name) {
 
 static void ush_ls_print_one(const char *name, u64 type, u64 size, int long_mode) {
     if (long_mode == 0) {
-        ush_writeln(name);
+        clio_writeln(name);
         return;
     }
 
     if (type == 2ULL) {
-        ush_write("d ");
+        clio_write("d ");
     } else if (type == 1ULL) {
-        ush_write("f ");
+        clio_write("f ");
     } else {
-        ush_write("? ");
+        clio_write("? ");
     }
 
-    ush_write(name);
+    clio_write(name);
 
     if (type == 1ULL) {
-        ush_write("  size=");
-        ush_write_hex_u64(size);
+        clio_write("  size=");
+        clio_write_hex_u64(size);
     } else if (type == 2ULL) {
-        ush_write("  <DIR>");
+        clio_write("  <DIR>");
     } else {
-        ush_write("  <UNKNOWN>");
+        clio_write("  <UNKNOWN>");
     }
 
-    ush_write_char('\n');
+    clio_write_char('\n');
 }
 
 static int ush_ls_parse_args(const char *arg,
@@ -186,19 +205,19 @@ static int ush_ls_dir(const char *path,
     u64 i;
 
     if (depth > 16ULL) {
-        ush_writeln("ls: recursion depth limit reached");
+        clio_writeln("ls: recursion depth limit reached");
         return 0;
     }
 
     count = cleonos_sys_fs_child_count(path);
 
     if (print_header != 0) {
-        ush_write(path);
-        ush_writeln(":");
+        clio_write(path);
+        clio_writeln(":");
     }
 
     if (count == 0ULL) {
-        ush_writeln("(empty)");
+        clio_writeln("(empty)");
     }
 
     for (i = 0ULL; i < count; i++) {
@@ -249,7 +268,7 @@ static int ush_ls_dir(const char *path,
         }
 
         if (cleonos_sys_fs_stat_type(child_path) == 2ULL) {
-            ush_write_char('\n');
+            clio_write_char('\n');
             (void)ush_ls_dir(child_path, long_mode, recursive, 1, depth + 1ULL);
         }
     }
@@ -265,12 +284,12 @@ static int ush_cmd_ls(const ush_state *sh, const char *arg) {
     int recursive;
 
     if (ush_ls_parse_args(arg, &long_mode, &recursive, target, (u64)sizeof(target)) == 0) {
-        ush_writeln("ls: usage ls [-l] [-R] [path]");
+        clio_writeln("ls: usage ls [-l] [-R] [path]");
         return 0;
     }
 
     if (ush_resolve_path(sh, target, path, (u64)sizeof(path)) == 0) {
-        ush_writeln("ls: invalid path");
+        clio_writeln("ls: invalid path");
         return 0;
     }
 
@@ -283,7 +302,7 @@ static int ush_cmd_ls(const ush_state *sh, const char *arg) {
     }
 
     if (type != 2ULL) {
-        ush_writeln("ls: path not found");
+        clio_writeln("ls: path not found");
         return 0;
     }
 

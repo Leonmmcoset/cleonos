@@ -1,4 +1,5 @@
 #include "cmd_runtime.h"
+#include <stdio.h>
 
 static int ush_tail_parse_args(const char *arg, u64 *out_line_count, char *out_file, u64 out_file_size) {
     char first[USH_PATH_MAX];
@@ -69,24 +70,24 @@ static int ush_tail_load_input(const ush_state *sh, const char *file_arg, const 
 
     if (file_arg != (const char *)0 && file_arg[0] != '\0') {
         if (ush_resolve_path(sh, file_arg, path, (u64)sizeof(path)) == 0) {
-            ush_writeln("tail: invalid path");
+            (void)puts("tail: invalid path");
             return 0;
         }
 
         if (cleonos_sys_fs_stat_type(path) != 1ULL) {
-            ush_writeln("tail: file not found");
+            (void)puts("tail: file not found");
             return 0;
         }
 
         size = cleonos_sys_fs_stat_size(path);
 
         if (size == (u64)-1) {
-            ush_writeln("tail: failed to stat file");
+            (void)puts("tail: failed to stat file");
             return 0;
         }
 
         if (size > (u64)USH_COPY_MAX) {
-            ush_writeln("tail: file too large for user buffer");
+            (void)puts("tail: file too large for user buffer");
             return 0;
         }
 
@@ -100,7 +101,7 @@ static int ush_tail_load_input(const ush_state *sh, const char *file_arg, const 
         got = cleonos_sys_fs_read(path, file_buf, size);
 
         if (got == 0ULL || got != size) {
-            ush_writeln("tail: read failed");
+            (void)puts("tail: read failed");
             return 0;
         }
 
@@ -111,7 +112,7 @@ static int ush_tail_load_input(const ush_state *sh, const char *file_arg, const 
     }
 
     if (ush_pipeline_stdin_text == (const char *)0) {
-        ush_writeln("tail: file path required (or pipeline input)");
+        (void)puts("tail: file path required (or pipeline input)");
         return 0;
     }
 
@@ -174,7 +175,7 @@ static int ush_cmd_tail(const ush_state *sh, const char *arg) {
     }
 
     if (ush_tail_parse_args(arg, &line_count, file_arg, (u64)sizeof(file_arg)) == 0) {
-        ush_writeln("tail: usage tail [-n N] [file]");
+        (void)puts("tail: usage tail [-n N] [file]");
         return 0;
     }
 
@@ -191,7 +192,7 @@ static int ush_cmd_tail(const ush_state *sh, const char *arg) {
     start_offset = ush_tail_find_start_offset(input, input_len, skip_lines);
 
     for (i = start_offset; i < input_len; i++) {
-        ush_write_char(input[i]);
+        (void)putchar((unsigned char)input[i]);
     }
 
     return 1;

@@ -4,16 +4,10 @@ const char *ush_pipeline_stdin_text = (const char *)0;
 u64 ush_pipeline_stdin_len = 0ULL;
 
 void ush_zero(void *ptr, u64 size) {
-    u64 i;
-    char *bytes = (char *)ptr;
-
-    if (bytes == (char *)0) {
+    if (ptr == (void *)0 || size == 0ULL) {
         return;
     }
-
-    for (i = 0ULL; i < size; i++) {
-        bytes[i] = 0;
-    }
+    (void)memset(ptr, 0, (size_t)size);
 }
 
 void ush_init_state(ush_state *sh) {
@@ -27,84 +21,47 @@ void ush_init_state(ush_state *sh) {
 }
 
 u64 ush_strlen(const char *str) {
-    u64 len = 0ULL;
-
-    if (str == (const char *)0) {
-        return 0ULL;
-    }
-
-    while (str[len] != '\0') {
-        len++;
-    }
-
-    return len;
+    return (str == (const char *)0) ? 0ULL : (u64)strlen(str);
 }
 
 int ush_streq(const char *left, const char *right) {
-    u64 i = 0ULL;
-
     if (left == (const char *)0 || right == (const char *)0) {
         return 0;
     }
-
-    while (left[i] != '\0' && right[i] != '\0') {
-        if (left[i] != right[i]) {
-            return 0;
-        }
-        i++;
-    }
-
-    return (left[i] == right[i]) ? 1 : 0;
+    return (strcmp(left, right) == 0) ? 1 : 0;
 }
 
 int ush_is_space(char ch) {
-    return (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') ? 1 : 0;
+    return (isspace((unsigned char)ch) != 0) ? 1 : 0;
 }
 
 int ush_is_printable(char ch) {
-    return (ch >= 32 && ch <= 126) ? 1 : 0;
+    return (isprint((unsigned char)ch) != 0) ? 1 : 0;
 }
 
 int ush_has_suffix(const char *name, const char *suffix) {
-    u64 name_len;
-    u64 suffix_len;
-    u64 i;
+    size_t name_len;
+    size_t suffix_len;
 
     if (name == (const char *)0 || suffix == (const char *)0) {
         return 0;
     }
 
-    name_len = ush_strlen(name);
-    suffix_len = ush_strlen(suffix);
+    name_len = strlen(name);
+    suffix_len = strlen(suffix);
 
     if (suffix_len > name_len) {
         return 0;
     }
 
-    for (i = 0ULL; i < suffix_len; i++) {
-        if (name[name_len - suffix_len + i] != suffix[i]) {
-            return 0;
-        }
-    }
-
-    return 1;
+    return (strncmp(name + (name_len - suffix_len), suffix, suffix_len) == 0) ? 1 : 0;
 }
 
 int ush_contains_char(const char *text, char needle) {
-    u64 i = 0ULL;
-
     if (text == (const char *)0) {
         return 0;
     }
-
-    while (text[i] != '\0') {
-        if (text[i] == needle) {
-            return 1;
-        }
-        i++;
-    }
-
-    return 0;
+    return (strchr(text, (int)needle) != (char *)0) ? 1 : 0;
 }
 
 int ush_parse_u64_dec(const char *text, u64 *out_value) {
@@ -118,7 +75,7 @@ int ush_parse_u64_dec(const char *text, u64 *out_value) {
     while (text[i] != '\0') {
         u64 digit;
 
-        if (text[i] < '0' || text[i] > '9') {
+        if (isdigit((unsigned char)text[i]) == 0) {
             return 0;
         }
 
@@ -137,45 +94,34 @@ int ush_parse_u64_dec(const char *text, u64 *out_value) {
 }
 
 void ush_copy(char *dst, u64 dst_size, const char *src) {
-    u64 i = 0ULL;
-
     if (dst == (char *)0 || src == (const char *)0 || dst_size == 0ULL) {
         return;
     }
-
-    while (src[i] != '\0' && i + 1ULL < dst_size) {
-        dst[i] = src[i];
-        i++;
-    }
-
-    dst[i] = '\0';
+    (void)strncpy(dst, src, (size_t)(dst_size - 1ULL));
+    dst[dst_size - 1ULL] = '\0';
 }
 
 void ush_trim_line(char *line) {
-    u64 start = 0ULL;
-    u64 i = 0ULL;
-    u64 len;
+    size_t start = 0U;
+    size_t len;
 
     if (line == (char *)0) {
         return;
     }
 
-    while (line[start] != '\0' && ush_is_space(line[start]) != 0) {
+    while (line[start] != '\0' && isspace((unsigned char)line[start]) != 0) {
         start++;
     }
 
-    if (start > 0ULL) {
-        while (line[start + i] != '\0') {
-            line[i] = line[start + i];
-            i++;
-        }
-        line[i] = '\0';
+    if (start > 0U) {
+        size_t remain = strlen(line + start) + 1U;
+        (void)memmove(line, line + start, remain);
     }
 
-    len = ush_strlen(line);
+    len = strlen(line);
 
-    while (len > 0ULL && ush_is_space(line[len - 1ULL]) != 0) {
-        line[len - 1ULL] = '\0';
+    while (len > 0U && isspace((unsigned char)line[len - 1U]) != 0) {
+        line[len - 1U] = '\0';
         len--;
     }
 }
@@ -220,37 +166,14 @@ void ush_parse_line(const char *line, char *out_cmd, u64 cmd_size, char *out_arg
 }
 
 void ush_write(const char *text) {
-    u64 len;
-    const char *cursor;
-    u64 left;
-
     if (text == (const char *)0) {
         return;
     }
-
-    len = ush_strlen(text);
-
-    if (len == 0ULL) {
-        return;
-    }
-
-    cursor = text;
-    left = len;
-
-    while (left > 0ULL) {
-        u64 wrote = cleonos_sys_fd_write(1ULL, cursor, left);
-
-        if (wrote == 0ULL || wrote == (u64)-1) {
-            break;
-        }
-
-        cursor += wrote;
-        left -= wrote;
-    }
+    (void)fputs(text, 1);
 }
 
 void ush_write_char(char ch) {
-    (void)cleonos_sys_fd_write(1ULL, &ch, 1ULL);
+    (void)fputc((int)(unsigned char)ch, 1);
 }
 
 void ush_writeln(const char *text) {
@@ -470,11 +393,9 @@ int ush_path_is_under_system(const char *path) {
     if (path == (const char *)0) {
         return 0;
     }
-
-    if (path[0] != '/' || path[1] != 's' || path[2] != 'y' || path[3] != 's' || path[4] != 't' || path[5] != 'e' || path[6] != 'm') {
+    if (strncmp(path, "/system", 7U) != 0) {
         return 0;
     }
-
     return (path[7] == '\0' || path[7] == '/') ? 1 : 0;
 }
 
@@ -482,11 +403,9 @@ int ush_path_is_under_temp(const char *path) {
     if (path == (const char *)0) {
         return 0;
     }
-
-    if (path[0] != '/' || path[1] != 't' || path[2] != 'e' || path[3] != 'm' || path[4] != 'p') {
+    if (strncmp(path, "/temp", 5U) != 0) {
         return 0;
     }
-
     return (path[5] == '\0' || path[5] == '/') ? 1 : 0;
 }
 

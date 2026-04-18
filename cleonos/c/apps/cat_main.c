@@ -1,4 +1,6 @@
 #include "cmd_runtime.h"
+#include <stdio.h>
+
 static int ush_cmd_cat(const ush_state *sh, const char *arg) {
     char path[USH_PATH_MAX];
     char buf[USH_CAT_MAX + 1ULL];
@@ -8,28 +10,28 @@ static int ush_cmd_cat(const ush_state *sh, const char *arg) {
 
     if (arg == (const char *)0 || arg[0] == '\0') {
         if (ush_pipeline_stdin_text != (const char *)0 && ush_pipeline_stdin_len > 0ULL) {
-            ush_write(ush_pipeline_stdin_text);
+            (void)fputs(ush_pipeline_stdin_text, 1);
             return 1;
         }
 
-        ush_writeln("cat: file path required");
+        (void)puts("cat: file path required");
         return 0;
     }
 
     if (ush_resolve_path(sh, arg, path, (u64)sizeof(path)) == 0) {
-        ush_writeln("cat: invalid path");
+        (void)puts("cat: invalid path");
         return 0;
     }
 
     if (cleonos_sys_fs_stat_type(path) != 1ULL) {
-        ush_writeln("cat: file not found");
+        (void)puts("cat: file not found");
         return 0;
     }
 
     size = cleonos_sys_fs_stat_size(path);
 
     if (size == (u64)-1) {
-        ush_writeln("cat: failed to stat file");
+        (void)puts("cat: failed to stat file");
         return 0;
     }
 
@@ -41,7 +43,7 @@ static int ush_cmd_cat(const ush_state *sh, const char *arg) {
     got = cleonos_sys_fs_read(path, buf, req);
 
     if (got == 0ULL) {
-        ush_writeln("cat: read failed");
+        (void)puts("cat: read failed");
         return 0;
     }
 
@@ -50,10 +52,10 @@ static int ush_cmd_cat(const ush_state *sh, const char *arg) {
     }
 
     buf[got] = '\0';
-    ush_writeln(buf);
+    (void)puts(buf);
 
     if (size > got) {
-        ush_writeln("[cat] output truncated");
+        (void)puts("[cat] output truncated");
     }
 
     return 1;

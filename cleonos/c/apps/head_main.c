@@ -1,4 +1,5 @@
 #include "cmd_runtime.h"
+#include <stdio.h>
 
 static int ush_head_parse_args(const char *arg, u64 *out_line_count, char *out_file, u64 out_file_size) {
     char first[USH_PATH_MAX];
@@ -69,24 +70,24 @@ static int ush_head_load_input(const ush_state *sh, const char *file_arg, const 
 
     if (file_arg != (const char *)0 && file_arg[0] != '\0') {
         if (ush_resolve_path(sh, file_arg, path, (u64)sizeof(path)) == 0) {
-            ush_writeln("head: invalid path");
+            (void)puts("head: invalid path");
             return 0;
         }
 
         if (cleonos_sys_fs_stat_type(path) != 1ULL) {
-            ush_writeln("head: file not found");
+            (void)puts("head: file not found");
             return 0;
         }
 
         size = cleonos_sys_fs_stat_size(path);
 
         if (size == (u64)-1) {
-            ush_writeln("head: failed to stat file");
+            (void)puts("head: failed to stat file");
             return 0;
         }
 
         if (size > (u64)USH_COPY_MAX) {
-            ush_writeln("head: file too large for user buffer");
+            (void)puts("head: file too large for user buffer");
             return 0;
         }
 
@@ -100,7 +101,7 @@ static int ush_head_load_input(const ush_state *sh, const char *file_arg, const 
         got = cleonos_sys_fs_read(path, file_buf, size);
 
         if (got == 0ULL || got != size) {
-            ush_writeln("head: read failed");
+            (void)puts("head: read failed");
             return 0;
         }
 
@@ -111,7 +112,7 @@ static int ush_head_load_input(const ush_state *sh, const char *file_arg, const 
     }
 
     if (ush_pipeline_stdin_text == (const char *)0) {
-        ush_writeln("head: file path required (or pipeline input)");
+        (void)puts("head: file path required (or pipeline input)");
         return 0;
     }
 
@@ -133,7 +134,7 @@ static void ush_head_emit(const char *input, u64 input_len, u64 line_count) {
             break;
         }
 
-        ush_write_char(input[i]);
+        (void)putchar((unsigned char)input[i]);
 
         if (input[i] == '\n') {
             emitted++;
@@ -152,7 +153,7 @@ static int ush_cmd_head(const ush_state *sh, const char *arg) {
     }
 
     if (ush_head_parse_args(arg, &line_count, file_arg, (u64)sizeof(file_arg)) == 0) {
-        ush_writeln("head: usage head [-n N] [file]");
+        (void)puts("head: usage head [-n N] [file]");
         return 0;
     }
 

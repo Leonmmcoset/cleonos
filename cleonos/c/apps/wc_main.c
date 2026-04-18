@@ -1,11 +1,12 @@
 #include "cmd_runtime.h"
+#include <stdio.h>
 
 static void ush_wc_write_u64_dec(u64 value) {
     char tmp[32];
     u64 len = 0ULL;
 
     if (value == 0ULL) {
-        ush_write_char('0');
+        (void)putchar('0');
         return;
     }
 
@@ -16,7 +17,7 @@ static void ush_wc_write_u64_dec(u64 value) {
 
     while (len > 0ULL) {
         len--;
-        ush_write_char(tmp[len]);
+        (void)putchar((unsigned char)tmp[len]);
     }
 }
 
@@ -61,24 +62,24 @@ static int ush_wc_load_input(const ush_state *sh, const char *file_arg, const ch
 
     if (file_arg != (const char *)0 && file_arg[0] != '\0') {
         if (ush_resolve_path(sh, file_arg, path, (u64)sizeof(path)) == 0) {
-            ush_writeln("wc: invalid path");
+            (void)puts("wc: invalid path");
             return 0;
         }
 
         if (cleonos_sys_fs_stat_type(path) != 1ULL) {
-            ush_writeln("wc: file not found");
+            (void)puts("wc: file not found");
             return 0;
         }
 
         size = cleonos_sys_fs_stat_size(path);
 
         if (size == (u64)-1) {
-            ush_writeln("wc: failed to stat file");
+            (void)puts("wc: failed to stat file");
             return 0;
         }
 
         if (size > (u64)USH_COPY_MAX) {
-            ush_writeln("wc: file too large for user buffer");
+            (void)puts("wc: file too large for user buffer");
             return 0;
         }
 
@@ -92,7 +93,7 @@ static int ush_wc_load_input(const ush_state *sh, const char *file_arg, const ch
         got = cleonos_sys_fs_read(path, file_buf, size);
 
         if (got == 0ULL || got != size) {
-            ush_writeln("wc: read failed");
+            (void)puts("wc: read failed");
             return 0;
         }
 
@@ -103,7 +104,7 @@ static int ush_wc_load_input(const ush_state *sh, const char *file_arg, const ch
     }
 
     if (ush_pipeline_stdin_text == (const char *)0) {
-        ush_writeln("wc: file path required (or pipeline input)");
+        (void)puts("wc: file path required (or pipeline input)");
         return 0;
     }
 
@@ -127,7 +128,7 @@ static int ush_cmd_wc(const ush_state *sh, const char *arg) {
     }
 
     if (ush_wc_parse_args(arg, file_arg, (u64)sizeof(file_arg)) == 0) {
-        ush_writeln("wc: usage wc [file]");
+        (void)puts("wc: usage wc [file]");
         return 0;
     }
 
@@ -153,11 +154,11 @@ static int ush_cmd_wc(const ush_state *sh, const char *arg) {
     }
 
     ush_wc_write_u64_dec(lines);
-    ush_write(" ");
+    (void)putchar(' ');
     ush_wc_write_u64_dec(words);
-    ush_write(" ");
+    (void)putchar(' ');
     ush_wc_write_u64_dec(bytes);
-    ush_write_char('\n');
+    (void)putchar('\n');
 
     return 1;
 }

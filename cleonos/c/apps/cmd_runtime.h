@@ -2,6 +2,10 @@
 #define CLEONOS_CMD_RUNTIME_H
 
 #include <cleonos_syscall.h>
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef long long i64;
 

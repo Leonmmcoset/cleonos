@@ -1,11 +1,11 @@
-#include <cleonos_syscall.h>
+#include <stdio.h>
 
 int cleonos_app_main(void) {
     static const char banner[] =
         "spin: busy loop started (test Alt+Ctrl+C force stop)\n";
-    volatile u64 noise = 0xC1E0C1E0ULL;
+    volatile unsigned long long noise = 0xC1E0C1E0ULL;
 
-    (void)cleonos_sys_fd_write(1ULL, banner, (u64)(sizeof(banner) - 1U));
+    (void)fputs(banner, 1);
 
     for (;;) {
         noise ^= (noise << 7);

@@ -5,106 +5,53 @@ void ush_init_state(ush_state *sh) {
         return;
     }
 
-    sh->line[0] = '\0';
-    sh->line_len = 0ULL;
-    sh->cursor = 0ULL;
-    sh->rendered_len = 0ULL;
+    (void)memset(sh, 0, sizeof(*sh));
 
     ush_copy(sh->cwd, (u64)sizeof(sh->cwd), "/");
-
-    sh->history_count = 0ULL;
     sh->history_nav = -1;
-    sh->nav_saved_line[0] = '\0';
-    sh->nav_saved_len = 0ULL;
-    sh->nav_saved_cursor = 0ULL;
-
-    sh->cmd_total = 0ULL;
-    sh->cmd_ok = 0ULL;
-    sh->cmd_fail = 0ULL;
-    sh->cmd_unknown = 0ULL;
-    sh->exit_requested = 0;
-    sh->exit_code = 0ULL;
 }
 
 u64 ush_strlen(const char *str) {
-    u64 len = 0ULL;
-
-    if (str == (const char *)0) {
-        return 0ULL;
-    }
-
-    while (str[len] != '\0') {
-        len++;
-    }
-
-    return len;
+    return (str == (const char *)0) ? 0ULL : (u64)strlen(str);
 }
 
 int ush_streq(const char *left, const char *right) {
-    u64 i = 0ULL;
-
     if (left == (const char *)0 || right == (const char *)0) {
         return 0;
     }
-
-    while (left[i] != '\0' && right[i] != '\0') {
-        if (left[i] != right[i]) {
-            return 0;
-        }
-        i++;
-    }
-
-    return (left[i] == right[i]) ? 1 : 0;
+    return (strcmp(left, right) == 0) ? 1 : 0;
 }
 
 int ush_is_space(char ch) {
-    return (ch == ' ' || ch == '\t' || ch == '\r' || ch == '\n') ? 1 : 0;
+    return (isspace((unsigned char)ch) != 0) ? 1 : 0;
 }
 
 int ush_is_printable(char ch) {
-    return (ch >= 32 && ch <= 126) ? 1 : 0;
+    return (isprint((unsigned char)ch) != 0) ? 1 : 0;
 }
 
 int ush_has_suffix(const char *name, const char *suffix) {
-    u64 name_len;
-    u64 suffix_len;
-    u64 i;
+    size_t name_len;
+    size_t suffix_len;
 
     if (name == (const char *)0 || suffix == (const char *)0) {
         return 0;
     }
 
-    name_len = ush_strlen(name);
-    suffix_len = ush_strlen(suffix);
+    name_len = strlen(name);
+    suffix_len = strlen(suffix);
 
     if (suffix_len > name_len) {
         return 0;
     }
-
-    for (i = 0ULL; i < suffix_len; i++) {
-        if (name[name_len - suffix_len + i] != suffix[i]) {
-            return 0;
-        }
-    }
-
-    return 1;
+    return (strncmp(name + (name_len - suffix_len), suffix, suffix_len) == 0) ? 1 : 0;
 }
 
 int ush_contains_char(const char *text, char needle) {
-    u64 i = 0ULL;
-
     if (text == (const char *)0) {
         return 0;
     }
-
-    while (text[i] != '\0') {
-        if (text[i] == needle) {
-            return 1;
-        }
-        i++;
-    }
-
-    return 0;
+    return (strchr(text, (int)needle) != (char *)0) ? 1 : 0;
 }
 
 int ush_parse_u64_dec(const char *text, u64 *out_value) {
@@ -118,7 +65,7 @@ int ush_parse_u64_dec(const char *text, u64 *out_value) {
     while (text[i] != '\0') {
         u64 digit;
 
-        if (text[i] < '0' || text[i] > '9') {
+        if (isdigit((unsigned char)text[i]) == 0) {
             return 0;
         }
 
@@ -137,45 +84,34 @@ int ush_parse_u64_dec(const char *text, u64 *out_value) {
 }
 
 void ush_copy(char *dst, u64 dst_size, const char *src) {
-    u64 i = 0ULL;
-
     if (dst == (char *)0 || src == (const char *)0 || dst_size == 0ULL) {
         return;
     }
-
-    while (src[i] != '\0' && i + 1ULL < dst_size) {
-        dst[i] = src[i];
-        i++;
-    }
-
-    dst[i] = '\0';
+    (void)strncpy(dst, src, (size_t)(dst_size - 1ULL));
+    dst[dst_size - 1ULL] = '\0';
 }
 
 void ush_trim_line(char *line) {
-    u64 start = 0ULL;
-    u64 i = 0ULL;
-    u64 len;
+    size_t start = 0U;
+    size_t len;
 
     if (line == (char *)0) {
         return;
     }
 
-    while (line[start] != '\0' && ush_is_space(line[start]) != 0) {
+    while (line[start] != '\0' && isspace((unsigned char)line[start]) != 0) {
         start++;
     }
 
-    if (start > 0ULL) {
-        while (line[start + i] != '\0') {
-            line[i] = line[start + i];
-            i++;
-        }
-        line[i] = '\0';
+    if (start > 0U) {
+        size_t remain = strlen(line + start) + 1U;
+        (void)memmove(line, line + start, remain);
     }
 
-    len = ush_strlen(line);
+    len = strlen(line);
 
-    while (len > 0ULL && ush_is_space(line[len - 1ULL]) != 0) {
-        line[len - 1ULL] = '\0';
+    while (len > 0U && isspace((unsigned char)line[len - 1U]) != 0) {
+        line[len - 1U] = '\0';
         len--;
     }
 }
@@ -231,7 +167,6 @@ static int ush_out_fd_mirror_tty = 1;
 
 static void ush_output_capture_append(const char *text, u64 len) {
     u64 writable;
-    u64 i;
 
     if (ush_out_capture_active == 0 || text == (const char *)0 || len == 0ULL) {
         return;
@@ -254,9 +189,7 @@ static void ush_output_capture_append(const char *text, u64 len) {
         ush_out_capture_truncated = 1;
     }
 
-    for (i = 0ULL; i < len; i++) {
-        ush_out_capture_buffer[ush_out_capture_length + i] = text[i];
-    }
+    (void)memcpy(ush_out_capture_buffer + ush_out_capture_length, text, (size_t)len);
 
     ush_out_capture_length += len;
     ush_out_capture_buffer[ush_out_capture_length] = '\0';
@@ -341,19 +274,7 @@ void ush_write(const char *text) {
     }
 
     if (should_write_tty != 0) {
-        const char *cursor = text;
-        u64 left = len;
-
-        while (left > 0ULL) {
-            u64 wrote = cleonos_sys_fd_write(1ULL, cursor, left);
-
-            if (wrote == 0ULL || wrote == (u64)-1) {
-                break;
-            }
-
-            cursor += wrote;
-            left -= wrote;
-        }
+        (void)fputs(text, 1);
     }
 }
 
@@ -377,7 +298,7 @@ void ush_write_char(char ch) {
     }
 
     if (should_write_tty != 0) {
-        (void)cleonos_sys_fd_write(1ULL, &ch, 1ULL);
+        (void)fputc((int)(unsigned char)ch, 1);
     }
 }
 

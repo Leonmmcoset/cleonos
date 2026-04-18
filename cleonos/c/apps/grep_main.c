@@ -1,10 +1,12 @@
 #include "cmd_runtime.h"
+#include <stdio.h>
+
 static void ush_grep_write_u64_dec(u64 value) {
     char tmp[32];
     u64 len = 0ULL;
 
     if (value == 0ULL) {
-        ush_write_char('0');
+        (void)putchar('0');
         return;
     }
 
@@ -15,7 +17,7 @@ static void ush_grep_write_u64_dec(u64 value) {
 
     while (len > 0ULL) {
         len--;
-        ush_write_char(tmp[len]);
+        (void)putchar((unsigned char)tmp[len]);
     }
 }
 
@@ -73,14 +75,14 @@ static u64 ush_grep_emit_matches(const char *input, u64 input_len, const char *p
 
                 if (with_line_number != 0) {
                     ush_grep_write_u64_dec(line_no);
-                    ush_write(":");
+                    (void)fputs(":", 1);
                 }
 
                 for (j = 0ULL; j < line_len; j++) {
-                    ush_write_char(input[start + j]);
+                    (void)putchar((unsigned char)input[start + j]);
                 }
 
-                ush_write_char('\n');
+                (void)putchar('\n');
             }
 
             start = i + 1ULL;
@@ -108,12 +110,12 @@ static int ush_cmd_grep(const ush_state *sh, const char *arg) {
     static char file_buf[USH_COPY_MAX + 1U];
 
     if (sh == (const ush_state *)0 || arg == (const char *)0 || arg[0] == '\0') {
-        ush_writeln("grep: usage grep [-n] <pattern> [file]");
+        (void)puts("grep: usage grep [-n] <pattern> [file]");
         return 0;
     }
 
     if (ush_split_first_and_rest(arg, first, (u64)sizeof(first), &rest) == 0) {
-        ush_writeln("grep: usage grep [-n] <pattern> [file]");
+        (void)puts("grep: usage grep [-n] <pattern> [file]");
         return 0;
     }
 
@@ -121,7 +123,7 @@ static int ush_cmd_grep(const ush_state *sh, const char *arg) {
         with_line_number = 1;
 
         if (ush_split_first_and_rest(rest, second, (u64)sizeof(second), &rest2) == 0) {
-            ush_writeln("grep: usage grep [-n] <pattern> [file]");
+            (void)puts("grep: usage grep [-n] <pattern> [file]");
             return 0;
         }
 
@@ -133,43 +135,43 @@ static int ush_cmd_grep(const ush_state *sh, const char *arg) {
 
     if (rest != (const char *)0 && rest[0] != '\0') {
         if (ush_split_first_and_rest(rest, third, (u64)sizeof(third), &rest2) == 0) {
-            ush_writeln("grep: usage grep [-n] <pattern> [file]");
+            (void)puts("grep: usage grep [-n] <pattern> [file]");
             return 0;
         }
 
         file_arg = third;
 
         if (rest2 != (const char *)0 && rest2[0] != '\0') {
-            ush_writeln("grep: usage grep [-n] <pattern> [file]");
+            (void)puts("grep: usage grep [-n] <pattern> [file]");
             return 0;
         }
     }
 
     if (pattern == (const char *)0 || pattern[0] == '\0') {
-        ush_writeln("grep: pattern required");
+        (void)puts("grep: pattern required");
         return 0;
     }
 
     if (file_arg != (const char *)0) {
         if (ush_resolve_path(sh, file_arg, path, (u64)sizeof(path)) == 0) {
-            ush_writeln("grep: invalid path");
+            (void)puts("grep: invalid path");
             return 0;
         }
 
         if (cleonos_sys_fs_stat_type(path) != 1ULL) {
-            ush_writeln("grep: file not found");
+            (void)puts("grep: file not found");
             return 0;
         }
 
         size = cleonos_sys_fs_stat_size(path);
 
         if (size == (u64)-1) {
-            ush_writeln("grep: failed to stat file");
+            (void)puts("grep: failed to stat file");
             return 0;
         }
 
         if (size > (u64)USH_COPY_MAX) {
-            ush_writeln("grep: file too large for user buffer");
+            (void)puts("grep: file too large for user buffer");
             return 0;
         }
 
@@ -180,7 +182,7 @@ static int ush_cmd_grep(const ush_state *sh, const char *arg) {
         got = cleonos_sys_fs_read(path, file_buf, size);
 
         if (got == 0ULL || got != size) {
-            ush_writeln("grep: read failed");
+            (void)puts("grep: read failed");
             return 0;
         }
 
@@ -189,7 +191,7 @@ static int ush_cmd_grep(const ush_state *sh, const char *arg) {
         input_len = got;
     } else {
         if (ush_pipeline_stdin_text == (const char *)0) {
-            ush_writeln("grep: file path required (or pipeline input)");
+            (void)puts("grep: file path required (or pipeline input)");
             return 0;
         }
 

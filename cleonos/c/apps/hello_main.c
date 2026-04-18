@@ -1,7 +1,6 @@
-#include <cleonos_syscall.h>
+#include <stdio.h>
 
 int cleonos_app_main(void) {
-    static const char msg[] = "[USER][HELLO] Hello world from /hello.elf\n";
-    (void)cleonos_sys_fd_write(1ULL, msg, (u64)(sizeof(msg) - 1U));
+    (void)printf("[USER][HELLO] Hello world from %s\n", "/hello.elf");
     return 0;
 }

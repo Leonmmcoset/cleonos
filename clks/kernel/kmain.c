@@ -74,6 +74,7 @@
 #define CLKS_CFG_USRD_TASK 1
 #endif
 
+#if CLKS_CFG_KLOGD_TASK
 static void clks_task_klogd(u64 tick) {
     static u64 last_emit = 0ULL;
 
@@ -84,7 +85,9 @@ static void clks_task_klogd(u64 tick) {
         last_emit = tick;
     }
 }
+#endif
 
+#if CLKS_CFG_KWORKER_TASK
 static void clks_task_kworker(u64 tick) {
     static u32 phase = 0U;
 
@@ -107,16 +110,16 @@ static void clks_task_kworker(u64 tick) {
 
     phase = (phase + 1U) & 3U;
 }
+#endif
 
-static void clks_task_kelfd(u64 tick) {
 #if CLKS_CFG_KELF
+static void clks_task_kelfd(u64 tick) {
     clks_service_heartbeat(CLKS_SERVICE_KELF, tick);
     clks_kelf_tick(tick);
-#else
-    (void)tick;
-#endif
 }
+#endif
 
+#if CLKS_CFG_USRD_TASK
 static void clks_task_usrd(u64 tick) {
     clks_service_heartbeat(CLKS_SERVICE_USER, tick);
     clks_exec_tick(tick);
@@ -127,6 +130,7 @@ static void clks_task_usrd(u64 tick) {
     clks_tty_tick(tick);
     clks_shell_tick(tick);
 }
+#endif
 
 void clks_kernel_main(void) {
     const struct limine_framebuffer *boot_fb;

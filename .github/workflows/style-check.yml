@@ -12,6 +12,8 @@ permissions:
 jobs:
   clang-format:
     runs-on: ubuntu-latest
+    env:
+      STYLE_FIX_BRANCH: codex/style-autofix-${{ github.run_id }}-${{ github.run_attempt }}
 
     steps:
       - name: Checkout
@@ -80,10 +82,12 @@ jobs:
           git diff -- "${files[@]}"
 
       - name: Create auto-fix PR
+        id: cpr
         if: steps.format.outputs.changed == 'true' && steps.capability.outputs.can_fix == 'true'
+        continue-on-error: true
         uses: peter-evans/create-pull-request@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.STYLE_PR_TOKEN != '' && secrets.STYLE_PR_TOKEN || secrets.GITHUB_TOKEN }}
           commit-message: "style: auto-format C/C++ sources with clang-format"
           title: "style: auto-format C/C++ sources"
           body: |
@@ -92,12 +96,27 @@ jobs:
             - Trigger: `${{ github.event_name }}`
             - Base branch: `${{ steps.base.outputs.base_ref }}`
             - Formatter: `clang-format`
-          branch: codex/style-autofix-${{ github.run_id }}-${{ github.run_attempt }}
+          branch: ${{ env.STYLE_FIX_BRANCH }}
           base: ${{ steps.base.outputs.base_ref }}
           delete-branch: true
           labels: |
             automated
             style
+
+      - name: Report auto-fix PR result
+        if: steps.format.outputs.changed == 'true' && steps.capability.outputs.can_fix == 'true'
+        shell: bash
+        run: |
+          if [[ "${{ steps.cpr.outcome }}" == "success" ]]; then
+            echo "Auto-fix PR created: ${{ steps.cpr.outputs.pull-request-url }}"
+            exit 0
+          fi
+
+          echo "::warning::Auto-fix branch was pushed, but PR creation is blocked by repository policy."
+          echo "::warning::Enable 'Allow GitHub Actions to create and approve pull requests' OR set secret STYLE_PR_TOKEN (PAT with repo scope)."
+          echo "Manual PR URL:"
+          echo "https://github.com/${{ github.repository }}/compare/${{ steps.base.outputs.base_ref }}...${{ env.STYLE_FIX_BRANCH }}?expand=1"
+          exit 0
 
       - name: Fail when style drift cannot be auto-fixed
         if: steps.format.outputs.changed == 'true' && steps.capability.outputs.can_fix != 'true'

@@ -1,6 +1,5 @@
 #include "cmd_runtime.h"
 
-#define USH_WAVPLAY_FILE_MAX       65536ULL
 #define USH_WAVPLAY_DEFAULT_STEPS    256ULL
 #define USH_WAVPLAY_MAX_STEPS       4096ULL
 #define USH_WAVPLAY_DEFAULT_TICKS      1ULL
@@ -8,7 +7,6 @@
 #define USH_WAVPLAY_RUN_TICK_MAX     512ULL
 
 typedef struct ush_wav_info {
-    const unsigned char *data;
     u64 data_size;
     u64 frame_count;
     u64 sample_rate;
@@ -16,8 +14,6 @@ typedef struct ush_wav_info {
     u64 bits_per_sample;
     u64 block_align;
 } ush_wav_info;
-
-static unsigned char ush_wavplay_file_buf[USH_WAVPLAY_FILE_MAX + 1ULL];
 
 static unsigned int ush_wav_le16(const unsigned char *ptr) {
     return (unsigned int)ptr[0] | ((unsigned int)ptr[1] << 8U);
@@ -41,6 +37,50 @@ static int ush_wav_tag_eq(const unsigned char *tag, const char *lit4) {
             tag[3] == (unsigned char)lit4[3])
                ? 1
                : 0;
+}
+
+static int ush_wav_read_exact(u64 fd, unsigned char *out, u64 size) {
+    u64 done = 0ULL;
+
+    if (out == (unsigned char *)0 || size == 0ULL) {
+        return 0;
+    }
+
+    while (done < size) {
+        u64 got = cleonos_sys_fd_read(fd, out + done, size - done);
+
+        if (got == (u64)-1 || got == 0ULL) {
+            return 0;
+        }
+
+        done += got;
+    }
+
+    return 1;
+}
+
+static int ush_wav_skip_bytes(u64 fd, u64 size) {
+    unsigned char scratch[256];
+    u64 remaining = size;
+
+    while (remaining > 0ULL) {
+        u64 req = remaining;
+        u64 got;
+
+        if (req > (u64)sizeof(scratch)) {
+            req = (u64)sizeof(scratch);
+        }
+
+        got = cleonos_sys_fd_read(fd, scratch, req);
+
+        if (got == (u64)-1 || got == 0ULL) {
+            return 0;
+        }
+
+        remaining -= got;
+    }
+
+    return 1;
 }
 
 static void ush_wavplay_write_u64_dec(u64 value) {
@@ -84,70 +124,79 @@ static void ush_wavplay_print_meta(const char *path, const ush_wav_info *info, u
     ush_write_char('\n');
 }
 
-static int ush_wav_parse(const unsigned char *buffer, u64 size, ush_wav_info *out_info) {
-    u64 offset = 12ULL;
+static int ush_wav_parse_stream(u64 fd, ush_wav_info *out_info) {
+    unsigned char riff_header[12];
+    unsigned char chunk_header[8];
+    unsigned char fmt_min[16];
     int found_fmt = 0;
     int found_data = 0;
     u64 sample_rate = 0ULL;
     u64 channels = 0ULL;
     u64 bits = 0ULL;
     u64 block_align = 0ULL;
-    const unsigned char *data = (const unsigned char *)0;
     u64 data_size = 0ULL;
 
-    if (buffer == (const unsigned char *)0 || out_info == (ush_wav_info *)0) {
+    if (out_info == (ush_wav_info *)0) {
         return 0;
     }
 
-    if (size < 12ULL) {
+    if (ush_wav_read_exact(fd, riff_header, (u64)sizeof(riff_header)) == 0) {
         return 0;
     }
 
-    if (ush_wav_tag_eq(&buffer[0], "RIFF") == 0 || ush_wav_tag_eq(&buffer[8], "WAVE") == 0) {
+    if (ush_wav_tag_eq(&riff_header[0], "RIFF") == 0 || ush_wav_tag_eq(&riff_header[8], "WAVE") == 0) {
         return 0;
     }
 
-    while (offset + 8ULL <= size) {
-        const unsigned char *chunk_tag = &buffer[offset];
-        u64 chunk_size = (u64)ush_wav_le32(&buffer[offset + 4ULL]);
-        u64 chunk_data = offset + 8ULL;
-        u64 next_offset;
+    while (found_data == 0) {
+        const unsigned char *chunk_tag;
+        u64 chunk_size;
 
-        if (chunk_data > size || chunk_size > (size - chunk_data)) {
+        if (ush_wav_read_exact(fd, chunk_header, (u64)sizeof(chunk_header)) == 0) {
             return 0;
         }
+
+        chunk_tag = &chunk_header[0];
+        chunk_size = (u64)ush_wav_le32(&chunk_header[4]);
 
         if (ush_wav_tag_eq(chunk_tag, "fmt ") != 0) {
             if (chunk_size < 16ULL) {
                 return 0;
             }
 
-            if (ush_wav_le16(&buffer[chunk_data + 0ULL]) != 1U) {
+            if (ush_wav_read_exact(fd, fmt_min, (u64)sizeof(fmt_min)) == 0) {
                 return 0;
             }
 
-            channels = (u64)ush_wav_le16(&buffer[chunk_data + 2ULL]);
-            sample_rate = (u64)ush_wav_le32(&buffer[chunk_data + 4ULL]);
-            block_align = (u64)ush_wav_le16(&buffer[chunk_data + 12ULL]);
-            bits = (u64)ush_wav_le16(&buffer[chunk_data + 14ULL]);
+            if (ush_wav_le16(&fmt_min[0]) != 1U) {
+                return 0;
+            }
+
+            channels = (u64)ush_wav_le16(&fmt_min[2]);
+            sample_rate = (u64)ush_wav_le32(&fmt_min[4]);
+            block_align = (u64)ush_wav_le16(&fmt_min[12]);
+            bits = (u64)ush_wav_le16(&fmt_min[14]);
             found_fmt = 1;
+
+            if (chunk_size > 16ULL) {
+                if (ush_wav_skip_bytes(fd, chunk_size - 16ULL) == 0) {
+                    return 0;
+                }
+            }
         } else if (ush_wav_tag_eq(chunk_tag, "data") != 0) {
-            data = &buffer[chunk_data];
             data_size = chunk_size;
             found_data = 1;
+        } else {
+            if (ush_wav_skip_bytes(fd, chunk_size) == 0) {
+                return 0;
+            }
         }
 
-        next_offset = chunk_data + chunk_size;
-
-        if ((chunk_size & 1ULL) != 0ULL) {
-            next_offset++;
+        if ((chunk_size & 1ULL) != 0ULL && found_data == 0) {
+            if (ush_wav_skip_bytes(fd, 1ULL) == 0) {
+                return 0;
+            }
         }
-
-        if (next_offset <= offset || next_offset > size) {
-            break;
-        }
-
-        offset = next_offset;
     }
 
     if (found_fmt == 0 || found_data == 0) {
@@ -166,7 +215,6 @@ static int ush_wav_parse(const unsigned char *buffer, u64 size, ush_wav_info *ou
         return 0;
     }
 
-    out_info->data = data;
     out_info->data_size = data_size;
     out_info->sample_rate = sample_rate;
     out_info->channels = channels;
@@ -177,18 +225,10 @@ static int ush_wav_parse(const unsigned char *buffer, u64 size, ush_wav_info *ou
     return (out_info->frame_count > 0ULL) ? 1 : 0;
 }
 
-static u64 ush_wav_sample_deviation(const ush_wav_info *info, u64 frame_index) {
-    const unsigned char *frame;
-
-    if (info == (const ush_wav_info *)0 || info->data == (const unsigned char *)0 || info->frame_count == 0ULL) {
+static u64 ush_wav_frame_deviation(const ush_wav_info *info, const unsigned char *frame) {
+    if (info == (const ush_wav_info *)0 || frame == (const unsigned char *)0) {
         return 0ULL;
     }
-
-    if (frame_index >= info->frame_count) {
-        frame_index = info->frame_count - 1ULL;
-    }
-
-    frame = &info->data[frame_index * info->block_align];
 
     if (info->bits_per_sample == 8ULL) {
         unsigned int left = (unsigned int)frame[0];
@@ -309,12 +349,13 @@ static int ush_wavplay_parse_args(const char *arg,
 static int ush_cmd_wavplay(const ush_state *sh, const char *arg) {
     char path_arg[USH_PATH_MAX];
     char abs_path[USH_PATH_MAX];
+    unsigned char frame_buf[8];
     ush_wav_info info;
-    u64 file_size;
-    u64 got;
+    u64 fd;
     u64 steps;
     u64 ticks_per_step;
     u64 stride;
+    u64 current_frame = 0ULL;
     u64 i;
     u64 run_freq = 0ULL;
     u64 run_ticks = 0ULL;
@@ -351,27 +392,21 @@ static int ush_cmd_wavplay(const ush_state *sh, const char *arg) {
         return 0;
     }
 
-    file_size = cleonos_sys_fs_stat_size(abs_path);
-
-    if (file_size == (u64)-1 || file_size == 0ULL) {
-        ush_writeln("wavplay: empty or unreadable file");
+    fd = cleonos_sys_fd_open(abs_path, CLEONOS_O_RDONLY, 0ULL);
+    if (fd == (u64)-1) {
+        ush_writeln("wavplay: open failed");
         return 0;
     }
 
-    if (file_size > USH_WAVPLAY_FILE_MAX) {
-        ush_writeln("wavplay: file too large (max 65536 bytes)");
-        return 0;
-    }
-
-    got = cleonos_sys_fs_read(abs_path, (char *)ush_wavplay_file_buf, file_size);
-
-    if (got != file_size) {
-        ush_writeln("wavplay: read failed");
-        return 0;
-    }
-
-    if (ush_wav_parse(ush_wavplay_file_buf, got, &info) == 0) {
+    if (ush_wav_parse_stream(fd, &info) == 0) {
+        (void)cleonos_sys_fd_close(fd);
         ush_writeln("wavplay: unsupported wav (need PCM 8/16-bit, mono/stereo)");
+        return 0;
+    }
+
+    if (info.block_align > (u64)sizeof(frame_buf)) {
+        (void)cleonos_sys_fd_close(fd);
+        ush_writeln("wavplay: unsupported block align");
         return 0;
     }
 
@@ -380,6 +415,7 @@ static int ush_cmd_wavplay(const ush_state *sh, const char *arg) {
     }
 
     if (steps == 0ULL) {
+        (void)cleonos_sys_fd_close(fd);
         ush_writeln("wavplay: nothing to play");
         return 0;
     }
@@ -403,12 +439,42 @@ static int ush_cmd_wavplay(const ush_state *sh, const char *arg) {
         u64 frame_index = i * stride;
         u64 deviation;
         u64 freq;
+        u64 skip_frames;
 
         if (frame_index >= info.frame_count) {
             frame_index = info.frame_count - 1ULL;
         }
 
-        deviation = ush_wav_sample_deviation(&info, frame_index);
+        if (frame_index < current_frame) {
+            (void)cleonos_sys_fd_close(fd);
+            ush_writeln("wavplay: internal frame order error");
+            return 0;
+        }
+
+        skip_frames = frame_index - current_frame;
+        if (skip_frames > 0ULL) {
+            if (skip_frames > (0xFFFFFFFFFFFFFFFFULL / info.block_align)) {
+                (void)cleonos_sys_fd_close(fd);
+                ush_writeln("wavplay: frame skip overflow");
+                return 0;
+            }
+
+            if (ush_wav_skip_bytes(fd, skip_frames * info.block_align) == 0) {
+                (void)cleonos_sys_fd_close(fd);
+                ush_writeln("wavplay: seek/read failed");
+                return 0;
+            }
+            current_frame = frame_index;
+        }
+
+        if (ush_wav_read_exact(fd, frame_buf, info.block_align) == 0) {
+            (void)cleonos_sys_fd_close(fd);
+            ush_writeln("wavplay: read failed");
+            return 0;
+        }
+        current_frame++;
+
+        deviation = ush_wav_frame_deviation(&info, frame_buf);
 
         if (deviation < 4ULL) {
             freq = 0ULL;
@@ -428,6 +494,7 @@ static int ush_cmd_wavplay(const ush_state *sh, const char *arg) {
         }
 
         if (cleonos_sys_audio_play_tone(run_freq, run_ticks) == 0ULL) {
+            (void)cleonos_sys_fd_close(fd);
             ush_writeln("wavplay: playback failed");
             (void)cleonos_sys_audio_stop();
             return 0;
@@ -439,12 +506,14 @@ static int ush_cmd_wavplay(const ush_state *sh, const char *arg) {
 
     if (run_ticks > 0ULL) {
         if (cleonos_sys_audio_play_tone(run_freq, run_ticks) == 0ULL) {
+            (void)cleonos_sys_fd_close(fd);
             ush_writeln("wavplay: playback failed");
             (void)cleonos_sys_audio_stop();
             return 0;
         }
     }
 
+    (void)cleonos_sys_fd_close(fd);
     (void)cleonos_sys_audio_stop();
     ush_writeln("wavplay: done");
     return 1;

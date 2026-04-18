@@ -66,7 +66,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 - 日志写入 `LOG_WRITE`：最大拷贝 `191` 字节。
 - TTY 文本写入 `TTY_WRITE`：最大拷贝 `512` 字节。
 - 文件读取 `FS_READ`：最多读取 `min(file_size, buffer_size)` 字节。
-- 文件写入 `FS_WRITE` / `FS_APPEND`：单次最大 `65536` 字节。
+- 文件写入 `FS_WRITE` / `FS_APPEND`：内核按 `65536` 字节分块搬运；这是实现分块大小，不是文件大小上限。
 - log journal 行读取缓冲：`256` 字节。
 - 路径缓冲上限：`192` 字节（包含 `\0`）。
 - 文件名输出上限：`96` 字节（与 `CLEONOS_FS_NAME_MAX` 对齐）。
@@ -634,7 +634,7 @@ u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 
 - 传入的字符串/缓冲指针目前按“同地址空间可直接访问”模型处理，后续若引入严格用户态地址隔离，需要补充用户内存校验。
 - `FS_READ` 不保证文本终止符；读取文本请预留 1 字节并手动 `buf[n] = '\0'`。
-- `FS_WRITE`/`FS_APPEND` 仅允许 `/temp`，并有单次长度上限。
+- `FS_WRITE`/`FS_APPEND` 仅允许 `/temp`；大数据写入由内核自动分块处理。
 - `/proc` 由 syscall 层虚拟导出，不占用 RAMDISK 节点，也不能通过写入类 syscall 修改。
 
 ## 7. Wine 兼容说明

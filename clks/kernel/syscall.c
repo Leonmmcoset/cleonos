@@ -20,7 +20,7 @@
 #define CLKS_SYSCALL_PATH_MAX         192U
 #define CLKS_SYSCALL_NAME_MAX          96U
 #define CLKS_SYSCALL_TTY_MAX_LEN     2048U
-#define CLKS_SYSCALL_FS_IO_MAX_LEN  65536U
+#define CLKS_SYSCALL_FS_IO_CHUNK_LEN  65536U
 #define CLKS_SYSCALL_JOURNAL_MAX_LEN  256U
 #define CLKS_SYSCALL_ARG_LINE_MAX     256U
 #define CLKS_SYSCALL_ENV_LINE_MAX     512U
@@ -1457,44 +1457,62 @@ static u64 clks_syscall_fs_mkdir(u64 arg0) {
 
 static u64 clks_syscall_fs_write_common(u64 arg0, u64 arg1, u64 arg2, clks_bool append_mode) {
     char path[CLKS_SYSCALL_PATH_MAX];
-    void *heap_copy = CLKS_NULL;
-    const void *payload = CLKS_NULL;
+    const u8 *src = (const u8 *)arg1;
+    u64 remaining = arg2;
+    clks_bool first_chunk = CLKS_TRUE;
     clks_bool ok;
 
     if (clks_syscall_copy_user_string(arg0, path, sizeof(path)) == CLKS_FALSE) {
         return 0ULL;
     }
 
-    if (arg2 > CLKS_SYSCALL_FS_IO_MAX_LEN) {
+    if (arg2 == 0ULL) {
+        if (append_mode == CLKS_TRUE) {
+            ok = clks_fs_append(path, CLKS_NULL, 0ULL);
+        } else {
+            ok = clks_fs_write_all(path, CLKS_NULL, 0ULL);
+        }
+
+        return (ok == CLKS_TRUE) ? 1ULL : 0ULL;
+    }
+
+    if (arg1 == 0ULL) {
         return 0ULL;
     }
 
-    if (arg2 > 0ULL) {
-        if (arg1 == 0ULL) {
-            return 0ULL;
+    while (remaining > 0ULL) {
+        u64 chunk_len = remaining;
+        void *heap_copy;
+
+        if (chunk_len > CLKS_SYSCALL_FS_IO_CHUNK_LEN) {
+            chunk_len = CLKS_SYSCALL_FS_IO_CHUNK_LEN;
         }
 
-        heap_copy = clks_kmalloc((usize)arg2);
-
+        heap_copy = clks_kmalloc((usize)chunk_len);
         if (heap_copy == CLKS_NULL) {
             return 0ULL;
         }
 
-        clks_memcpy(heap_copy, (const void *)arg1, (usize)arg2);
-        payload = (const void *)heap_copy;
-    }
+        clks_memcpy(heap_copy, (const void *)src, (usize)chunk_len);
 
-    if (append_mode == CLKS_TRUE) {
-        ok = clks_fs_append(path, payload, arg2);
-    } else {
-        ok = clks_fs_write_all(path, payload, arg2);
-    }
+        if (append_mode == CLKS_TRUE || first_chunk == CLKS_FALSE) {
+            ok = clks_fs_append(path, heap_copy, chunk_len);
+        } else {
+            ok = clks_fs_write_all(path, heap_copy, chunk_len);
+        }
 
-    if (heap_copy != CLKS_NULL) {
         clks_kfree(heap_copy);
+
+        if (ok == CLKS_FALSE) {
+            return 0ULL;
+        }
+
+        src += chunk_len;
+        remaining -= chunk_len;
+        first_chunk = CLKS_FALSE;
     }
 
-    return (ok == CLKS_TRUE) ? 1ULL : 0ULL;
+    return 1ULL;
 }
 
 static u64 clks_syscall_fs_write(u64 arg0, u64 arg1, u64 arg2) {

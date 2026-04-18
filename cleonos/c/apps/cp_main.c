@@ -1,45 +1,60 @@
 #include "cmd_runtime.h"
 static int ush_copy_file(const char *src_path, const char *dst_path) {
-    static char copy_buf[USH_COPY_MAX];
-    u64 src_type;
-    u64 src_size;
-    u64 got;
+    static char copy_buf[4096];
+    u64 src_fd;
+    u64 dst_fd;
 
-    src_type = cleonos_sys_fs_stat_type(src_path);
-
-    if (src_type != 1ULL) {
+    if (cleonos_sys_fs_stat_type(src_path) != 1ULL) {
         ush_writeln("cp: source file not found");
         return 0;
     }
 
-    src_size = cleonos_sys_fs_stat_size(src_path);
-
-    if (src_size == (u64)-1) {
-        ush_writeln("cp: failed to stat source");
+    src_fd = cleonos_sys_fd_open(src_path, CLEONOS_O_RDONLY, 0ULL);
+    if (src_fd == (u64)-1) {
+        ush_writeln("cp: failed to open source");
         return 0;
     }
 
-    if (src_size > (u64)USH_COPY_MAX) {
-        ush_writeln("cp: source too large for user shell buffer");
+    dst_fd = cleonos_sys_fd_open(dst_path, CLEONOS_O_WRONLY | CLEONOS_O_CREAT | CLEONOS_O_TRUNC, 0ULL);
+    if (dst_fd == (u64)-1) {
+        (void)cleonos_sys_fd_close(src_fd);
+        ush_writeln("cp: failed to open destination");
         return 0;
     }
 
-    if (src_size == 0ULL) {
-        got = 0ULL;
-    } else {
-        got = cleonos_sys_fs_read(src_path, copy_buf, src_size);
+    for (;;) {
+        u64 got = cleonos_sys_fd_read(src_fd, copy_buf, (u64)sizeof(copy_buf));
 
-        if (got == 0ULL || got != src_size) {
-            ush_writeln("cp: failed to read source");
+        if (got == (u64)-1) {
+            (void)cleonos_sys_fd_close(dst_fd);
+            (void)cleonos_sys_fd_close(src_fd);
+            ush_writeln("cp: read failed");
             return 0;
+        }
+
+        if (got == 0ULL) {
+            break;
+        }
+
+        {
+            u64 written_total = 0ULL;
+            while (written_total < got) {
+                u64 written = cleonos_sys_fd_write(dst_fd,
+                                                   copy_buf + written_total,
+                                                   got - written_total);
+                if (written == (u64)-1 || written == 0ULL) {
+                    (void)cleonos_sys_fd_close(dst_fd);
+                    (void)cleonos_sys_fd_close(src_fd);
+                    ush_writeln("cp: write failed");
+                    return 0;
+                }
+                written_total += written;
+            }
         }
     }
 
-    if (cleonos_sys_fs_write(dst_path, copy_buf, got) == 0ULL) {
-        ush_writeln("cp: failed to write destination");
-        return 0;
-    }
-
+    (void)cleonos_sys_fd_close(dst_fd);
+    (void)cleonos_sys_fd_close(src_fd);
     return 1;
 }
 

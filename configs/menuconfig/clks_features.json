@@ -1,0 +1,82 @@
+{
+  "features": [
+    {
+      "key": "CLEONOS_CLKS_ENABLE_AUDIO",
+      "title": "Audio Driver Init",
+      "description": "Initialize kernel audio subsystem during boot.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_MOUSE",
+      "title": "PS/2 Mouse Input",
+      "description": "Initialize kernel PS/2 mouse input subsystem.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_DESKTOP",
+      "title": "TTY2 Desktop",
+      "description": "Enable desktop compositor tick/update path on TTY2.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_DRIVER_MANAGER",
+      "title": "Driver Manager",
+      "description": "Initialize kernel ELF driver manager.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_KELF",
+      "title": "KELF Executor",
+      "description": "Enable kernel ELF app dispatcher and kelfd task.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_USERLAND_AUTO_EXEC",
+      "title": "Auto Enter User Shell",
+      "description": "Auto-exec /shell/shell.elf after kernel boot.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_HEAP_SELFTEST",
+      "title": "Heap Selftest",
+      "description": "Run kmalloc/kfree selftest during kernel boot.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_EXTERNAL_PSF",
+      "title": "Load External PSF Font",
+      "description": "Load /system/tty.psf and apply it to framebuffer TTY.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_KEYBOARD",
+      "title": "PS/2 Keyboard Input",
+      "description": "Initialize PS/2 keyboard input subsystem.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_ELFRUNNER_PROBE",
+      "title": "ELFRUNNER Probe",
+      "description": "Probe kernel ELF runtime metadata after ELFRUNNER init.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_KLOGD_TASK",
+      "title": "Scheduler Task: klogd",
+      "description": "Enable periodic klogd maintenance task.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_KWORKER_TASK",
+      "title": "Scheduler Task: kworker",
+      "description": "Enable periodic kernel worker service-heartbeat task.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_USRD_TASK",
+      "title": "Scheduler Task: usrd",
+      "description": "Enable user/runtime dispatch task (shell tick, tty tick, exec tick).",
+      "default": true
+    }
+  ]
+}

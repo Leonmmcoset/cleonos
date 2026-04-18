@@ -12,3 +12,7 @@ compile_commands.json
 CTestTestfile.cmake
 Testing/
 .cmake/
+
+# menuconfig generated
+configs/menuconfig/.config.json
+configs/menuconfig/config.cmake

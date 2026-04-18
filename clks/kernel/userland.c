@@ -7,6 +7,10 @@
 
 #define CLKS_USERLAND_RETRY_INTERVAL 500ULL
 
+#ifndef CLKS_CFG_USERLAND_AUTO_EXEC
+#define CLKS_CFG_USERLAND_AUTO_EXEC 1
+#endif
+
 static clks_bool clks_user_shell_ready = CLKS_FALSE;
 static clks_bool clks_user_shell_exec_requested_flag = CLKS_FALSE;
 static clks_bool clks_user_shell_exec_enabled = CLKS_FALSE;
@@ -84,7 +88,7 @@ clks_bool clks_userland_init(void) {
 
     clks_user_shell_ready = CLKS_FALSE;
     clks_user_shell_exec_requested_flag = CLKS_FALSE;
-    clks_user_shell_exec_enabled = CLKS_TRUE;
+    clks_user_shell_exec_enabled = (CLKS_CFG_USERLAND_AUTO_EXEC != 0) ? CLKS_TRUE : CLKS_FALSE;
     clks_user_launch_attempt_count = 0ULL;
     clks_user_launch_success_count = 0ULL;
     clks_user_launch_fail_count = 0ULL;
@@ -107,7 +111,11 @@ clks_bool clks_userland_init(void) {
         return CLKS_FALSE;
     }
 
-    clks_log(CLKS_LOG_INFO, "USER", "USER SHELL AUTO EXEC ENABLED");
+    if (clks_user_shell_exec_enabled == CLKS_TRUE) {
+        clks_log(CLKS_LOG_INFO, "USER", "USER SHELL AUTO EXEC ENABLED");
+    } else {
+        clks_log(CLKS_LOG_WARN, "USER", "USER SHELL AUTO EXEC DISABLED BY MENUCONFIG");
+    }
     return CLKS_TRUE;
 }
 

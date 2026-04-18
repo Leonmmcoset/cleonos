@@ -117,6 +117,56 @@ set(CLKS_ARCH "x86_64" CACHE STRING "Target CLKS arch")
 set(LINKER_SCRIPT "${CMAKE_SOURCE_DIR}/clks/arch/${CLKS_ARCH}/linker.ld")
 set(USER_LINKER_SCRIPT "${CMAKE_SOURCE_DIR}/cleonos/c/user.ld")
 set(KELF_LINKER_SCRIPT "${CMAKE_SOURCE_DIR}/cleonos/c/kelf.ld")
+set(CLEONOS_MENUCONFIG_CMAKE "${CMAKE_SOURCE_DIR}/configs/menuconfig/config.cmake" CACHE FILEPATH "menuconfig generated CMake config")
+
+if(EXISTS "${CLEONOS_MENUCONFIG_CMAKE}")
+    include("${CLEONOS_MENUCONFIG_CMAKE}")
+    cl_log_info("menuconfig loaded from ${CLEONOS_MENUCONFIG_CMAKE}")
+endif()
+
+function(cl_set_bool_cache VAR_NAME DEFAULT_VALUE DOC_TEXT)
+    if(NOT DEFINED ${VAR_NAME})
+        set(${VAR_NAME} ${DEFAULT_VALUE} CACHE BOOL "${DOC_TEXT}")
+    else()
+        set(${VAR_NAME} ${${VAR_NAME}} CACHE BOOL "${DOC_TEXT}" FORCE)
+    endif()
+endfunction()
+
+function(cl_bool_to_int BOOL_VAR OUT_VAR)
+    if(${BOOL_VAR})
+        set(${OUT_VAR} 1 PARENT_SCOPE)
+    else()
+        set(${OUT_VAR} 0 PARENT_SCOPE)
+    endif()
+endfunction()
+
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_AUDIO ON "Initialize kernel audio subsystem")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_MOUSE ON "Initialize kernel mouse subsystem")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_DESKTOP ON "Initialize desktop compositor subsystem")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_DRIVER_MANAGER ON "Initialize kernel driver manager")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_KELF ON "Enable KELF app dispatcher")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_USERLAND_AUTO_EXEC ON "Auto exec /shell/shell.elf on boot")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_HEAP_SELFTEST ON "Run heap selftest at boot")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_EXTERNAL_PSF ON "Load /system/tty.psf external font")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_KEYBOARD ON "Initialize keyboard input subsystem")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_ELFRUNNER_PROBE ON "Run ELFRUNNER kernel ELF probe")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_KLOGD_TASK ON "Enable scheduler klogd task")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_KWORKER_TASK ON "Enable scheduler kworker task")
+cl_set_bool_cache(CLEONOS_CLKS_ENABLE_USRD_TASK ON "Enable scheduler usrd task")
+
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_AUDIO CLKS_CFG_AUDIO_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_MOUSE CLKS_CFG_MOUSE_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_DESKTOP CLKS_CFG_DESKTOP_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_DRIVER_MANAGER CLKS_CFG_DRIVER_MANAGER_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_KELF CLKS_CFG_KELF_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_USERLAND_AUTO_EXEC CLKS_CFG_USERLAND_AUTO_EXEC_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_HEAP_SELFTEST CLKS_CFG_HEAP_SELFTEST_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_EXTERNAL_PSF CLKS_CFG_EXTERNAL_PSF_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_KEYBOARD CLKS_CFG_KEYBOARD_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_ELFRUNNER_PROBE CLKS_CFG_ELFRUNNER_PROBE_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_KLOGD_TASK CLKS_CFG_KLOGD_TASK_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_KWORKER_TASK CLKS_CFG_KWORKER_TASK_INT)
+cl_bool_to_int(CLEONOS_CLKS_ENABLE_USRD_TASK CLKS_CFG_USRD_TASK_INT)
 
 set(CFLAGS_COMMON
     -std=c11
@@ -132,6 +182,19 @@ set(CFLAGS_COMMON
 
 set(ARCH_CFLAGS
     -DCLKS_ARCH_X86_64=1
+    "-DCLKS_CFG_AUDIO=${CLKS_CFG_AUDIO_INT}"
+    "-DCLKS_CFG_MOUSE=${CLKS_CFG_MOUSE_INT}"
+    "-DCLKS_CFG_DESKTOP=${CLKS_CFG_DESKTOP_INT}"
+    "-DCLKS_CFG_DRIVER_MANAGER=${CLKS_CFG_DRIVER_MANAGER_INT}"
+    "-DCLKS_CFG_KELF=${CLKS_CFG_KELF_INT}"
+    "-DCLKS_CFG_USERLAND_AUTO_EXEC=${CLKS_CFG_USERLAND_AUTO_EXEC_INT}"
+    "-DCLKS_CFG_HEAP_SELFTEST=${CLKS_CFG_HEAP_SELFTEST_INT}"
+    "-DCLKS_CFG_EXTERNAL_PSF=${CLKS_CFG_EXTERNAL_PSF_INT}"
+    "-DCLKS_CFG_KEYBOARD=${CLKS_CFG_KEYBOARD_INT}"
+    "-DCLKS_CFG_ELFRUNNER_PROBE=${CLKS_CFG_ELFRUNNER_PROBE_INT}"
+    "-DCLKS_CFG_KLOGD_TASK=${CLKS_CFG_KLOGD_TASK_INT}"
+    "-DCLKS_CFG_KWORKER_TASK=${CLKS_CFG_KWORKER_TASK_INT}"
+    "-DCLKS_CFG_USRD_TASK=${CLKS_CFG_USRD_TASK_INT}"
     -m64
     -mno-red-zone
     -mcmodel=kernel
@@ -393,10 +456,24 @@ set(USER_SHELL_COMMAND_APPS
 foreach(SRC IN LISTS USER_APP_MAIN_SOURCES)
     get_filename_component(_stem "${SRC}" NAME_WE)
     string(REGEX REPLACE "_main$" "" _app_name "${_stem}")
+    string(TOUPPER "${_app_name}" _app_name_upper)
+    string(REGEX REPLACE "[^A-Z0-9]" "_" _app_name_key "${_app_name_upper}")
+    set(_app_enabled_var "CLEONOS_USER_APP_${_app_name_key}")
 
     list(FIND USER_KELF_APP_NAMES "${_app_name}" _shadowed_by_kmain)
     if(NOT _shadowed_by_kmain EQUAL -1)
         cl_log_info("skip ${SRC} because ${_app_name}_kmain.c exists")
+        continue()
+    endif()
+
+    if(NOT DEFINED ${_app_enabled_var})
+        set(${_app_enabled_var} ON CACHE BOOL "Build user app ${_app_name}")
+    else()
+        set(${_app_enabled_var} ${${_app_enabled_var}} CACHE BOOL "Build user app ${_app_name}" FORCE)
+    endif()
+
+    if(NOT ${_app_enabled_var})
+        cl_log_info("menuconfig: skip disabled user app ${_app_name}")
         continue()
     endif()
 
@@ -456,6 +533,20 @@ endforeach()
 foreach(SRC IN LISTS USER_APP_KMAIN_SOURCES)
     get_filename_component(_stem "${SRC}" NAME_WE)
     string(REGEX REPLACE "_kmain$" "" _app_name "${_stem}")
+    string(TOUPPER "${_app_name}" _app_name_upper)
+    string(REGEX REPLACE "[^A-Z0-9]" "_" _app_name_key "${_app_name_upper}")
+    set(_app_enabled_var "CLEONOS_USER_APP_${_app_name_key}")
+
+    if(NOT DEFINED ${_app_enabled_var})
+        set(${_app_enabled_var} ON CACHE BOOL "Build user app ${_app_name}")
+    else()
+        set(${_app_enabled_var} ${${_app_enabled_var}} CACHE BOOL "Build user app ${_app_name}" FORCE)
+    endif()
+
+    if(NOT ${_app_enabled_var})
+        cl_log_info("menuconfig: skip disabled user app ${_app_name}")
+        continue()
+    endif()
 
     list(FIND USER_APP_NAMES "${_app_name}" _dup_name_idx)
     if(NOT _dup_name_idx EQUAL -1)
@@ -690,9 +781,23 @@ add_custom_target(clean-all
         -P "${CL_LOG_EMIT_SCRIPT}"
 )
 
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_custom_target(menuconfig
+        COMMAND ${Python3_EXECUTABLE} "${CMAKE_SOURCE_DIR}/scripts/menuconfig.py"
+        USES_TERMINAL
+    )
+else()
+    add_custom_target(menuconfig
+        COMMAND ${CMAKE_COMMAND} -E echo "python3 not found; run scripts/menuconfig.py manually"
+        USES_TERMINAL
+    )
+endif()
+
 add_custom_target(cleonos-help
     COMMAND ${CMAKE_COMMAND} -E echo "CLeonOS CMake build system (x86_64 only)"
     COMMAND ${CMAKE_COMMAND} -E echo "  cmake -S . -B build-cmake"
+    COMMAND ${CMAKE_COMMAND} -E echo "  cmake --build build-cmake --target menuconfig"
     COMMAND ${CMAKE_COMMAND} -E echo "  cmake --build build-cmake --target setup"
     COMMAND ${CMAKE_COMMAND} -E echo "  cmake --build build-cmake --target userapps"
     COMMAND ${CMAKE_COMMAND} -E echo "  cmake --build build-cmake --target iso"

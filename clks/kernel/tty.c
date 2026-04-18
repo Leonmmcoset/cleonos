@@ -59,7 +59,14 @@ static u32 clks_tty_cell_height = 8U;
 static clks_bool clks_tty_is_ready = CLKS_FALSE;
 static clks_bool clks_tty_cursor_visible = CLKS_FALSE;
 static clks_bool clks_tty_blink_enabled = CLKS_TRUE;
+static clks_bool clks_tty_defer_draw = CLKS_FALSE;
+static clks_bool clks_tty_dirty_any = CLKS_FALSE;
+static clks_bool clks_tty_dirty_rows[CLKS_TTY_MAX_ROWS];
 static u64 clks_tty_blink_last_tick = CLKS_TTY_BLINK_TICK_UNSET;
+
+static u32 clks_tty_content_rows(void);
+static clks_bool clks_tty_scrollback_is_active(u32 tty_index);
+static void clks_tty_redraw_active(void);
 
 static u32 clks_tty_ansi_palette(u32 index) {
     static const u32 palette[16] = {
@@ -100,6 +107,58 @@ static void clks_tty_draw_cell(u32 tty_index, u32 row, u32 col) {
         clks_tty_cell_bg[tty_index][row][col],
         clks_tty_cell_style[tty_index][row][col]
     );
+}
+
+static void clks_tty_dirty_reset(void) {
+    clks_memset(clks_tty_dirty_rows, 0, sizeof(clks_tty_dirty_rows));
+    clks_tty_dirty_any = CLKS_FALSE;
+}
+
+static void clks_tty_dirty_mark_row(u32 row) {
+    if (row >= clks_tty_content_rows() || row >= CLKS_TTY_MAX_ROWS) {
+        return;
+    }
+
+    clks_tty_dirty_rows[row] = CLKS_TRUE;
+    clks_tty_dirty_any = CLKS_TRUE;
+}
+
+static void clks_tty_dirty_mark_cell(u32 row, u32 col) {
+    if (col >= clks_tty_cols) {
+        return;
+    }
+
+    clks_tty_dirty_mark_row(row);
+}
+
+static void clks_tty_flush_dirty(void) {
+    u32 tty_index;
+    u32 row;
+    u32 col;
+
+    if (clks_tty_is_ready == CLKS_FALSE || clks_tty_dirty_any == CLKS_FALSE) {
+        return;
+    }
+
+    tty_index = clks_tty_active_index;
+
+    if (clks_tty_scrollback_is_active(tty_index) == CLKS_TRUE) {
+        clks_tty_redraw_active();
+        clks_tty_dirty_reset();
+        return;
+    }
+
+    for (row = 0U; row < clks_tty_content_rows(); row++) {
+        if (clks_tty_dirty_rows[row] != CLKS_TRUE) {
+            continue;
+        }
+
+        for (col = 0U; col < clks_tty_cols; col++) {
+            clks_tty_draw_cell(tty_index, row, col);
+        }
+    }
+
+    clks_tty_dirty_reset();
 }
 
 static u32 clks_tty_scrollback_logical_to_physical(u32 tty_index, u32 logical_index) {
@@ -402,6 +461,7 @@ static void clks_tty_redraw_active(void) {
 
     clks_fb_clear(CLKS_TTY_BG);
     clks_tty_cursor_visible = CLKS_FALSE;
+    clks_tty_dirty_reset();
 
     for (row = 0; row < clks_tty_content_rows(); row++) {
         u32 doc_index = start_doc + row;
@@ -483,8 +543,12 @@ static void clks_tty_scroll_up(u32 tty_index) {
 
             clks_fb_scroll_up(clks_tty_cell_height, CLKS_TTY_BG);
 
-            for (col = 0U; col < clks_tty_cols; col++) {
-                clks_tty_draw_cell(tty_index, clks_tty_content_rows() - 1U, col);
+            if (clks_tty_defer_draw == CLKS_TRUE) {
+                clks_tty_dirty_mark_row(clks_tty_content_rows() - 1U);
+            } else {
+                for (col = 0U; col < clks_tty_cols; col++) {
+                    clks_tty_draw_cell(tty_index, clks_tty_content_rows() - 1U, col);
+                }
             }
         }
     }
@@ -514,7 +578,11 @@ static void clks_tty_put_visible(u32 tty_index, u32 row, u32 col, char ch) {
     clks_tty_cell_style[tty_index][row][col] = style;
 
     if (tty_index == clks_tty_active_index) {
-        clks_tty_draw_cell(tty_index, row, col);
+        if (clks_tty_defer_draw == CLKS_TRUE) {
+            clks_tty_dirty_mark_cell(row, col);
+        } else {
+            clks_tty_draw_cell(tty_index, row, col);
+        }
     }
 }
 
@@ -694,8 +762,12 @@ static void clks_tty_ansi_clear_line_mode(u32 tty_index, u32 mode) {
     }
 
     if (tty_index == clks_tty_active_index) {
-        for (col = start; col < end; col++) {
-            clks_tty_draw_cell(tty_index, row, col);
+        if (clks_tty_defer_draw == CLKS_TRUE) {
+            clks_tty_dirty_mark_row(row);
+        } else {
+            for (col = start; col < end; col++) {
+                clks_tty_draw_cell(tty_index, row, col);
+            }
         }
     }
 }
@@ -1186,6 +1258,8 @@ void clks_tty_init(void) {
     clks_tty_is_ready = CLKS_TRUE;
     clks_tty_cursor_visible = CLKS_FALSE;
     clks_tty_blink_enabled = CLKS_TRUE;
+    clks_tty_defer_draw = CLKS_FALSE;
+    clks_tty_dirty_reset();
     clks_tty_reset_blink_timer();
     clks_tty_redraw_active();
 }
@@ -1206,9 +1280,12 @@ void clks_tty_write_char(char ch) {
         clks_tty_redraw_active();
     }
 
+    clks_tty_defer_draw = CLKS_TRUE;
     if (clks_tty_ansi_process_byte(tty_index, ch) == CLKS_FALSE) {
         clks_tty_put_char_raw(tty_index, ch);
     }
+    clks_tty_defer_draw = CLKS_FALSE;
+    clks_tty_flush_dirty();
 
     clks_tty_draw_cursor();
     clks_tty_draw_status_bar();
@@ -1231,6 +1308,7 @@ void clks_tty_write_n(const char *text, usize len) {
         clks_tty_redraw_active();
     }
 
+    clks_tty_defer_draw = CLKS_TRUE;
     while (i < len) {
         if (clks_tty_ansi_process_byte(tty_index, text[i]) == CLKS_FALSE) {
             clks_tty_put_char_raw(tty_index, text[i]);
@@ -1238,6 +1316,8 @@ void clks_tty_write_n(const char *text, usize len) {
 
         i++;
     }
+    clks_tty_defer_draw = CLKS_FALSE;
+    clks_tty_flush_dirty();
 
     clks_tty_draw_cursor();
     clks_tty_draw_status_bar();

@@ -69,6 +69,29 @@ u64 cleonos_sys_exec_pathv(const char *path, const char *argv_line, const char *
     return cleonos_syscall(CLEONOS_SYSCALL_EXEC_PATHV, (u64)path, (u64)argv_line, (u64)env_line);
 }
 
+struct cleonos_exec_pathv_io_req {
+    u64 env_line_ptr;
+    u64 stdin_fd;
+    u64 stdout_fd;
+    u64 stderr_fd;
+};
+
+u64 cleonos_sys_exec_pathv_io(const char *path,
+                              const char *argv_line,
+                              const char *env_line,
+                              u64 stdin_fd,
+                              u64 stdout_fd,
+                              u64 stderr_fd) {
+    struct cleonos_exec_pathv_io_req req;
+
+    req.env_line_ptr = (u64)env_line;
+    req.stdin_fd = stdin_fd;
+    req.stdout_fd = stdout_fd;
+    req.stderr_fd = stderr_fd;
+
+    return cleonos_syscall(CLEONOS_SYSCALL_EXEC_PATHV_IO, (u64)path, (u64)argv_line, (u64)&req);
+}
+
 u64 cleonos_sys_exec_request_count(void) {
     return cleonos_syscall(CLEONOS_SYSCALL_EXEC_REQUESTS, 0ULL, 0ULL, 0ULL);
 }

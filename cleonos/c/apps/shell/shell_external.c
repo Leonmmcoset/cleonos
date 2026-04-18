@@ -137,10 +137,16 @@ int ush_command_ret_read(ush_cmd_ret *out_ret) {
     return (got == (u64)sizeof(*out_ret)) ? 1 : 0;
 }
 
-int ush_try_exec_external(ush_state *sh, const char *cmd, const char *arg, int *out_success) {
+int ush_try_exec_external_with_fds(ush_state *sh,
+                                   const char *cmd,
+                                   const char *arg,
+                                   u64 stdin_fd,
+                                   u64 stdout_fd,
+                                   u64 stderr_fd,
+                                   int *out_success) {
     const char *canonical;
     char path[USH_PATH_MAX];
-    char env_line[USH_PATH_MAX + USH_CMD_MAX + 32ULL];
+    char env_line[USH_PATH_MAX + USH_CMD_MAX + 96ULL];
     u64 status;
     ush_cmd_ret ret;
 
@@ -179,7 +185,11 @@ int ush_try_exec_external(ush_state *sh, const char *cmd, const char *arg, int *
     ush_append_text(env_line, (u64)sizeof(env_line), ";CMD=");
     ush_append_text(env_line, (u64)sizeof(env_line), canonical);
 
-    status = cleonos_sys_exec_pathv(path, arg, env_line);
+    if (stdin_fd != CLEONOS_FD_INHERIT) {
+        ush_append_text(env_line, (u64)sizeof(env_line), ";USH_STDIN_MODE=PIPE");
+    }
+
+    status = cleonos_sys_exec_pathv_io(path, arg, env_line, stdin_fd, stdout_fd, stderr_fd);
 
     if (status == (u64)-1) {
         ush_writeln("exec: request failed");
@@ -217,4 +227,14 @@ int ush_try_exec_external(ush_state *sh, const char *cmd, const char *arg, int *
     }
 
     return 1;
+}
+
+int ush_try_exec_external(ush_state *sh, const char *cmd, const char *arg, int *out_success) {
+    return ush_try_exec_external_with_fds(sh,
+                                          cmd,
+                                          arg,
+                                          CLEONOS_FD_INHERIT,
+                                          CLEONOS_FD_INHERIT,
+                                          CLEONOS_FD_INHERIT,
+                                          out_success);
 }

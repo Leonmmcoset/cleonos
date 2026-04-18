@@ -32,7 +32,7 @@
 #define CLKS_SYSCALL_KDBG_STACK_WINDOW_BYTES (128ULL * 1024ULL)
 #define CLKS_SYSCALL_KERNEL_SYMBOL_FILE "/system/kernel.sym"
 #define CLKS_SYSCALL_KERNEL_ADDR_BASE 0xFFFF800000000000ULL
-#define CLKS_SYSCALL_STATS_MAX_ID     CLKS_SYSCALL_DL_SYM
+#define CLKS_SYSCALL_STATS_MAX_ID     CLKS_SYSCALL_EXEC_PATHV_IO
 #define CLKS_SYSCALL_STATS_RING_SIZE  256U
 
 struct clks_syscall_frame {
@@ -65,6 +65,13 @@ struct clks_syscall_kdbg_bt_req {
     u64 rip;
     u64 out_ptr;
     u64 out_size;
+};
+
+struct clks_syscall_exec_io_req {
+    u64 env_line_ptr;
+    u64 stdin_fd;
+    u64 stdout_fd;
+    u64 stderr_fd;
 };
 
 static clks_bool clks_syscall_ready = CLKS_FALSE;
@@ -1202,6 +1209,38 @@ static u64 clks_syscall_exec_pathv(u64 arg0, u64 arg1, u64 arg2) {
     return status;
 }
 
+static u64 clks_syscall_exec_pathv_io(u64 arg0, u64 arg1, u64 arg2) {
+    char path[CLKS_SYSCALL_PATH_MAX];
+    char argv_line[CLKS_SYSCALL_ARG_LINE_MAX];
+    char env_line[CLKS_SYSCALL_ENV_LINE_MAX];
+    struct clks_syscall_exec_io_req req;
+    u64 status = (u64)-1;
+
+    if (arg2 == 0ULL) {
+        return (u64)-1;
+    }
+
+    if (clks_syscall_copy_user_string(arg0, path, sizeof(path)) == CLKS_FALSE) {
+        return (u64)-1;
+    }
+
+    if (clks_syscall_copy_user_optional_string(arg1, argv_line, sizeof(argv_line)) == CLKS_FALSE) {
+        return (u64)-1;
+    }
+
+    clks_memcpy(&req, (const void *)arg2, sizeof(req));
+
+    if (clks_syscall_copy_user_optional_string(req.env_line_ptr, env_line, sizeof(env_line)) == CLKS_FALSE) {
+        return (u64)-1;
+    }
+
+    if (clks_exec_run_pathv_io(path, argv_line, env_line, req.stdin_fd, req.stdout_fd, req.stderr_fd, &status) == CLKS_FALSE) {
+        return (u64)-1;
+    }
+
+    return status;
+}
+
 static u64 clks_syscall_getpid(void) {
     return clks_exec_current_pid();
 }
@@ -1747,6 +1786,8 @@ u64 clks_syscall_dispatch(void *frame_ptr) {
             return clks_syscall_exec_path(frame->rbx);
         case CLKS_SYSCALL_EXEC_PATHV:
             return clks_syscall_exec_pathv(frame->rbx, frame->rcx, frame->rdx);
+        case CLKS_SYSCALL_EXEC_PATHV_IO:
+            return clks_syscall_exec_pathv_io(frame->rbx, frame->rcx, frame->rdx);
         case CLKS_SYSCALL_EXEC_REQUESTS:
             return clks_exec_request_count();
         case CLKS_SYSCALL_EXEC_SUCCESS:

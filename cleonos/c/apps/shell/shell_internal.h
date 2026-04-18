@@ -112,6 +112,13 @@ void ush_command_ret_reset(void);
 int ush_command_ret_write(const ush_cmd_ret *ret);
 int ush_command_ret_read(ush_cmd_ret *out_ret);
 int ush_try_exec_external(ush_state *sh, const char *cmd, const char *arg, int *out_success);
+int ush_try_exec_external_with_fds(ush_state *sh,
+                                   const char *cmd,
+                                   const char *arg,
+                                   u64 stdin_fd,
+                                   u64 stdout_fd,
+                                   u64 stderr_fd,
+                                   int *out_success);
 
 #endif
 

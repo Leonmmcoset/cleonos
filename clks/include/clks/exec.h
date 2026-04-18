@@ -36,6 +36,13 @@ struct clks_exec_proc_snapshot {
 void clks_exec_init(void);
 clks_bool clks_exec_run_path(const char *path, u64 *out_status);
 clks_bool clks_exec_run_pathv(const char *path, const char *argv_line, const char *env_line, u64 *out_status);
+clks_bool clks_exec_run_pathv_io(const char *path,
+                                 const char *argv_line,
+                                 const char *env_line,
+                                 u64 stdin_fd,
+                                 u64 stdout_fd,
+                                 u64 stderr_fd,
+                                 u64 *out_status);
 clks_bool clks_exec_spawn_path(const char *path, u64 *out_pid);
 clks_bool clks_exec_spawn_pathv(const char *path, const char *argv_line, const char *env_line, u64 *out_pid);
 u64 clks_exec_wait_pid(u64 pid, u64 *out_status);

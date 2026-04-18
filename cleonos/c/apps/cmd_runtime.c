@@ -2,6 +2,87 @@
 
 const char *ush_pipeline_stdin_text = (const char *)0;
 u64 ush_pipeline_stdin_len = 0ULL;
+static char ush_pipeline_stdin_buf[USH_COPY_MAX + 1U];
+
+static int ush_cmd_runtime_has_prefix(const char *text, const char *prefix) {
+    u64 i = 0ULL;
+
+    if (text == (const char *)0 || prefix == (const char *)0) {
+        return 0;
+    }
+
+    while (prefix[i] != '\0') {
+        if (text[i] != prefix[i]) {
+            return 0;
+        }
+        i++;
+    }
+
+    return 1;
+}
+
+static int ush_cmd_runtime_stdin_pipe_enabled(char **envp) {
+    u64 i = 0ULL;
+
+    if (envp == (char **)0) {
+        return 0;
+    }
+
+    while (envp[i] != (char *)0) {
+        const char *entry = envp[i];
+
+        if (ush_cmd_runtime_has_prefix(entry, "USH_STDIN_MODE=PIPE") != 0) {
+            return 1;
+        }
+
+        i++;
+    }
+
+    return 0;
+}
+
+static void ush_cmd_runtime_capture_stdin_pipe(void) {
+    u64 total = 0ULL;
+    int truncated = 0;
+    char drain[256];
+
+    for (;;) {
+        u64 got;
+
+        if (total < (u64)USH_COPY_MAX) {
+            got = cleonos_sys_fd_read(0ULL, ush_pipeline_stdin_buf + total, (u64)USH_COPY_MAX - total);
+        } else {
+            got = cleonos_sys_fd_read(0ULL, drain, (u64)sizeof(drain));
+            truncated = 1;
+        }
+
+        if (got == (u64)-1 || got == 0ULL) {
+            break;
+        }
+
+        if (total < (u64)USH_COPY_MAX) {
+            total += got;
+        }
+    }
+
+    ush_pipeline_stdin_buf[total] = '\0';
+    ush_pipeline_stdin_text = ush_pipeline_stdin_buf;
+    ush_pipeline_stdin_len = total;
+
+    if (truncated != 0) {
+        ush_writeln("[pipe] input truncated");
+    }
+}
+
+void cleonos_cmd_runtime_pre_main(char **envp) {
+    ush_pipeline_stdin_text = (const char *)0;
+    ush_pipeline_stdin_len = 0ULL;
+    ush_pipeline_stdin_buf[0] = '\0';
+
+    if (ush_cmd_runtime_stdin_pipe_enabled(envp) != 0) {
+        ush_cmd_runtime_capture_stdin_pipe();
+    }
+}
 
 void ush_zero(void *ptr, u64 size) {
     if (ptr == (void *)0 || size == 0ULL) {

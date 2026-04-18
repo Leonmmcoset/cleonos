@@ -5,6 +5,7 @@
 #define CLEONOS_RUNTIME_ITEM_MAX 128ULL
 
 extern int cleonos_app_main(int argc, char **argv, char **envp);
+extern void cleonos_cmd_runtime_pre_main(char **envp) __attribute__((weak));
 
 u64 _start(void) {
     static char argv_items[CLEONOS_RUNTIME_ARGV_MAX][CLEONOS_RUNTIME_ITEM_MAX];
@@ -42,6 +43,10 @@ u64 _start(void) {
     }
 
     env_ptrs[envc] = (char *)0;
+
+    if (cleonos_cmd_runtime_pre_main != (void (*)(char **))0) {
+        cleonos_cmd_runtime_pre_main(env_ptrs);
+    }
 
     code = cleonos_app_main((int)argc, argv_ptrs, env_ptrs);
     return (u64)code;

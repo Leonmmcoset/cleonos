@@ -74,6 +74,42 @@
 #define CLKS_CFG_USRD_TASK 1
 #endif
 
+#ifndef CLKS_CFG_BOOT_VIDEO_LOG
+#define CLKS_CFG_BOOT_VIDEO_LOG 1
+#endif
+
+#ifndef CLKS_CFG_PMM_STATS_LOG
+#define CLKS_CFG_PMM_STATS_LOG 1
+#endif
+
+#ifndef CLKS_CFG_HEAP_STATS_LOG
+#define CLKS_CFG_HEAP_STATS_LOG 1
+#endif
+
+#ifndef CLKS_CFG_FS_ROOT_LOG
+#define CLKS_CFG_FS_ROOT_LOG 1
+#endif
+
+#ifndef CLKS_CFG_SYSTEM_DIR_CHECK
+#define CLKS_CFG_SYSTEM_DIR_CHECK 1
+#endif
+
+#ifndef CLKS_CFG_ELFRUNNER_INIT
+#define CLKS_CFG_ELFRUNNER_INIT 1
+#endif
+
+#ifndef CLKS_CFG_SYSCALL_TICK_QUERY
+#define CLKS_CFG_SYSCALL_TICK_QUERY 1
+#endif
+
+#ifndef CLKS_CFG_TTY_READY_LOG
+#define CLKS_CFG_TTY_READY_LOG 1
+#endif
+
+#ifndef CLKS_CFG_IDLE_DEBUG_LOG
+#define CLKS_CFG_IDLE_DEBUG_LOG 1
+#endif
+
 #if CLKS_CFG_KLOGD_TASK
 static void clks_task_klogd(u64 tick) {
     static u64 last_emit = 0ULL;
@@ -161,10 +197,14 @@ void clks_kernel_main(void) {
     if (boot_fb == CLKS_NULL) {
         clks_log(CLKS_LOG_WARN, "VIDEO", "NO FRAMEBUFFER FROM LIMINE");
     } else {
+#if CLKS_CFG_BOOT_VIDEO_LOG
         clks_log_hex(CLKS_LOG_INFO, "VIDEO", "WIDTH", boot_fb->width);
         clks_log_hex(CLKS_LOG_INFO, "VIDEO", "HEIGHT", boot_fb->height);
         clks_log_hex(CLKS_LOG_INFO, "VIDEO", "PITCH", boot_fb->pitch);
         clks_log_hex(CLKS_LOG_INFO, "VIDEO", "BPP", boot_fb->bpp);
+#else
+        clks_log(CLKS_LOG_WARN, "CFG", "BOOT VIDEO LOGS DISABLED BY MENUCONFIG");
+#endif
     }
 
 #if defined(CLKS_ARCH_X86_64)
@@ -183,16 +223,26 @@ void clks_kernel_main(void) {
     clks_pmm_init(boot_memmap);
     pmm_stats = clks_pmm_get_stats();
 
+#if CLKS_CFG_PMM_STATS_LOG
     clks_log_hex(CLKS_LOG_INFO, "PMM", "MANAGED_PAGES", pmm_stats.managed_pages);
     clks_log_hex(CLKS_LOG_INFO, "PMM", "FREE_PAGES", pmm_stats.free_pages);
     clks_log_hex(CLKS_LOG_INFO, "PMM", "USED_PAGES", pmm_stats.used_pages);
     clks_log_hex(CLKS_LOG_INFO, "PMM", "DROPPED_PAGES", pmm_stats.dropped_pages);
+#else
+    (void)pmm_stats;
+    clks_log(CLKS_LOG_WARN, "CFG", "PMM STATS LOGS DISABLED BY MENUCONFIG");
+#endif
 
     clks_heap_init();
     heap_stats = clks_heap_get_stats();
 
+#if CLKS_CFG_HEAP_STATS_LOG
     clks_log_hex(CLKS_LOG_INFO, "HEAP", "TOTAL_BYTES", heap_stats.total_bytes);
     clks_log_hex(CLKS_LOG_INFO, "HEAP", "FREE_BYTES", heap_stats.free_bytes);
+#else
+    (void)heap_stats;
+    clks_log(CLKS_LOG_WARN, "CFG", "HEAP STATS LOGS DISABLED BY MENUCONFIG");
+#endif
 
 #if CLKS_CFG_HEAP_SELFTEST
     void *heap_probe = clks_kmalloc(128);
@@ -215,12 +265,21 @@ void clks_kernel_main(void) {
     }
 
     fs_root_children = clks_fs_count_children("/");
+#if CLKS_CFG_FS_ROOT_LOG
     clks_log_hex(CLKS_LOG_INFO, "FS", "ROOT_CHILDREN", fs_root_children);
+#else
+    (void)fs_root_children;
+#endif
 
+#if CLKS_CFG_SYSTEM_DIR_CHECK
     if (clks_fs_stat("/system", &fs_system_dir) == CLKS_FALSE || fs_system_dir.type != CLKS_FS_NODE_DIR) {
         clks_log(CLKS_LOG_ERROR, "FS", "/SYSTEM DIRECTORY CHECK FAILED");
         clks_cpu_halt_forever();
     }
+#else
+    (void)fs_system_dir;
+    clks_log(CLKS_LOG_WARN, "CFG", "/SYSTEM DIRECTORY CHECK DISABLED BY MENUCONFIG");
+#endif
 
     if (boot_fb != CLKS_NULL) {
 #if CLKS_CFG_EXTERNAL_PSF
@@ -318,8 +377,13 @@ void clks_kernel_main(void) {
 
     clks_service_init();
 
+#if CLKS_CFG_ELFRUNNER_INIT
     clks_elfrunner_init();
+#else
+    clks_log(CLKS_LOG_WARN, "CFG", "ELFRUNNER INIT DISABLED BY MENUCONFIG");
+#endif
 
+#if CLKS_CFG_ELFRUNNER_INIT
 #if CLKS_CFG_ELFRUNNER_PROBE
     if (clks_elfrunner_probe_kernel_executable() == CLKS_FALSE) {
         clks_log(CLKS_LOG_ERROR, "ELF", "KERNEL ELF PROBE FAILED");
@@ -327,14 +391,22 @@ void clks_kernel_main(void) {
 #else
     clks_log(CLKS_LOG_WARN, "CFG", "ELFRUNNER PROBE DISABLED BY MENUCONFIG");
 #endif
+#else
+    clks_log(CLKS_LOG_WARN, "CFG", "ELFRUNNER PROBE SKIPPED (INIT DISABLED)");
+#endif
 
     clks_syscall_init();
 
     clks_interrupts_init();
     clks_log(CLKS_LOG_INFO, "INT", "IDT + PIC INITIALIZED");
 
+#if CLKS_CFG_SYSCALL_TICK_QUERY
     syscall_ticks = clks_syscall_invoke_kernel(CLKS_SYSCALL_TIMER_TICKS, 0ULL, 0ULL, 0ULL);
     clks_log_hex(CLKS_LOG_INFO, "SYSCALL", "TICKS", syscall_ticks);
+#else
+    (void)syscall_ticks;
+    clks_log(CLKS_LOG_WARN, "CFG", "SYSCALL TICK QUERY DISABLED BY MENUCONFIG");
+#endif
 
     clks_shell_init();
 
@@ -348,11 +420,15 @@ void clks_kernel_main(void) {
     clks_log(CLKS_LOG_WARN, "SHELL", "USRD TASK DISABLED; INTERACTIVE SHELL TICK OFF");
 #endif
 
+#if CLKS_CFG_TTY_READY_LOG
     clks_log_hex(CLKS_LOG_INFO, "TTY", "COUNT", (u64)clks_tty_count());
     clks_log_hex(CLKS_LOG_INFO, "TTY", "ACTIVE", (u64)clks_tty_active());
     clks_log(CLKS_LOG_INFO, "TTY", "VIRTUAL TTY0 READY");
     clks_log(CLKS_LOG_INFO, "TTY", "CURSOR ENABLED");
+#endif
+#if CLKS_CFG_IDLE_DEBUG_LOG
     clks_log(CLKS_LOG_DEBUG, "KERNEL", "IDLE LOOP ENTER");
+#endif
 
     for (;;) {
         u64 tick_now = clks_interrupts_timer_ticks();

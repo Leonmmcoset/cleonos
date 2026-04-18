@@ -2438,6 +2438,23 @@ static int ush_cmd_not_supported(const char *name, const char *why) {
     return 0;
 }
 
+static volatile int ush_builtin_fallback_enabled = 0;
+
+static int ush_builtin_fallback_is_enabled(void) {
+    return ush_builtin_fallback_enabled;
+}
+
+static void ush_report_external_not_found(const char *cmd) {
+    ush_write("command not found (external ELF required): ");
+
+    if (cmd == (const char *)0 || cmd[0] == '\0') {
+        ush_writeln("(empty)");
+        return;
+    }
+
+    ush_writeln(cmd);
+}
+
 static int ush_execute_single_command(ush_state *sh,
                                       const char *cmd,
                                       const char *arg,
@@ -2462,10 +2479,28 @@ static int ush_execute_single_command(ush_state *sh,
         return 0;
     }
 
-    if (allow_external != 0 && ush_try_exec_external(sh, cmd, arg, &success) != 0) {
+    (void)allow_external;
+
+    if (ush_try_exec_external(sh, cmd, arg, &success) != 0) {
         if (out_success != (int *)0) {
             *out_success = success;
         }
+        return 1;
+    }
+
+    if (ush_builtin_fallback_is_enabled() == 0) {
+        known = 0;
+        success = 0;
+        ush_report_external_not_found(cmd);
+
+        if (out_known != (int *)0) {
+            *out_known = known;
+        }
+
+        if (out_success != (int *)0) {
+            *out_success = success;
+        }
+
         return 1;
     }
 
@@ -2743,6 +2778,23 @@ static int ush_pipeline_open_write_fd(const char *path, u64 flags, u64 *out_fd) 
     return 1;
 }
 
+static int ush_pipeline_open_read_fd(const char *path, u64 *out_fd) {
+    u64 fd;
+
+    if (path == (const char *)0 || out_fd == (u64 *)0) {
+        return 0;
+    }
+
+    fd = cleonos_sys_fd_open(path, CLEONOS_O_RDONLY, 0ULL);
+
+    if (fd == (u64)-1) {
+        return 0;
+    }
+
+    *out_fd = fd;
+    return 1;
+}
+
 static int ush_pipeline_read_path_into_buffer(const char *path, char *buffer, u64 buffer_size, u64 *out_len) {
     u64 fd;
     u64 total = 0ULL;
@@ -2862,6 +2914,114 @@ static int ush_execute_pipeline(ush_state *sh,
 
     if (ush_pipeline_parse(line, stages, USH_PIPELINE_MAX_STAGES, &stage_count) == 0) {
         return 0;
+    }
+
+    if (ush_builtin_fallback_is_enabled() == 0) {
+        const char *pipe_input_path_external = (const char *)0;
+        int pipe_output_toggle_external = 0;
+
+        for (i = 0ULL; i < stage_count; i++) {
+            int stage_known = 1;
+            int stage_success = 0;
+            u64 stage_stdin_fd = CLEONOS_FD_INHERIT;
+            u64 stage_stdout_fd = CLEONOS_FD_INHERIT;
+            u64 opened_in_fd = (u64)-1;
+            u64 opened_out_fd = (u64)-1;
+            const char *stage_pipe_out = (const char *)0;
+
+            if (i + 1ULL < stage_count && stages[i].redirect_mode != 0) {
+                ush_writeln("pipe: redirection is only supported on final stage");
+                known = 1;
+                success = 0;
+                break;
+            }
+
+            if (pipe_input_path_external != (const char *)0) {
+                if (ush_pipeline_open_read_fd(pipe_input_path_external, &opened_in_fd) == 0) {
+                    ush_writeln("pipe: failed to open stage input");
+                    success = 0;
+                    break;
+                }
+
+                stage_stdin_fd = opened_in_fd;
+            }
+
+            if (i + 1ULL < stage_count) {
+                stage_pipe_out = (pipe_output_toggle_external == 0) ? USH_PIPE_TMP_A : USH_PIPE_TMP_B;
+
+                if (ush_pipeline_open_write_fd(stage_pipe_out,
+                                               CLEONOS_O_WRONLY | CLEONOS_O_CREAT | CLEONOS_O_TRUNC,
+                                               &opened_out_fd) == 0) {
+                    ush_writeln("pipe: failed to open temp stream");
+
+                    if (opened_in_fd != (u64)-1) {
+                        (void)cleonos_sys_fd_close(opened_in_fd);
+                    }
+
+                    success = 0;
+                    break;
+                }
+
+                stage_stdout_fd = opened_out_fd;
+            } else if (stages[i].redirect_mode != 0) {
+                if (ush_pipeline_open_redirect_fd(sh, &stages[i], &opened_out_fd) == 0) {
+                    if (opened_in_fd != (u64)-1) {
+                        (void)cleonos_sys_fd_close(opened_in_fd);
+                    }
+
+                    success = 0;
+                    break;
+                }
+
+                stage_stdout_fd = opened_out_fd;
+            }
+
+            stage_known = ush_try_exec_external_with_fds(sh,
+                                                         stages[i].cmd,
+                                                         stages[i].arg,
+                                                         stage_stdin_fd,
+                                                         stage_stdout_fd,
+                                                         CLEONOS_FD_INHERIT,
+                                                         &stage_success);
+
+            if (opened_in_fd != (u64)-1) {
+                (void)cleonos_sys_fd_close(opened_in_fd);
+            }
+
+            if (opened_out_fd != (u64)-1) {
+                (void)cleonos_sys_fd_close(opened_out_fd);
+            }
+
+            if (stage_known == 0) {
+                known = 0;
+                success = 0;
+                ush_report_external_not_found(stages[i].cmd);
+                break;
+            }
+
+            if (stage_success == 0) {
+                success = 0;
+                break;
+            }
+
+            if (i + 1ULL < stage_count) {
+                pipe_input_path_external = stage_pipe_out;
+                pipe_output_toggle_external = (pipe_output_toggle_external == 0) ? 1 : 0;
+            }
+        }
+
+        (void)cleonos_sys_fs_remove(USH_PIPE_TMP_A);
+        (void)cleonos_sys_fs_remove(USH_PIPE_TMP_B);
+
+        if (out_known != (int *)0) {
+            *out_known = known;
+        }
+
+        if (out_success != (int *)0) {
+            *out_success = success;
+        }
+
+        return 1;
     }
 
     for (i = 0ULL; i < stage_count; i++) {

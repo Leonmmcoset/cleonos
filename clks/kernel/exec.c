@@ -34,6 +34,7 @@ typedef u64 (*clks_exec_entry_fn)(void);
 #define CLKS_EXEC_O_CREAT        0x0040ULL
 #define CLKS_EXEC_O_TRUNC        0x0200ULL
 #define CLKS_EXEC_O_APPEND       0x0400ULL
+#define CLKS_EXEC_FD_INHERIT     ((u64)-1)
 #define CLKS_EXEC_DYNLIB_MAX       32U
 
 #define CLKS_EXEC_ELF64_MAGIC_0 0x7FU
@@ -828,6 +829,66 @@ static void clks_exec_fd_init_defaults(struct clks_exec_proc_record *proc) {
     proc->fds[2].path[0] = '\0';
 }
 
+static clks_bool clks_exec_fd_copy_from_parent(struct clks_exec_proc_record *child,
+                                                const struct clks_exec_proc_record *parent,
+                                                u64 parent_fd,
+                                                u64 child_fd,
+                                                clks_bool require_read,
+                                                clks_bool require_write) {
+    const struct clks_exec_fd_entry *src;
+
+    if (child == CLKS_NULL || parent == CLKS_NULL || parent_fd >= CLKS_EXEC_FD_MAX || child_fd >= CLKS_EXEC_FD_MAX) {
+        return CLKS_FALSE;
+    }
+
+    src = &parent->fds[(u32)parent_fd];
+
+    if (src->used == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    if (require_read == CLKS_TRUE && clks_exec_fd_can_read(src->flags) == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    if (require_write == CLKS_TRUE && clks_exec_fd_can_write(src->flags) == CLKS_FALSE) {
+        return CLKS_FALSE;
+    }
+
+    child->fds[(u32)child_fd] = *src;
+    return CLKS_TRUE;
+}
+
+static clks_bool clks_exec_fd_apply_stdio_overrides(struct clks_exec_proc_record *child,
+                                                    const struct clks_exec_proc_record *parent,
+                                                    u64 stdin_fd,
+                                                    u64 stdout_fd,
+                                                    u64 stderr_fd) {
+    if (child == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    if (stdin_fd != CLKS_EXEC_FD_INHERIT) {
+        if (clks_exec_fd_copy_from_parent(child, parent, stdin_fd, 0ULL, CLKS_TRUE, CLKS_FALSE) == CLKS_FALSE) {
+            return CLKS_FALSE;
+        }
+    }
+
+    if (stdout_fd != CLKS_EXEC_FD_INHERIT) {
+        if (clks_exec_fd_copy_from_parent(child, parent, stdout_fd, 1ULL, CLKS_FALSE, CLKS_TRUE) == CLKS_FALSE) {
+            return CLKS_FALSE;
+        }
+    }
+
+    if (stderr_fd != CLKS_EXEC_FD_INHERIT) {
+        if (clks_exec_fd_copy_from_parent(child, parent, stderr_fd, 2ULL, CLKS_FALSE, CLKS_TRUE) == CLKS_FALSE) {
+            return CLKS_FALSE;
+        }
+    }
+
+    return CLKS_TRUE;
+}
+
 static i32 clks_exec_fd_find_free(struct clks_exec_proc_record *proc) {
     u32 i;
 
@@ -1330,10 +1391,14 @@ static clks_bool clks_exec_dispatch_pending_once(void) {
 static clks_bool clks_exec_run_path_internal(const char *path,
                                              const char *argv_line,
                                              const char *env_line,
+                                             u64 stdin_fd,
+                                             u64 stdout_fd,
+                                             u64 stderr_fd,
                                              u64 *out_status,
                                              u64 *out_pid) {
     i32 slot;
     u64 pid;
+    const struct clks_exec_proc_record *parent_proc = clks_exec_current_proc();
     struct clks_exec_proc_record *proc;
     u64 status = (u64)-1;
 
@@ -1363,6 +1428,12 @@ static clks_bool clks_exec_run_path_internal(const char *path,
     proc = clks_exec_prepare_proc_record(slot, pid, path, argv_line, env_line, CLKS_EXEC_PROC_RUNNING);
 
     if (proc == CLKS_NULL) {
+        return CLKS_FALSE;
+    }
+
+    if (clks_exec_fd_apply_stdio_overrides(proc, parent_proc, stdin_fd, stdout_fd, stderr_fd) == CLKS_FALSE) {
+        clks_log(CLKS_LOG_WARN, "EXEC", "INVALID STDIO FD OVERRIDE");
+        clks_memset(proc, 0, sizeof(*proc));
         return CLKS_FALSE;
     }
 
@@ -1403,11 +1474,35 @@ void clks_exec_init(void) {
 }
 
 clks_bool clks_exec_run_path(const char *path, u64 *out_status) {
-    return clks_exec_run_path_internal(path, CLKS_NULL, CLKS_NULL, out_status, CLKS_NULL);
+    return clks_exec_run_path_internal(path,
+                                       CLKS_NULL,
+                                       CLKS_NULL,
+                                       CLKS_EXEC_FD_INHERIT,
+                                       CLKS_EXEC_FD_INHERIT,
+                                       CLKS_EXEC_FD_INHERIT,
+                                       out_status,
+                                       CLKS_NULL);
 }
 
 clks_bool clks_exec_run_pathv(const char *path, const char *argv_line, const char *env_line, u64 *out_status) {
-    return clks_exec_run_path_internal(path, argv_line, env_line, out_status, CLKS_NULL);
+    return clks_exec_run_path_internal(path,
+                                       argv_line,
+                                       env_line,
+                                       CLKS_EXEC_FD_INHERIT,
+                                       CLKS_EXEC_FD_INHERIT,
+                                       CLKS_EXEC_FD_INHERIT,
+                                       out_status,
+                                       CLKS_NULL);
+}
+
+clks_bool clks_exec_run_pathv_io(const char *path,
+                                 const char *argv_line,
+                                 const char *env_line,
+                                 u64 stdin_fd,
+                                 u64 stdout_fd,
+                                 u64 stderr_fd,
+                                 u64 *out_status) {
+    return clks_exec_run_path_internal(path, argv_line, env_line, stdin_fd, stdout_fd, stderr_fd, out_status, CLKS_NULL);
 }
 
 clks_bool clks_exec_spawn_pathv(const char *path, const char *argv_line, const char *env_line, u64 *out_pid) {

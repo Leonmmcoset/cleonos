@@ -7,7 +7,7 @@ static int ush_cmd_cat(const ush_state *sh, const char *arg) {
     u64 fd;
 
     if (arg == (const char *)0 || arg[0] == '\0') {
-        if (ush_pipeline_stdin_text != (const char *)0 && ush_pipeline_stdin_len > 0ULL) {
+        if (ush_pipeline_stdin_text != (const char *)0) {
             (void)fputs(ush_pipeline_stdin_text, 1);
             return 1;
         }

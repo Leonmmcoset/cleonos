@@ -24,6 +24,7 @@ typedef unsigned long long usize;
 #define CLEONOS_O_CREAT  0x0040ULL
 #define CLEONOS_O_TRUNC  0x0200ULL
 #define CLEONOS_O_APPEND 0x0400ULL
+#define CLEONOS_FD_INHERIT ((u64)-1)
 
 typedef struct cleonos_proc_snapshot {
     u64 pid;
@@ -122,6 +123,7 @@ typedef struct cleonos_proc_snapshot {
 #define CLEONOS_SYSCALL_DL_OPEN             77ULL
 #define CLEONOS_SYSCALL_DL_CLOSE            78ULL
 #define CLEONOS_SYSCALL_DL_SYM              79ULL
+#define CLEONOS_SYSCALL_EXEC_PATHV_IO       80ULL
 
 u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2);
 u64 cleonos_sys_log_write(const char *message, u64 length);
@@ -138,6 +140,12 @@ u64 cleonos_sys_fs_get_child_name(const char *dir_path, u64 index, char *out_nam
 u64 cleonos_sys_fs_read(const char *path, char *out_buffer, u64 buffer_size);
 u64 cleonos_sys_exec_path(const char *path);
 u64 cleonos_sys_exec_pathv(const char *path, const char *argv_line, const char *env_line);
+u64 cleonos_sys_exec_pathv_io(const char *path,
+                              const char *argv_line,
+                              const char *env_line,
+                              u64 stdin_fd,
+                              u64 stdout_fd,
+                              u64 stderr_fd);
 u64 cleonos_sys_exec_request_count(void);
 u64 cleonos_sys_exec_success_count(void);
 u64 cleonos_sys_user_shell_ready(void);

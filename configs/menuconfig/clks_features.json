@@ -77,6 +77,60 @@
       "title": "Scheduler Task: usrd",
       "description": "Enable user/runtime dispatch task (shell tick, tty tick, exec tick).",
       "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_BOOT_VIDEO_LOG",
+      "title": "Boot Video Geometry Logs",
+      "description": "Print framebuffer width/height/pitch/bpp logs at boot.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_PMM_STATS_LOG",
+      "title": "PMM Stats Logs",
+      "description": "Print PMM managed/free/used/dropped pages at boot.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_HEAP_STATS_LOG",
+      "title": "Heap Stats Logs",
+      "description": "Print heap total/free bytes at boot.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_FS_ROOT_LOG",
+      "title": "FS Root Children Log",
+      "description": "Print root directory children count during FS init.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_SYSTEM_DIR_CHECK",
+      "title": "FS /SYSTEM Sanity Check",
+      "description": "Require /system directory check during boot.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_ELFRUNNER_INIT",
+      "title": "ELFRUNNER Init",
+      "description": "Initialize ELFRUNNER framework in kernel boot path.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_SYSCALL_TICK_QUERY",
+      "title": "SYSCALL Tick Query",
+      "description": "Query timer ticks via syscall and log result during boot.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_TTY_READY_LOG",
+      "title": "TTY Ready Logs",
+      "description": "Print TTY count/active/cursor ready logs.",
+      "default": true
+    },
+    {
+      "key": "CLEONOS_CLKS_ENABLE_IDLE_DEBUG_LOG",
+      "title": "Idle Loop Debug Log",
+      "description": "Print debug log before entering kernel idle loop.",
+      "default": true
     }
   ]
 }

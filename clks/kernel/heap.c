@@ -3,8 +3,8 @@
 #include <clks/types.h>
 
 #define CLKS_HEAP_ARENA_SIZE (1024ULL * 1024ULL)
-#define CLKS_HEAP_ALIGN      16ULL
-#define CLKS_HEAP_MAGIC      0x434C454F4E4F534FULL
+#define CLKS_HEAP_ALIGN 16ULL
+#define CLKS_HEAP_MAGIC 0x434C454F4E4F534FULL
 
 struct clks_heap_block {
     usize size;

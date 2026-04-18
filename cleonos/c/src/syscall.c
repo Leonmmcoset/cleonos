@@ -3,12 +3,7 @@
 u64 cleonos_syscall(u64 id, u64 arg0, u64 arg1, u64 arg2) {
     u64 ret;
 
-    __asm__ volatile(
-        "int $0x80"
-        : "=a"(ret)
-        : "a"(id), "b"(arg0), "c"(arg1), "d"(arg2)
-        : "memory"
-    );
+    __asm__ volatile("int $0x80" : "=a"(ret) : "a"(id), "b"(arg0), "c"(arg1), "d"(arg2) : "memory");
 
     return ret;
 }
@@ -76,12 +71,8 @@ struct cleonos_exec_pathv_io_req {
     u64 stderr_fd;
 };
 
-u64 cleonos_sys_exec_pathv_io(const char *path,
-                              const char *argv_line,
-                              const char *env_line,
-                              u64 stdin_fd,
-                              u64 stdout_fd,
-                              u64 stderr_fd) {
+u64 cleonos_sys_exec_pathv_io(const char *path, const char *argv_line, const char *env_line, u64 stdin_fd,
+                              u64 stdout_fd, u64 stderr_fd) {
     struct cleonos_exec_pathv_io_req req;
 
     req.env_line_ptr = (u64)env_line;
@@ -230,7 +221,6 @@ u64 cleonos_sys_shutdown(void) {
 u64 cleonos_sys_restart(void) {
     return cleonos_syscall(CLEONOS_SYSCALL_RESTART, 0ULL, 0ULL, 0ULL);
 }
-
 
 u64 cleonos_sys_audio_available(void) {
     return cleonos_syscall(CLEONOS_SYSCALL_AUDIO_AVAILABLE, 0ULL, 0ULL, 0ULL);

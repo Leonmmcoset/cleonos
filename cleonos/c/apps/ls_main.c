@@ -125,19 +125,13 @@ static void ush_ls_print_one(const char *name, u64 type, u64 size, int long_mode
     clio_write_char('\n');
 }
 
-static int ush_ls_parse_args(const char *arg,
-                             int *out_long_mode,
-                             int *out_recursive,
-                             char *out_target,
+static int ush_ls_parse_args(const char *arg, int *out_long_mode, int *out_recursive, char *out_target,
                              u64 out_target_size) {
     char token[USH_PATH_MAX];
     u64 i = 0ULL;
     int path_set = 0;
 
-    if (out_long_mode == (int *)0 ||
-        out_recursive == (int *)0 ||
-        out_target == (char *)0 ||
-        out_target_size == 0ULL) {
+    if (out_long_mode == (int *)0 || out_recursive == (int *)0 || out_target == (char *)0 || out_target_size == 0ULL) {
         return 0;
     }
 
@@ -196,11 +190,7 @@ static int ush_ls_parse_args(const char *arg,
     return 1;
 }
 
-static int ush_ls_dir(const char *path,
-                      int long_mode,
-                      int recursive,
-                      int print_header,
-                      u64 depth) {
+static int ush_ls_dir(const char *path, int long_mode, int recursive, int print_header, u64 depth) {
     u64 count;
     u64 i;
 
@@ -309,7 +299,6 @@ static int ush_cmd_ls(const ush_state *sh, const char *arg) {
     return ush_ls_dir(path, long_mode, recursive, recursive, 0ULL);
 }
 
-
 int cleonos_app_main(void) {
     ush_cmd_ctx ctx;
     ush_cmd_ret ret;
@@ -353,4 +342,3 @@ int cleonos_app_main(void) {
 
     return (success != 0) ? 0 : 1;
 }
-

@@ -4,9 +4,9 @@
 #include <clks/types.h>
 
 #define CLKS_AUDIO_PIT_BASE_HZ 1193182ULL
-#define CLKS_AUDIO_FREQ_MIN      20ULL
-#define CLKS_AUDIO_FREQ_MAX   20000ULL
-#define CLKS_AUDIO_TICKS_MAX   2048ULL
+#define CLKS_AUDIO_FREQ_MIN 20ULL
+#define CLKS_AUDIO_FREQ_MAX 20000ULL
+#define CLKS_AUDIO_TICKS_MAX 2048ULL
 
 static clks_bool clks_audio_ready = CLKS_FALSE;
 static u64 clks_audio_played_count = 0ULL;

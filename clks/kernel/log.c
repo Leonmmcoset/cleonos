@@ -14,16 +14,16 @@ static u32 clks_log_journal_count_live = 0U;
 
 static const char *clks_log_level_name(enum clks_log_level level) {
     switch (level) {
-        case CLKS_LOG_DEBUG:
-            return "DEBUG";
-        case CLKS_LOG_INFO:
-            return "INFO";
-        case CLKS_LOG_WARN:
-            return "WARN";
-        case CLKS_LOG_ERROR:
-            return "ERROR";
-        default:
-            return "UNK";
+    case CLKS_LOG_DEBUG:
+        return "DEBUG";
+    case CLKS_LOG_INFO:
+        return "INFO";
+    case CLKS_LOG_WARN:
+        return "WARN";
+    case CLKS_LOG_ERROR:
+        return "ERROR";
+    default:
+        return "UNK";
     }
 }
 
@@ -91,29 +91,23 @@ static void clks_log_journal_push(const char *line) {
 
 static const char *clks_log_level_ansi(enum clks_log_level level) {
     switch (level) {
-        case CLKS_LOG_DEBUG:
-            return "\x1B[38;5;110m";
-        case CLKS_LOG_INFO:
-            return "\x1B[38;5;120m";
-        case CLKS_LOG_WARN:
-            return "\x1B[1;38;5;220m";
-        case CLKS_LOG_ERROR:
-            return "\x1B[1;38;5;203m";
-        default:
-            return "\x1B[38;5;250m";
+    case CLKS_LOG_DEBUG:
+        return "\x1B[38;5;110m";
+    case CLKS_LOG_INFO:
+        return "\x1B[38;5;120m";
+    case CLKS_LOG_WARN:
+        return "\x1B[1;38;5;220m";
+    case CLKS_LOG_ERROR:
+        return "\x1B[1;38;5;203m";
+    default:
+        return "\x1B[38;5;250m";
     }
 }
 
 static const char *clks_log_tag_ansi(const char *tag) {
     static const char *palette[] = {
-        "\x1B[38;5;81m",
-        "\x1B[38;5;117m",
-        "\x1B[38;5;159m",
-        "\x1B[38;5;45m",
-        "\x1B[38;5;75m",
-        "\x1B[38;5;141m",
-        "\x1B[38;5;214m",
-        "\x1B[38;5;168m",
+        "\x1B[38;5;81m", "\x1B[38;5;117m", "\x1B[38;5;159m", "\x1B[38;5;45m",
+        "\x1B[38;5;75m", "\x1B[38;5;141m", "\x1B[38;5;214m", "\x1B[38;5;168m",
     };
     u32 hash = 5381U;
     usize i = 0U;

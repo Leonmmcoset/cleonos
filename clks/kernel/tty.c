@@ -69,12 +69,9 @@ static clks_bool clks_tty_scrollback_is_active(u32 tty_index);
 static void clks_tty_redraw_active(void);
 
 static u32 clks_tty_ansi_palette(u32 index) {
-    static const u32 palette[16] = {
-        0x00000000U, 0x00CD3131U, 0x000DBC79U, 0x00E5E510U,
-        0x002472C8U, 0x00BC3FBCU, 0x0011A8CDU, 0x00E5E5E5U,
-        0x00666666U, 0x00F14C4CU, 0x0023D18BU, 0x00F5F543U,
-        0x003B8EEAU, 0x00D670D6U, 0x0029B8DBU, 0x00FFFFFFU
-    };
+    static const u32 palette[16] = {0x00000000U, 0x00CD3131U, 0x000DBC79U, 0x00E5E510U, 0x002472C8U, 0x00BC3FBCU,
+                                    0x0011A8CDU, 0x00E5E5E5U, 0x00666666U, 0x00F14C4CU, 0x0023D18BU, 0x00F5F543U,
+                                    0x003B8EEAU, 0x00D670D6U, 0x0029B8DBU, 0x00FFFFFFU};
 
     if (index < 16U) {
         return palette[index];
@@ -88,25 +85,12 @@ static void clks_tty_reset_blink_timer(void) {
 }
 
 static void clks_tty_draw_cell_with_colors(u32 row, u32 col, char ch, u32 fg, u32 bg, u8 style) {
-    clks_fb_draw_char_styled(
-        col * clks_tty_cell_width,
-        row * clks_tty_cell_height,
-        ch,
-        fg,
-        bg,
-        (u32)style
-    );
+    clks_fb_draw_char_styled(col * clks_tty_cell_width, row * clks_tty_cell_height, ch, fg, bg, (u32)style);
 }
 
 static void clks_tty_draw_cell(u32 tty_index, u32 row, u32 col) {
-    clks_tty_draw_cell_with_colors(
-        row,
-        col,
-        clks_tty_cells[tty_index][row][col],
-        clks_tty_cell_fg[tty_index][row][col],
-        clks_tty_cell_bg[tty_index][row][col],
-        clks_tty_cell_style[tty_index][row][col]
-    );
+    clks_tty_draw_cell_with_colors(row, col, clks_tty_cells[tty_index][row][col], clks_tty_cell_fg[tty_index][row][col],
+                                   clks_tty_cell_bg[tty_index][row][col], clks_tty_cell_style[tty_index][row][col]);
 }
 
 static void clks_tty_dirty_reset(void) {
@@ -189,21 +173,11 @@ static void clks_tty_scrollback_push_row(u32 tty_index, u32 row) {
     u32 slot = clks_tty_scrollback_head[tty_index];
 
     clks_memcpy(clks_tty_scrollback_cells[tty_index][slot], clks_tty_cells[tty_index][row], clks_tty_cols);
-    clks_memcpy(
-        clks_tty_scrollback_fg[tty_index][slot],
-        clks_tty_cell_fg[tty_index][row],
-        (usize)clks_tty_cols * sizeof(u32)
-    );
-    clks_memcpy(
-        clks_tty_scrollback_bg[tty_index][slot],
-        clks_tty_cell_bg[tty_index][row],
-        (usize)clks_tty_cols * sizeof(u32)
-    );
-    clks_memcpy(
-        clks_tty_scrollback_style[tty_index][slot],
-        clks_tty_cell_style[tty_index][row],
-        clks_tty_cols
-    );
+    clks_memcpy(clks_tty_scrollback_fg[tty_index][slot], clks_tty_cell_fg[tty_index][row],
+                (usize)clks_tty_cols * sizeof(u32));
+    clks_memcpy(clks_tty_scrollback_bg[tty_index][slot], clks_tty_cell_bg[tty_index][row],
+                (usize)clks_tty_cols * sizeof(u32));
+    clks_memcpy(clks_tty_scrollback_style[tty_index][slot], clks_tty_cell_style[tty_index][row], clks_tty_cols);
 
     clks_tty_scrollback_head[tty_index] = (slot + 1U) % CLKS_TTY_SCROLLBACK_LINES;
 
@@ -338,14 +312,8 @@ static void clks_tty_draw_status_bar(void) {
     for (col = 0U; col < clks_tty_cols; col++) {
         char ch = (col < CLKS_TTY_MAX_COLS) ? line[col] : ' ';
 
-        clks_tty_draw_cell_with_colors(
-            status_row,
-            col,
-            ch,
-            CLKS_TTY_STATUS_FG,
-            CLKS_TTY_STATUS_BG,
-            CLKS_TTY_STATUS_STYLE
-        );
+        clks_tty_draw_cell_with_colors(status_row, col, ch, CLKS_TTY_STATUS_FG, CLKS_TTY_STATUS_BG,
+                                       CLKS_TTY_STATUS_STYLE);
     }
 }
 
@@ -470,14 +438,10 @@ static void clks_tty_redraw_active(void) {
             u32 phys = clks_tty_scrollback_logical_to_physical(tty_index, doc_index);
 
             for (col = 0; col < clks_tty_cols; col++) {
-                clks_tty_draw_cell_with_colors(
-                    row,
-                    col,
-                    clks_tty_scrollback_cells[tty_index][phys][col],
-                    clks_tty_scrollback_fg[tty_index][phys][col],
-                    clks_tty_scrollback_bg[tty_index][phys][col],
-                    clks_tty_scrollback_style[tty_index][phys][col]
-                );
+                clks_tty_draw_cell_with_colors(row, col, clks_tty_scrollback_cells[tty_index][phys][col],
+                                               clks_tty_scrollback_fg[tty_index][phys][col],
+                                               clks_tty_scrollback_bg[tty_index][phys][col],
+                                               clks_tty_scrollback_style[tty_index][phys][col]);
             }
 
             continue;
@@ -492,13 +456,8 @@ static void clks_tty_redraw_active(void) {
 
             for (col = 0; col < clks_tty_cols; col++) {
                 clks_tty_draw_cell_with_colors(
-                    row,
-                    col,
-                    clks_tty_cells[tty_index][src_row][col],
-                    clks_tty_cell_fg[tty_index][src_row][col],
-                    clks_tty_cell_bg[tty_index][src_row][col],
-                    clks_tty_cell_style[tty_index][src_row][col]
-                );
+                    row, col, clks_tty_cells[tty_index][src_row][col], clks_tty_cell_fg[tty_index][src_row][col],
+                    clks_tty_cell_bg[tty_index][src_row][col], clks_tty_cell_style[tty_index][src_row][col]);
             }
         }
     }
@@ -516,21 +475,11 @@ static void clks_tty_scroll_up(u32 tty_index) {
 
     for (row = 1; row < clks_tty_content_rows(); row++) {
         clks_memcpy(clks_tty_cells[tty_index][row - 1U], clks_tty_cells[tty_index][row], clks_tty_cols);
-        clks_memcpy(
-            clks_tty_cell_fg[tty_index][row - 1U],
-            clks_tty_cell_fg[tty_index][row],
-            (usize)clks_tty_cols * sizeof(u32)
-        );
-        clks_memcpy(
-            clks_tty_cell_bg[tty_index][row - 1U],
-            clks_tty_cell_bg[tty_index][row],
-            (usize)clks_tty_cols * sizeof(u32)
-        );
-        clks_memcpy(
-            clks_tty_cell_style[tty_index][row - 1U],
-            clks_tty_cell_style[tty_index][row],
-            clks_tty_cols
-        );
+        clks_memcpy(clks_tty_cell_fg[tty_index][row - 1U], clks_tty_cell_fg[tty_index][row],
+                    (usize)clks_tty_cols * sizeof(u32));
+        clks_memcpy(clks_tty_cell_bg[tty_index][row - 1U], clks_tty_cell_bg[tty_index][row],
+                    (usize)clks_tty_cols * sizeof(u32));
+        clks_memcpy(clks_tty_cell_style[tty_index][row - 1U], clks_tty_cell_style[tty_index][row], clks_tty_cols);
     }
 
     clks_tty_fill_row(tty_index, clks_tty_content_rows() - 1U, ' ');
@@ -1462,7 +1411,6 @@ void clks_tty_scrollback_page_down(void) {
     }
 }
 
-
 u32 clks_tty_active(void) {
     return clks_tty_active_index;
 }
@@ -1474,4 +1422,3 @@ u32 clks_tty_count(void) {
 clks_bool clks_tty_ready(void) {
     return clks_tty_is_ready;
 }
-

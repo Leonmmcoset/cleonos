@@ -5,21 +5,21 @@
 #include <clks/tty.h>
 #include <clks/types.h>
 
-#define CLKS_DESKTOP_TTY_INDEX       1U
+#define CLKS_DESKTOP_TTY_INDEX 1U
 
-#define CLKS_DESKTOP_BG_COLOR        0x001B2430U
-#define CLKS_DESKTOP_TOPBAR_COLOR    0x00293447U
-#define CLKS_DESKTOP_DOCK_COLOR      0x00232C3AU
-#define CLKS_DESKTOP_WINDOW_COLOR    0x00313E52U
-#define CLKS_DESKTOP_TITLE_COLOR     0x003B4A61U
-#define CLKS_DESKTOP_TEXT_FG         0x00E6EDF7U
-#define CLKS_DESKTOP_TEXT_BG         0x003B4A61U
+#define CLKS_DESKTOP_BG_COLOR 0x001B2430U
+#define CLKS_DESKTOP_TOPBAR_COLOR 0x00293447U
+#define CLKS_DESKTOP_DOCK_COLOR 0x00232C3AU
+#define CLKS_DESKTOP_WINDOW_COLOR 0x00313E52U
+#define CLKS_DESKTOP_TITLE_COLOR 0x003B4A61U
+#define CLKS_DESKTOP_TEXT_FG 0x00E6EDF7U
+#define CLKS_DESKTOP_TEXT_BG 0x003B4A61U
 
-#define CLKS_DESKTOP_CURSOR_FILL     0x00F5F8FFU
-#define CLKS_DESKTOP_CURSOR_OUTLINE  0x00101010U
-#define CLKS_DESKTOP_CURSOR_ACTIVE   0x00FFCE6EU
-#define CLKS_DESKTOP_CURSOR_W        16U
-#define CLKS_DESKTOP_CURSOR_H        16U
+#define CLKS_DESKTOP_CURSOR_FILL 0x00F5F8FFU
+#define CLKS_DESKTOP_CURSOR_OUTLINE 0x00101010U
+#define CLKS_DESKTOP_CURSOR_ACTIVE 0x00FFCE6EU
+#define CLKS_DESKTOP_CURSOR_W 16U
+#define CLKS_DESKTOP_CURSOR_H 16U
 
 struct clks_desktop_layout {
     u32 width;
@@ -207,8 +207,8 @@ static void clks_desktop_draw_static_scene(const struct clks_mouse_state *mouse)
     }
 
     if (clks_desktop.height > clks_desktop.topbar_h) {
-        clks_fb_fill_rect(0U, clks_desktop.topbar_h, clks_desktop.dock_w,
-                          clks_desktop.height - clks_desktop.topbar_h, CLKS_DESKTOP_DOCK_COLOR);
+        clks_fb_fill_rect(0U, clks_desktop.topbar_h, clks_desktop.dock_w, clks_desktop.height - clks_desktop.topbar_h,
+                          CLKS_DESKTOP_DOCK_COLOR);
     }
 
     clks_fb_fill_rect(clks_desktop.win_x, clks_desktop.win_y, clks_desktop.win_w, clks_desktop.win_h,
@@ -217,8 +217,8 @@ static void clks_desktop_draw_static_scene(const struct clks_mouse_state *mouse)
                       CLKS_DESKTOP_TITLE_COLOR);
 
     clks_desktop_draw_text(12U, 6U, "CLeonOS Desktop TTY2", CLKS_DESKTOP_TEXT_FG, CLKS_DESKTOP_TOPBAR_COLOR);
-    clks_desktop_draw_text(clks_desktop.win_x + 12U, clks_desktop.win_y + 6U, "Mouse Input Ready",
-                           CLKS_DESKTOP_TEXT_FG, CLKS_DESKTOP_TITLE_COLOR);
+    clks_desktop_draw_text(clks_desktop.win_x + 12U, clks_desktop.win_y + 6U, "Mouse Input Ready", CLKS_DESKTOP_TEXT_FG,
+                           CLKS_DESKTOP_TITLE_COLOR);
     clks_desktop_draw_text(clks_desktop.win_x + 16U, clks_desktop.win_y + clks_desktop.win_title_h + 16U,
                            "Stage25: Alt+F2 desktop, Alt+F1 shell", CLKS_DESKTOP_TEXT_FG, CLKS_DESKTOP_WINDOW_COLOR);
 

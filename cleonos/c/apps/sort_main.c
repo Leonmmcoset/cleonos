@@ -28,7 +28,8 @@ static int ush_sort_parse_args(const char *arg, char *out_file, u64 out_file_siz
     return 1;
 }
 
-static int ush_sort_load_input(const ush_state *sh, const char *file_arg, char *out_buf, u64 out_buf_size, u64 *out_len) {
+static int ush_sort_load_input(const ush_state *sh, const char *file_arg, char *out_buf, u64 out_buf_size,
+                               u64 *out_len) {
     char path[USH_PATH_MAX];
     u64 size;
     u64 got;
@@ -220,7 +221,6 @@ static int ush_cmd_sort(const ush_state *sh, const char *arg) {
 
     return 1;
 }
-
 
 int cleonos_app_main(void) {
     ush_cmd_ctx ctx;

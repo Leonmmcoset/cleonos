@@ -52,8 +52,7 @@ static int ush_fg_pick_latest_job(u64 *out_pid) {
             continue;
         }
 
-        if (snap.state != CLEONOS_PROC_STATE_PENDING &&
-            snap.state != CLEONOS_PROC_STATE_RUNNING &&
+        if (snap.state != CLEONOS_PROC_STATE_PENDING && snap.state != CLEONOS_PROC_STATE_RUNNING &&
             snap.state != CLEONOS_PROC_STATE_STOPPED) {
             continue;
         }

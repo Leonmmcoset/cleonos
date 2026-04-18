@@ -48,10 +48,9 @@ static clks_bool clks_driver_has_elf_suffix(const char *name) {
         return CLKS_FALSE;
     }
 
-    return (name[len - 4U] == '.' &&
-            name[len - 3U] == 'e' &&
-            name[len - 2U] == 'l' &&
-            name[len - 1U] == 'f') ? CLKS_TRUE : CLKS_FALSE;
+    return (name[len - 4U] == '.' && name[len - 3U] == 'e' && name[len - 2U] == 'l' && name[len - 1U] == 'f')
+               ? CLKS_TRUE
+               : CLKS_FALSE;
 }
 
 static clks_bool clks_driver_build_path(const char *child_name, char *out_path, usize out_size) {
@@ -75,12 +74,8 @@ static clks_bool clks_driver_build_path(const char *child_name, char *out_path, 
     return CLKS_TRUE;
 }
 
-static clks_bool clks_driver_push(const char *name,
-                                  enum clks_driver_kind kind,
-                                  enum clks_driver_state state,
-                                  clks_bool from_elf,
-                                  u64 image_size,
-                                  u64 elf_entry) {
+static clks_bool clks_driver_push(const char *name, enum clks_driver_kind kind, enum clks_driver_state state,
+                                  clks_bool from_elf, u64 image_size, u64 elf_entry) {
     struct clks_driver_info *slot;
 
     if (clks_driver_table_count >= CLKS_DRIVER_MAX) {
@@ -110,10 +105,12 @@ static void clks_driver_register_builtins(void) {
     clks_driver_push("serial", CLKS_DRIVER_KIND_BUILTIN_CHAR, CLKS_DRIVER_STATE_READY, CLKS_FALSE, 0ULL, 0ULL);
 
     if (clks_fb_ready() == CLKS_TRUE) {
-        clks_driver_push("framebuffer", CLKS_DRIVER_KIND_BUILTIN_VIDEO, CLKS_DRIVER_STATE_READY, CLKS_FALSE, 0ULL, 0ULL);
+        clks_driver_push("framebuffer", CLKS_DRIVER_KIND_BUILTIN_VIDEO, CLKS_DRIVER_STATE_READY, CLKS_FALSE, 0ULL,
+                         0ULL);
         clks_driver_push("tty", CLKS_DRIVER_KIND_BUILTIN_TTY, CLKS_DRIVER_STATE_READY, CLKS_FALSE, 0ULL, 0ULL);
     } else {
-        clks_driver_push("framebuffer", CLKS_DRIVER_KIND_BUILTIN_VIDEO, CLKS_DRIVER_STATE_FAILED, CLKS_FALSE, 0ULL, 0ULL);
+        clks_driver_push("framebuffer", CLKS_DRIVER_KIND_BUILTIN_VIDEO, CLKS_DRIVER_STATE_FAILED, CLKS_FALSE, 0ULL,
+                         0ULL);
         clks_driver_push("tty", CLKS_DRIVER_KIND_BUILTIN_TTY, CLKS_DRIVER_STATE_FAILED, CLKS_FALSE, 0ULL, 0ULL);
     }
 

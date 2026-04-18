@@ -7,7 +7,7 @@
 #include <clks/types.h>
 
 #define CLKS_FS_MAX_NODES 512U
-#define CLKS_FS_PATH_MAX  CLKS_RAMDISK_PATH_MAX
+#define CLKS_FS_PATH_MAX CLKS_RAMDISK_PATH_MAX
 
 #define CLKS_FS_NODE_FLAG_HEAP_DATA 0x0001U
 
@@ -103,10 +103,7 @@ static clks_bool clks_fs_internal_in_temp_tree(const char *internal_path) {
         return CLKS_FALSE;
     }
 
-    if (internal_path[0] != 't' ||
-        internal_path[1] != 'e' ||
-        internal_path[2] != 'm' ||
-        internal_path[3] != 'p') {
+    if (internal_path[0] != 't' || internal_path[1] != 'e' || internal_path[2] != 'm' || internal_path[3] != 'p') {
         return CLKS_FALSE;
     }
 
@@ -248,11 +245,8 @@ static i32 clks_fs_alloc_slot(void) {
     return (i32)(clks_fs_nodes_used - 1U);
 }
 
-static i32 clks_fs_create_or_update_node(const char *internal_path,
-                                         enum clks_fs_node_type type,
-                                         u16 parent,
-                                         const void *data,
-                                         u64 size) {
+static i32 clks_fs_create_or_update_node(const char *internal_path, enum clks_fs_node_type type, u16 parent,
+                                         const void *data, u64 size) {
     i32 existing;
     i32 slot;
     usize path_len;
@@ -433,11 +427,8 @@ static clks_bool clks_fs_ramdisk_visit(const struct clks_ramdisk_entry *entry, v
             return CLKS_FALSE;
         }
 
-        if (clks_fs_create_or_update_node(entry->path,
-                                          CLKS_FS_NODE_FILE,
-                                          (u16)parent_index,
-                                          entry->data,
-                                          entry->size) < 0) {
+        if (clks_fs_create_or_update_node(entry->path, CLKS_FS_NODE_FILE, (u16)parent_index, entry->data, entry->size) <
+            0) {
             return CLKS_FALSE;
         }
 
@@ -448,9 +439,7 @@ static clks_bool clks_fs_ramdisk_visit(const struct clks_ramdisk_entry *entry, v
     return CLKS_TRUE;
 }
 
-static clks_bool clks_fs_build_file_payload(const void *data,
-                                            u64 size,
-                                            const void **out_data,
+static clks_bool clks_fs_build_file_payload(const void *data, u64 size, const void **out_data,
                                             clks_bool *out_heap_owned) {
     void *payload;
 
@@ -764,13 +753,7 @@ clks_bool clks_fs_write_all(const char *path, const void *data, u64 size) {
         clks_fs_node_release_heap_data((u16)node_index);
     }
 
-    node_index = clks_fs_create_or_update_node(
-        internal,
-        CLKS_FS_NODE_FILE,
-        (u16)parent_index,
-        payload_data,
-        size
-    );
+    node_index = clks_fs_create_or_update_node(internal, CLKS_FS_NODE_FILE, (u16)parent_index, payload_data, size);
 
     if (node_index < 0) {
         if (payload_heap_owned == CLKS_TRUE) {

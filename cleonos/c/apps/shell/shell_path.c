@@ -194,7 +194,8 @@ int ush_path_is_under_system(const char *path) {
         return 0;
     }
 
-    if (path[0] != '/' || path[1] != 's' || path[2] != 'y' || path[3] != 's' || path[4] != 't' || path[5] != 'e' || path[6] != 'm') {
+    if (path[0] != '/' || path[1] != 's' || path[2] != 'y' || path[3] != 's' || path[4] != 't' || path[5] != 'e' ||
+        path[6] != 'm') {
         return 0;
     }
 

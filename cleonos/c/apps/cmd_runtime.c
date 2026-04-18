@@ -526,17 +526,12 @@ int ush_split_first_and_rest(const char *arg, char *out_first, u64 out_first_siz
     return 1;
 }
 
-int ush_split_two_args(const char *arg,
-                       char *out_first,
-                       u64 out_first_size,
-                       char *out_second,
-                       u64 out_second_size) {
+int ush_split_two_args(const char *arg, char *out_first, u64 out_first_size, char *out_second, u64 out_second_size) {
     u64 i = 0ULL;
     u64 p = 0ULL;
 
-    if (arg == (const char *)0 ||
-        out_first == (char *)0 || out_first_size == 0ULL ||
-        out_second == (char *)0 || out_second_size == 0ULL) {
+    if (arg == (const char *)0 || out_first == (char *)0 || out_first_size == 0ULL || out_second == (char *)0 ||
+        out_second_size == 0ULL) {
         return 0;
     }
 

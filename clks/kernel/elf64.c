@@ -10,10 +10,10 @@
 
 #define CLKS_ELF64_CLASS_64 2U
 #define CLKS_ELF64_DATA_LSB 1U
-#define CLKS_ELF64_VERSION  1U
+#define CLKS_ELF64_VERSION 1U
 
 #define CLKS_ELF64_ET_EXEC 2U
-#define CLKS_ELF64_ET_DYN  3U
+#define CLKS_ELF64_ET_DYN 3U
 
 #define CLKS_ELF64_EM_X86_64 62U
 
@@ -46,10 +46,8 @@ struct clks_elf64_phdr {
 };
 
 static clks_bool clks_elf64_header_ok(const struct clks_elf64_ehdr *eh) {
-    if (eh->e_ident[0] != CLKS_ELF64_MAGIC_0 ||
-        eh->e_ident[1] != CLKS_ELF64_MAGIC_1 ||
-        eh->e_ident[2] != CLKS_ELF64_MAGIC_2 ||
-        eh->e_ident[3] != CLKS_ELF64_MAGIC_3) {
+    if (eh->e_ident[0] != CLKS_ELF64_MAGIC_0 || eh->e_ident[1] != CLKS_ELF64_MAGIC_1 ||
+        eh->e_ident[2] != CLKS_ELF64_MAGIC_2 || eh->e_ident[3] != CLKS_ELF64_MAGIC_3) {
         return CLKS_FALSE;
     }
 

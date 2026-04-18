@@ -1,10 +1,10 @@
 #include "cmd_runtime.h"
 
-#define USH_WAVPLAY_DEFAULT_STEPS    256ULL
-#define USH_WAVPLAY_MAX_STEPS       4096ULL
-#define USH_WAVPLAY_DEFAULT_TICKS      1ULL
-#define USH_WAVPLAY_MAX_TICKS         64ULL
-#define USH_WAVPLAY_RUN_TICK_MAX     512ULL
+#define USH_WAVPLAY_DEFAULT_STEPS 256ULL
+#define USH_WAVPLAY_MAX_STEPS 4096ULL
+#define USH_WAVPLAY_DEFAULT_TICKS 1ULL
+#define USH_WAVPLAY_MAX_TICKS 64ULL
+#define USH_WAVPLAY_RUN_TICK_MAX 512ULL
 
 typedef struct ush_wav_info {
     u64 data_size;
@@ -20,9 +20,7 @@ static unsigned int ush_wav_le16(const unsigned char *ptr) {
 }
 
 static unsigned int ush_wav_le32(const unsigned char *ptr) {
-    return (unsigned int)ptr[0] |
-           ((unsigned int)ptr[1] << 8U) |
-           ((unsigned int)ptr[2] << 16U) |
+    return (unsigned int)ptr[0] | ((unsigned int)ptr[1] << 8U) | ((unsigned int)ptr[2] << 16U) |
            ((unsigned int)ptr[3] << 24U);
 }
 
@@ -31,9 +29,7 @@ static int ush_wav_tag_eq(const unsigned char *tag, const char *lit4) {
         return 0;
     }
 
-    return (tag[0] == (unsigned char)lit4[0] &&
-            tag[1] == (unsigned char)lit4[1] &&
-            tag[2] == (unsigned char)lit4[2] &&
+    return (tag[0] == (unsigned char)lit4[0] && tag[1] == (unsigned char)lit4[1] && tag[2] == (unsigned char)lit4[2] &&
             tag[3] == (unsigned char)lit4[3])
                ? 1
                : 0;
@@ -278,11 +274,7 @@ static u64 ush_wav_frame_deviation(const ush_wav_info *info, const unsigned char
     return 0ULL;
 }
 
-static int ush_wavplay_parse_args(const char *arg,
-                                  char *out_path,
-                                  u64 out_path_size,
-                                  u64 *out_steps,
-                                  u64 *out_ticks,
+static int ush_wavplay_parse_args(const char *arg, char *out_path, u64 out_path_size, u64 *out_steps, u64 *out_ticks,
                                   int *out_stop) {
     char first[USH_PATH_MAX];
     char second[32];

@@ -4,7 +4,7 @@
 
 typedef unsigned long clio_size_t;
 
-#define CLIO_SINK_FD  1
+#define CLIO_SINK_FD 1
 #define CLIO_SINK_BUF 2
 
 struct clio_sink {
@@ -126,10 +126,7 @@ static int clio_sink_emit(struct clio_sink *sink, const char *text, clio_size_t 
     return 1;
 }
 
-static clio_size_t clio_u64_to_base(unsigned long long value,
-                                    unsigned int base,
-                                    int uppercase,
-                                    char *out,
+static clio_size_t clio_u64_to_base(unsigned long long value, unsigned int base, int uppercase, char *out,
                                     clio_size_t out_size) {
     char tmp[64];
     clio_size_t pos = 0UL;

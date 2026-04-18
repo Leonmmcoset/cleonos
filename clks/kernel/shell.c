@@ -12,17 +12,17 @@
 #include <clks/tty.h>
 #include <clks/types.h>
 
-#define CLKS_SHELL_LINE_MAX       192U
-#define CLKS_SHELL_CMD_MAX         32U
-#define CLKS_SHELL_ARG_MAX        160U
-#define CLKS_SHELL_NAME_MAX        96U
-#define CLKS_SHELL_PATH_MAX       192U
-#define CLKS_SHELL_CAT_LIMIT      512U
-#define CLKS_SHELL_DMESG_LINE_MAX  256U
-#define CLKS_SHELL_DMESG_DEFAULT    64ULL
-#define CLKS_SHELL_INPUT_BUDGET   128U
-#define CLKS_SHELL_CLEAR_LINES     56U
-#define CLKS_SHELL_HISTORY_MAX     16U
+#define CLKS_SHELL_LINE_MAX 192U
+#define CLKS_SHELL_CMD_MAX 32U
+#define CLKS_SHELL_ARG_MAX 160U
+#define CLKS_SHELL_NAME_MAX 96U
+#define CLKS_SHELL_PATH_MAX 192U
+#define CLKS_SHELL_CAT_LIMIT 512U
+#define CLKS_SHELL_DMESG_LINE_MAX 256U
+#define CLKS_SHELL_DMESG_DEFAULT 64ULL
+#define CLKS_SHELL_INPUT_BUDGET 128U
+#define CLKS_SHELL_CLEAR_LINES 56U
+#define CLKS_SHELL_HISTORY_MAX 16U
 #define CLKS_SHELL_PROMPT_TEXT "cleonos> "
 
 static clks_bool clks_shell_ready = CLKS_FALSE;
@@ -173,35 +173,24 @@ static void clks_shell_history_push(const char *line) {
         return;
     }
 
-    if (clks_shell_history_count > 0U &&
-        clks_strcmp(clks_shell_history[clks_shell_history_count - 1U], line) == 0) {
+    if (clks_shell_history_count > 0U && clks_strcmp(clks_shell_history[clks_shell_history_count - 1U], line) == 0) {
         clks_shell_history_cancel_nav();
         return;
     }
 
     if (clks_shell_history_count < CLKS_SHELL_HISTORY_MAX) {
-        clks_shell_copy_line(
-            clks_shell_history[clks_shell_history_count],
-            sizeof(clks_shell_history[clks_shell_history_count]),
-            line
-        );
+        clks_shell_copy_line(clks_shell_history[clks_shell_history_count],
+                             sizeof(clks_shell_history[clks_shell_history_count]), line);
         clks_shell_history_count++;
     } else {
         u32 i;
 
         for (i = 1U; i < CLKS_SHELL_HISTORY_MAX; i++) {
-            clks_memcpy(
-                clks_shell_history[i - 1U],
-                clks_shell_history[i],
-                CLKS_SHELL_LINE_MAX
-            );
+            clks_memcpy(clks_shell_history[i - 1U], clks_shell_history[i], CLKS_SHELL_LINE_MAX);
         }
 
-        clks_shell_copy_line(
-            clks_shell_history[CLKS_SHELL_HISTORY_MAX - 1U],
-            sizeof(clks_shell_history[CLKS_SHELL_HISTORY_MAX - 1U]),
-            line
-        );
+        clks_shell_copy_line(clks_shell_history[CLKS_SHELL_HISTORY_MAX - 1U],
+                             sizeof(clks_shell_history[CLKS_SHELL_HISTORY_MAX - 1U]), line);
     }
 
     clks_shell_history_cancel_nav();
@@ -287,10 +276,7 @@ static void clks_shell_trim(char *line) {
     }
 }
 
-static void clks_shell_split_line(const char *line,
-                                  char *out_cmd,
-                                  usize out_cmd_size,
-                                  char *out_arg,
+static void clks_shell_split_line(const char *line, char *out_cmd, usize out_cmd_size, char *out_arg,
                                   usize out_arg_size) {
     usize i = 0U;
     usize cmd_pos = 0U;
@@ -407,7 +393,8 @@ static clks_bool clks_shell_resolve_exec_path(const char *arg, char *out_path, u
     return CLKS_TRUE;
 }
 
-static clks_bool clks_shell_path_push_component(char *path, usize path_size, usize *io_len, const char *component, usize comp_len) {
+static clks_bool clks_shell_path_push_component(char *path, usize path_size, usize *io_len, const char *component,
+                                                usize comp_len) {
     if (path == CLKS_NULL || io_len == CLKS_NULL || component == CLKS_NULL || comp_len == 0U) {
         return CLKS_FALSE;
     }
@@ -528,9 +515,7 @@ static clks_bool clks_shell_resolve_path(const char *arg, char *out_path, usize 
     return clks_shell_path_parse_into(arg, out_path, out_size, &len);
 }
 
-static clks_bool clks_shell_split_first_and_rest(const char *arg,
-                                                 char *out_first,
-                                                 usize out_first_size,
+static clks_bool clks_shell_split_first_and_rest(const char *arg, char *out_first, usize out_first_size,
                                                  const char **out_rest) {
     usize i = 0U;
     usize p = 0U;
@@ -567,17 +552,13 @@ static clks_bool clks_shell_split_first_and_rest(const char *arg,
     return CLKS_TRUE;
 }
 
-static clks_bool clks_shell_split_two_args(const char *arg,
-                                           char *out_first,
-                                           usize out_first_size,
-                                           char *out_second,
+static clks_bool clks_shell_split_two_args(const char *arg, char *out_first, usize out_first_size, char *out_second,
                                            usize out_second_size) {
     usize i = 0U;
     usize p = 0U;
 
-    if (arg == CLKS_NULL ||
-        out_first == CLKS_NULL || out_first_size == 0U ||
-        out_second == CLKS_NULL || out_second_size == 0U) {
+    if (arg == CLKS_NULL || out_first == CLKS_NULL || out_first_size == 0U || out_second == CLKS_NULL ||
+        out_second_size == 0U) {
         return CLKS_FALSE;
     }
 
@@ -1018,7 +999,8 @@ static clks_bool clks_shell_cmd_mv(const char *arg) {
         return CLKS_FALSE;
     }
 
-    if (clks_shell_path_is_under_temp(src_path) == CLKS_FALSE || clks_shell_path_is_under_temp(dst_path) == CLKS_FALSE) {
+    if (clks_shell_path_is_under_temp(src_path) == CLKS_FALSE ||
+        clks_shell_path_is_under_temp(dst_path) == CLKS_FALSE) {
         clks_shell_writeln("mv: source and destination must be under /temp");
         return CLKS_FALSE;
     }
@@ -1563,4 +1545,3 @@ void clks_shell_tick(u64 tick) {
     clks_shell_drain_input(CLKS_SHELL_INPUT_BUDGET);
     clks_shell_process_pending_command();
 }
-

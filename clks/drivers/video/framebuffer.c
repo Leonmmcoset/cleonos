@@ -181,11 +181,8 @@ void clks_fb_scroll_up(u32 pixel_rows, u32 fill_rgb) {
     row_bytes = (usize)clks_fb.info.pitch;
     move_bytes = (usize)(clks_fb.info.height - pixel_rows) * row_bytes;
 
-    clks_memmove(
-        (void *)clks_fb.address,
-        (const void *)(clks_fb.address + ((usize)pixel_rows * row_bytes)),
-        move_bytes
-    );
+    clks_memmove((void *)clks_fb.address, (const void *)(clks_fb.address + ((usize)pixel_rows * row_bytes)),
+                 move_bytes);
 
     for (y = clks_fb.info.height - pixel_rows; y < clks_fb.info.height; y++) {
         volatile u32 *row_ptr = (volatile u32 *)(clks_fb.address + ((usize)y * row_bytes));
@@ -265,9 +262,8 @@ void clks_fb_draw_char_styled(u32 x, u32 y, char ch, u32 fg_rgb, u32 bg_rgb, u32
 
     for (row = 0U; row < draw_rows; row++) {
         const u8 *row_bits = glyph + ((usize)row * (usize)row_stride);
-        volatile u32 *dst_row = (volatile u32 *)(
-            clks_fb.address + ((usize)(y + row) * (usize)clks_fb.info.pitch) + ((usize)x * 4U)
-        );
+        volatile u32 *dst_row =
+            (volatile u32 *)(clks_fb.address + ((usize)(y + row) * (usize)clks_fb.info.pitch) + ((usize)x * 4U));
 
         for (col = 0U; col < draw_cols; col++) {
             u8 bits = row_bits[col >> 3U];
@@ -317,4 +313,3 @@ u32 clks_fb_cell_width(void) {
 u32 clks_fb_cell_height(void) {
     return clks_fb.glyph_height == 0U ? 8U : clks_fb.glyph_height;
 }
-

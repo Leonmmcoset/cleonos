@@ -11,23 +11,23 @@
 #include <clks/types.h>
 
 #define CLKS_IDT_ENTRY_COUNT 256U
-#define CLKS_INTERRUPT_GATE  0x8EU
-#define CLKS_USER_INT_GATE   0xEEU
+#define CLKS_INTERRUPT_GATE 0x8EU
+#define CLKS_USER_INT_GATE 0xEEU
 
-#define CLKS_PIC1_CMD   0x20U
-#define CLKS_PIC1_DATA  0x21U
-#define CLKS_PIC2_CMD   0xA0U
-#define CLKS_PIC2_DATA  0xA1U
-#define CLKS_PIC_EOI    0x20U
+#define CLKS_PIC1_CMD 0x20U
+#define CLKS_PIC1_DATA 0x21U
+#define CLKS_PIC2_CMD 0xA0U
+#define CLKS_PIC2_DATA 0xA1U
+#define CLKS_PIC_EOI 0x20U
 
-#define CLKS_IRQ_BASE   32U
-#define CLKS_IRQ_TIMER  32U
+#define CLKS_IRQ_BASE 32U
+#define CLKS_IRQ_TIMER 32U
 #define CLKS_IRQ_KEYBOARD 33U
-#define CLKS_IRQ_MOUSE  44U
-#define CLKS_IRQ_LAST   47U
+#define CLKS_IRQ_MOUSE 44U
+#define CLKS_IRQ_LAST 47U
 #define CLKS_SYSCALL_VECTOR 128U
 
-#define CLKS_PS2_DATA_PORT  0x60U
+#define CLKS_PS2_DATA_PORT 0x60U
 #define CLKS_PS2_STATUS_PORT 0x64U
 
 struct clks_idt_entry {
@@ -125,40 +125,38 @@ static struct clks_idt_entry clks_idt[CLKS_IDT_ENTRY_COUNT];
 static u16 clks_idt_code_selector = 0x08U;
 static u64 clks_timer_ticks = 0;
 
-static const char *clks_exception_names[32] = {
-    "DE DIVIDE ERROR",
-    "DB DEBUG",
-    "NMI",
-    "BP BREAKPOINT",
-    "OF OVERFLOW",
-    "BR BOUND RANGE",
-    "UD INVALID OPCODE",
-    "NM DEVICE NOT AVAILABLE",
-    "DF DOUBLE FAULT",
-    "COPROCESSOR SEGMENT",
-    "TS INVALID TSS",
-    "NP SEGMENT NOT PRESENT",
-    "SS STACK SEGMENT",
-    "GP GENERAL PROTECTION",
-    "PF PAGE FAULT",
-    "RESERVED",
-    "MF X87 FLOAT",
-    "AC ALIGNMENT CHECK",
-    "MC MACHINE CHECK",
-    "XF SIMD FLOAT",
-    "VE VIRT EXCEPTION",
-    "CP CONTROL PROTECTION",
-    "RESERVED",
-    "RESERVED",
-    "RESERVED",
-    "RESERVED",
-    "RESERVED",
-    "RESERVED",
-    "HV HYPERVISOR",
-    "VC VMM COMM",
-    "SX SECURITY",
-    "RESERVED"
-};
+static const char *clks_exception_names[32] = {"DE DIVIDE ERROR",
+                                               "DB DEBUG",
+                                               "NMI",
+                                               "BP BREAKPOINT",
+                                               "OF OVERFLOW",
+                                               "BR BOUND RANGE",
+                                               "UD INVALID OPCODE",
+                                               "NM DEVICE NOT AVAILABLE",
+                                               "DF DOUBLE FAULT",
+                                               "COPROCESSOR SEGMENT",
+                                               "TS INVALID TSS",
+                                               "NP SEGMENT NOT PRESENT",
+                                               "SS STACK SEGMENT",
+                                               "GP GENERAL PROTECTION",
+                                               "PF PAGE FAULT",
+                                               "RESERVED",
+                                               "MF X87 FLOAT",
+                                               "AC ALIGNMENT CHECK",
+                                               "MC MACHINE CHECK",
+                                               "XF SIMD FLOAT",
+                                               "VE VIRT EXCEPTION",
+                                               "CP CONTROL PROTECTION",
+                                               "RESERVED",
+                                               "RESERVED",
+                                               "RESERVED",
+                                               "RESERVED",
+                                               "RESERVED",
+                                               "RESERVED",
+                                               "HV HYPERVISOR",
+                                               "VC VMM COMM",
+                                               "SX SECURITY",
+                                               "RESERVED"};
 
 static inline void clks_outb(u16 port, u8 value) {
     __asm__ volatile("outb %0, %1" : : "a"(value), "Nd"(port));
@@ -234,7 +232,6 @@ static void clks_load_idt(void) {
     __asm__ volatile("lidt %0" : : "m"(idtr));
 }
 
-
 static clks_bool clks_ps2_has_output(void) {
     return (clks_inb(CLKS_PS2_STATUS_PORT) & 0x01U) != 0U ? CLKS_TRUE : CLKS_FALSE;
 }
@@ -251,20 +248,12 @@ void clks_interrupt_dispatch(struct clks_interrupt_frame *frame) {
     }
 
     if (vector < 32U) {
-        if (clks_exec_handle_exception(vector,
-                                       frame->error_code,
-                                       frame->rip,
-                                       &frame->rip,
-                                       &frame->rdi,
-                                       &frame->rsi) == CLKS_TRUE) {
+        if (clks_exec_handle_exception(vector, frame->error_code, frame->rip, &frame->rip, &frame->rdi, &frame->rsi) ==
+            CLKS_TRUE) {
             return;
         }
 
-        clks_panic_exception(clks_exception_names[vector],
-                             vector,
-                             frame->error_code,
-                             frame->rip,
-                             frame->rbp,
+        clks_panic_exception(clks_exception_names[vector], vector, frame->error_code, frame->rip, frame->rbp,
                              frame->rsp);
     }
 

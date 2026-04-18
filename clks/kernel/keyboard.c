@@ -5,30 +5,30 @@
 #include <clks/tty.h>
 #include <clks/types.h>
 
-#define CLKS_SC_ALT              0x38U
-#define CLKS_SC_LSHIFT           0x2AU
-#define CLKS_SC_RSHIFT           0x36U
-#define CLKS_SC_CTRL             0x1DU
-#define CLKS_SC_F1               0x3BU
-#define CLKS_SC_F2               0x3CU
-#define CLKS_SC_F3               0x3DU
-#define CLKS_SC_F4               0x3EU
-#define CLKS_SC_C                0x2EU
-#define CLKS_SC_EXT_PREFIX       0xE0U
+#define CLKS_SC_ALT 0x38U
+#define CLKS_SC_LSHIFT 0x2AU
+#define CLKS_SC_RSHIFT 0x36U
+#define CLKS_SC_CTRL 0x1DU
+#define CLKS_SC_F1 0x3BU
+#define CLKS_SC_F2 0x3CU
+#define CLKS_SC_F3 0x3DU
+#define CLKS_SC_F4 0x3EU
+#define CLKS_SC_C 0x2EU
+#define CLKS_SC_EXT_PREFIX 0xE0U
 
-#define CLKS_SC_EXT_HOME         0x47U
-#define CLKS_SC_EXT_UP           0x48U
-#define CLKS_SC_EXT_LEFT         0x4BU
-#define CLKS_SC_EXT_RIGHT        0x4DU
-#define CLKS_SC_EXT_END          0x4FU
-#define CLKS_SC_EXT_DOWN         0x50U
-#define CLKS_SC_EXT_PAGEUP       0x49U
-#define CLKS_SC_EXT_PAGEDOWN     0x51U
-#define CLKS_SC_EXT_DELETE       0x53U
+#define CLKS_SC_EXT_HOME 0x47U
+#define CLKS_SC_EXT_UP 0x48U
+#define CLKS_SC_EXT_LEFT 0x4BU
+#define CLKS_SC_EXT_RIGHT 0x4DU
+#define CLKS_SC_EXT_END 0x4FU
+#define CLKS_SC_EXT_DOWN 0x50U
+#define CLKS_SC_EXT_PAGEUP 0x49U
+#define CLKS_SC_EXT_PAGEDOWN 0x51U
+#define CLKS_SC_EXT_DELETE 0x53U
 
-#define CLKS_KBD_INPUT_CAP       256U
-#define CLKS_KBD_TTY_MAX         8U
-#define CLKS_KBD_DROP_LOG_EVERY  64ULL
+#define CLKS_KBD_INPUT_CAP 256U
+#define CLKS_KBD_TTY_MAX 8U
+#define CLKS_KBD_DROP_LOG_EVERY 64ULL
 
 #ifndef CLKS_CFG_KBD_TTY_SWITCH_HOTKEY
 #define CLKS_CFG_KBD_TTY_SWITCH_HOTKEY 1
@@ -43,26 +43,20 @@
 #endif
 
 static const char clks_kbd_map[128] = {
-    [2] = '1', [3] = '2', [4] = '3', [5] = '4', [6] = '5', [7] = '6', [8] = '7', [9] = '8',
-    [10] = '9', [11] = '0', [12] = '-', [13] = '=', [14] = '\b', [15] = '\t',
-    [16] = 'q', [17] = 'w', [18] = 'e', [19] = 'r', [20] = 't', [21] = 'y', [22] = 'u', [23] = 'i',
-    [24] = 'o', [25] = 'p', [26] = '[', [27] = ']', [28] = '\n',
-    [30] = 'a', [31] = 's', [32] = 'd', [33] = 'f', [34] = 'g', [35] = 'h', [36] = 'j', [37] = 'k',
-    [38] = 'l', [39] = ';', [40] = '\'', [41] = '`', [43] = '\\',
-    [44] = 'z', [45] = 'x', [46] = 'c', [47] = 'v', [48] = 'b', [49] = 'n', [50] = 'm',
-    [51] = ',', [52] = '.', [53] = '/', [57] = ' '
-};
+    [2] = '1',  [3] = '2',   [4] = '3',  [5] = '4',   [6] = '5',   [7] = '6',  [8] = '7',  [9] = '8',  [10] = '9',
+    [11] = '0', [12] = '-',  [13] = '=', [14] = '\b', [15] = '\t', [16] = 'q', [17] = 'w', [18] = 'e', [19] = 'r',
+    [20] = 't', [21] = 'y',  [22] = 'u', [23] = 'i',  [24] = 'o',  [25] = 'p', [26] = '[', [27] = ']', [28] = '\n',
+    [30] = 'a', [31] = 's',  [32] = 'd', [33] = 'f',  [34] = 'g',  [35] = 'h', [36] = 'j', [37] = 'k', [38] = 'l',
+    [39] = ';', [40] = '\'', [41] = '`', [43] = '\\', [44] = 'z',  [45] = 'x', [46] = 'c', [47] = 'v', [48] = 'b',
+    [49] = 'n', [50] = 'm',  [51] = ',', [52] = '.',  [53] = '/',  [57] = ' '};
 
 static const char clks_kbd_shift_map[128] = {
-    [2] = '!', [3] = '@', [4] = '#', [5] = '$', [6] = '%', [7] = '^', [8] = '&', [9] = '*',
-    [10] = '(', [11] = ')', [12] = '_', [13] = '+', [14] = '\b', [15] = '\t',
-    [16] = 'Q', [17] = 'W', [18] = 'E', [19] = 'R', [20] = 'T', [21] = 'Y', [22] = 'U', [23] = 'I',
-    [24] = 'O', [25] = 'P', [26] = '{', [27] = '}', [28] = '\n',
-    [30] = 'A', [31] = 'S', [32] = 'D', [33] = 'F', [34] = 'G', [35] = 'H', [36] = 'J', [37] = 'K',
-    [38] = 'L', [39] = ':', [40] = '"', [41] = '~', [43] = '|',
-    [44] = 'Z', [45] = 'X', [46] = 'C', [47] = 'V', [48] = 'B', [49] = 'N', [50] = 'M',
-    [51] = '<', [52] = '>', [53] = '?', [57] = ' '
-};
+    [2] = '!',  [3] = '@',  [4] = '#',  [5] = '$',   [6] = '%',   [7] = '^',  [8] = '&',  [9] = '*',  [10] = '(',
+    [11] = ')', [12] = '_', [13] = '+', [14] = '\b', [15] = '\t', [16] = 'Q', [17] = 'W', [18] = 'E', [19] = 'R',
+    [20] = 'T', [21] = 'Y', [22] = 'U', [23] = 'I',  [24] = 'O',  [25] = 'P', [26] = '{', [27] = '}', [28] = '\n',
+    [30] = 'A', [31] = 'S', [32] = 'D', [33] = 'F',  [34] = 'G',  [35] = 'H', [36] = 'J', [37] = 'K', [38] = 'L',
+    [39] = ':', [40] = '"', [41] = '~', [43] = '|',  [44] = 'Z',  [45] = 'X', [46] = 'C', [47] = 'V', [48] = 'B',
+    [49] = 'N', [50] = 'M', [51] = '<', [52] = '>',  [53] = '?',  [57] = ' '};
 
 static char clks_kbd_input_queue[CLKS_KBD_TTY_MAX][CLKS_KBD_INPUT_CAP];
 static u16 clks_kbd_input_head[CLKS_KBD_TTY_MAX];
@@ -114,22 +108,22 @@ static char clks_keyboard_translate_ext_scancode(u8 code) {
     clks_bool shift_active = clks_keyboard_shift_active();
 
     switch (code) {
-        case CLKS_SC_EXT_LEFT:
-            return (shift_active == CLKS_TRUE) ? CLKS_KEY_SHIFT_LEFT : CLKS_KEY_LEFT;
-        case CLKS_SC_EXT_RIGHT:
-            return (shift_active == CLKS_TRUE) ? CLKS_KEY_SHIFT_RIGHT : CLKS_KEY_RIGHT;
-        case CLKS_SC_EXT_UP:
-            return CLKS_KEY_UP;
-        case CLKS_SC_EXT_DOWN:
-            return CLKS_KEY_DOWN;
-        case CLKS_SC_EXT_HOME:
-            return (shift_active == CLKS_TRUE) ? CLKS_KEY_SHIFT_HOME : CLKS_KEY_HOME;
-        case CLKS_SC_EXT_END:
-            return (shift_active == CLKS_TRUE) ? CLKS_KEY_SHIFT_END : CLKS_KEY_END;
-        case CLKS_SC_EXT_DELETE:
-            return CLKS_KEY_DELETE;
-        default:
-            return '\0';
+    case CLKS_SC_EXT_LEFT:
+        return (shift_active == CLKS_TRUE) ? CLKS_KEY_SHIFT_LEFT : CLKS_KEY_LEFT;
+    case CLKS_SC_EXT_RIGHT:
+        return (shift_active == CLKS_TRUE) ? CLKS_KEY_SHIFT_RIGHT : CLKS_KEY_RIGHT;
+    case CLKS_SC_EXT_UP:
+        return CLKS_KEY_UP;
+    case CLKS_SC_EXT_DOWN:
+        return CLKS_KEY_DOWN;
+    case CLKS_SC_EXT_HOME:
+        return (shift_active == CLKS_TRUE) ? CLKS_KEY_SHIFT_HOME : CLKS_KEY_HOME;
+    case CLKS_SC_EXT_END:
+        return (shift_active == CLKS_TRUE) ? CLKS_KEY_SHIFT_END : CLKS_KEY_END;
+    case CLKS_SC_EXT_DELETE:
+        return CLKS_KEY_DELETE;
+    default:
+        return '\0';
     }
 }
 
@@ -172,9 +166,8 @@ static clks_bool clks_keyboard_should_pump_shell_now(void) {
 }
 
 static char clks_keyboard_translate_scancode(u8 code) {
-    clks_bool shift_active = (clks_kbd_lshift_down == CLKS_TRUE || clks_kbd_rshift_down == CLKS_TRUE)
-                                 ? CLKS_TRUE
-                                 : CLKS_FALSE;
+    clks_bool shift_active =
+        (clks_kbd_lshift_down == CLKS_TRUE || clks_kbd_rshift_down == CLKS_TRUE) ? CLKS_TRUE : CLKS_FALSE;
 
     if (shift_active == CLKS_TRUE) {
         return clks_kbd_shift_map[code];
@@ -199,17 +192,17 @@ static clks_bool clks_keyboard_try_emit_ctrl_shortcut(u8 code, u32 tty_index) {
     }
 
     switch (code) {
-        case 0x1EU:
-            shortcut = CLKS_KEY_SELECT_ALL;
-            break;
-        case 0x2EU:
-            shortcut = CLKS_KEY_COPY;
-            break;
-        case 0x2FU:
-            shortcut = CLKS_KEY_PASTE;
-            break;
-        default:
-            return CLKS_FALSE;
+    case 0x1EU:
+        shortcut = CLKS_KEY_SELECT_ALL;
+        break;
+    case 0x2EU:
+        shortcut = CLKS_KEY_COPY;
+        break;
+    case 0x2FU:
+        shortcut = CLKS_KEY_PASTE;
+        break;
+    default:
+        return CLKS_FALSE;
     }
 
     if (clks_keyboard_queue_push_for_tty(tty_index, shortcut) == CLKS_TRUE &&
@@ -383,9 +376,7 @@ void clks_keyboard_handle_scancode(u8 scancode) {
         return;
     }
 
-    if (CLKS_CFG_KBD_TTY_SWITCH_HOTKEY != 0 &&
-        clks_kbd_alt_down == CLKS_TRUE &&
-        code >= CLKS_SC_F1 &&
+    if (CLKS_CFG_KBD_TTY_SWITCH_HOTKEY != 0 && clks_kbd_alt_down == CLKS_TRUE && code >= CLKS_SC_F1 &&
         code <= CLKS_SC_F4) {
         u32 target = (u32)(code - CLKS_SC_F1);
         u32 before = clks_tty_active();
@@ -471,4 +462,3 @@ u64 clks_keyboard_push_count(void) {
 u64 clks_keyboard_pop_count(void) {
     return clks_kbd_pop_count;
 }
-

@@ -3,7 +3,7 @@
 #include <clks/types.h>
 
 #define CLKS_PMM_MAX_TRACKED_PAGES 262144ULL
-#define CLKS_PMM_MIN_USABLE_ADDR   0x100000ULL
+#define CLKS_PMM_MIN_USABLE_ADDR 0x100000ULL
 
 static u64 clks_pmm_free_stack[CLKS_PMM_MAX_TRACKED_PAGES];
 static u64 clks_pmm_free_top = 0;

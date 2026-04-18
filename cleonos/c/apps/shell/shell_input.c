@@ -712,4 +712,3 @@ void ush_read_line(ush_state *sh, char *out_line, u64 out_size) {
         }
     }
 }
-

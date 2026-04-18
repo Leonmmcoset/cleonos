@@ -23,12 +23,12 @@ static void test_fail(const char *group, int line, const char *expr) {
     (void)printf("[libctest][FAIL] %s:%d %s\n", group, line, expr);
 }
 
-#define TEST_ASSERT(group, expr)            \
-    do {                                    \
-        g_total++;                          \
-        if (!(expr)) {                      \
-            test_fail((group), __LINE__, #expr); \
-        }                                   \
+#define TEST_ASSERT(group, expr)                                                                                       \
+    do {                                                                                                               \
+        g_total++;                                                                                                     \
+        if (!(expr)) {                                                                                                 \
+            test_fail((group), __LINE__, #expr);                                                                       \
+        }                                                                                                              \
     } while (0)
 
 static void test_string_lib(void) {

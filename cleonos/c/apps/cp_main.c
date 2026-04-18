@@ -39,9 +39,7 @@ static int ush_copy_file(const char *src_path, const char *dst_path) {
         {
             u64 written_total = 0ULL;
             while (written_total < got) {
-                u64 written = cleonos_sys_fd_write(dst_fd,
-                                                   copy_buf + written_total,
-                                                   got - written_total);
+                u64 written = cleonos_sys_fd_write(dst_fd, copy_buf + written_total, got - written_total);
                 if (written == (u64)-1 || written == 0ULL) {
                     (void)cleonos_sys_fd_close(dst_fd);
                     (void)cleonos_sys_fd_close(src_fd);
@@ -88,7 +86,6 @@ static int ush_cmd_cp(const ush_state *sh, const char *arg) {
     return ush_copy_file(src_path, dst_path);
 }
 
-
 int cleonos_app_main(void) {
     ush_cmd_ctx ctx;
     ush_cmd_ret ret;
@@ -132,4 +129,3 @@ int cleonos_app_main(void) {
 
     return (success != 0) ? 0 : 1;
 }
-

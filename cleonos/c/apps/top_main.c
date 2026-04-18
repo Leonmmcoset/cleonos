@@ -117,8 +117,7 @@ static void ush_top_render_frame(u64 frame_index, u64 delay_ticks) {
             continue;
         }
 
-        if (snap.state != CLEONOS_PROC_STATE_PENDING &&
-            snap.state != CLEONOS_PROC_STATE_RUNNING &&
+        if (snap.state != CLEONOS_PROC_STATE_PENDING && snap.state != CLEONOS_PROC_STATE_RUNNING &&
             snap.state != CLEONOS_PROC_STATE_STOPPED) {
             continue;
         }

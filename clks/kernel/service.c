@@ -70,24 +70,18 @@ void clks_service_init(void) {
     heap_stats = clks_heap_get_stats();
 
     clks_service_register(CLKS_SERVICE_LOG, "log", CLKS_SERVICE_STATE_READY);
-    clks_service_register(CLKS_SERVICE_MEM,
-                          "memory",
+    clks_service_register(CLKS_SERVICE_MEM, "memory",
                           (heap_stats.total_bytes > 0U) ? CLKS_SERVICE_STATE_READY : CLKS_SERVICE_STATE_DEGRADED);
-    clks_service_register(CLKS_SERVICE_FS,
-                          "filesystem",
+    clks_service_register(CLKS_SERVICE_FS, "filesystem",
                           (clks_fs_is_ready() == CLKS_TRUE) ? CLKS_SERVICE_STATE_READY : CLKS_SERVICE_STATE_DEGRADED);
-    clks_service_register(CLKS_SERVICE_DRIVER,
-                          "driver",
+    clks_service_register(CLKS_SERVICE_DRIVER, "driver",
                           (clks_driver_count() > 0ULL) ? CLKS_SERVICE_STATE_READY : CLKS_SERVICE_STATE_DEGRADED);
-    clks_service_register(CLKS_SERVICE_SCHED,
-                          "scheduler",
-                          CLKS_SERVICE_STATE_READY);
-    clks_service_register(CLKS_SERVICE_KELF,
-                          "kelf",
+    clks_service_register(CLKS_SERVICE_SCHED, "scheduler", CLKS_SERVICE_STATE_READY);
+    clks_service_register(CLKS_SERVICE_KELF, "kelf",
                           (clks_kelf_count() > 0ULL) ? CLKS_SERVICE_STATE_READY : CLKS_SERVICE_STATE_DEGRADED);
-    clks_service_register(CLKS_SERVICE_USER,
-                          "userland",
-                          (clks_userland_shell_ready() == CLKS_TRUE) ? CLKS_SERVICE_STATE_READY : CLKS_SERVICE_STATE_DEGRADED);
+    clks_service_register(CLKS_SERVICE_USER, "userland",
+                          (clks_userland_shell_ready() == CLKS_TRUE) ? CLKS_SERVICE_STATE_READY
+                                                                     : CLKS_SERVICE_STATE_DEGRADED);
 
     clks_log(CLKS_LOG_INFO, "SRV", "KERNEL SERVICES ONLINE");
     clks_log_hex(CLKS_LOG_INFO, "SRV", "COUNT", clks_service_count());

@@ -18,11 +18,7 @@ static int ush_cut_parse_delim(const char *token, char *out_delim) {
     return 1;
 }
 
-static int ush_cut_parse_args(const char *arg,
-                              char *out_delim,
-                              u64 *out_field,
-                              char *out_file,
-                              u64 out_file_size) {
+static int ush_cut_parse_args(const char *arg, char *out_delim, u64 *out_field, char *out_file, u64 out_file_size) {
     char token[USH_PATH_MAX];
     char value[USH_PATH_MAX];
     const char *cursor = arg;
@@ -222,7 +218,6 @@ static int ush_cmd_cut(const ush_state *sh, const char *arg) {
 
     return 1;
 }
-
 
 int cleonos_app_main(void) {
     ush_cmd_ctx ctx;

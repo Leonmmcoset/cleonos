@@ -136,8 +136,7 @@ clks_bool clks_userland_init(void) {
 }
 
 void clks_userland_tick(u64 tick) {
-    if (clks_user_shell_exec_enabled == CLKS_FALSE ||
-        clks_user_shell_ready == CLKS_FALSE ||
+    if (clks_user_shell_exec_enabled == CLKS_FALSE || clks_user_shell_ready == CLKS_FALSE ||
         clks_user_shell_exec_requested_flag == CLKS_TRUE) {
         return;
     }

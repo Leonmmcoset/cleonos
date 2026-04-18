@@ -3,26 +3,26 @@
 #include <clks/mouse.h>
 #include <clks/types.h>
 
-#define CLKS_PS2_DATA_PORT      0x60U
-#define CLKS_PS2_STATUS_PORT    0x64U
-#define CLKS_PS2_CMD_PORT       0x64U
-#define CLKS_PS2_STATUS_OBF     0x01U
-#define CLKS_PS2_STATUS_IBF     0x02U
+#define CLKS_PS2_DATA_PORT 0x60U
+#define CLKS_PS2_STATUS_PORT 0x64U
+#define CLKS_PS2_CMD_PORT 0x64U
+#define CLKS_PS2_STATUS_OBF 0x01U
+#define CLKS_PS2_STATUS_IBF 0x02U
 
 #define CLKS_PS2_CMD_ENABLE_AUX 0xA8U
-#define CLKS_PS2_CMD_READ_CFG   0x20U
-#define CLKS_PS2_CMD_WRITE_CFG  0x60U
-#define CLKS_PS2_CMD_WRITE_AUX  0xD4U
+#define CLKS_PS2_CMD_READ_CFG 0x20U
+#define CLKS_PS2_CMD_WRITE_CFG 0x60U
+#define CLKS_PS2_CMD_WRITE_AUX 0xD4U
 
 #define CLKS_PS2_MOUSE_CMD_RESET_DEFAULTS 0xF6U
-#define CLKS_PS2_MOUSE_CMD_ENABLE_STREAM  0xF4U
-#define CLKS_PS2_MOUSE_ACK                0xFAU
+#define CLKS_PS2_MOUSE_CMD_ENABLE_STREAM 0xF4U
+#define CLKS_PS2_MOUSE_ACK 0xFAU
 
-#define CLKS_MOUSE_IO_TIMEOUT      100000U
-#define CLKS_MOUSE_DRAIN_MAX       64U
-#define CLKS_MOUSE_SYNC_BIT        0x08U
-#define CLKS_MOUSE_OVERFLOW_MASK   0xC0U
-#define CLKS_MOUSE_BUTTON_MASK     0x07U
+#define CLKS_MOUSE_IO_TIMEOUT 100000U
+#define CLKS_MOUSE_DRAIN_MAX 64U
+#define CLKS_MOUSE_SYNC_BIT 0x08U
+#define CLKS_MOUSE_OVERFLOW_MASK 0xC0U
+#define CLKS_MOUSE_BUTTON_MASK 0x07U
 
 struct clks_mouse_runtime {
     i32 x;
@@ -193,8 +193,7 @@ void clks_mouse_init(void) {
         return;
     }
 
-    if (clks_mouse_write_cmd(CLKS_PS2_CMD_READ_CFG) == CLKS_FALSE ||
-        clks_mouse_read_data(&config) == CLKS_FALSE) {
+    if (clks_mouse_write_cmd(CLKS_PS2_CMD_READ_CFG) == CLKS_FALSE || clks_mouse_read_data(&config) == CLKS_FALSE) {
         clks_log(CLKS_LOG_WARN, "MOUSE", "PS2 READ CFG FAILED");
         return;
     }
@@ -202,8 +201,7 @@ void clks_mouse_init(void) {
     config |= 0x02U;
     config &= (u8)~0x20U;
 
-    if (clks_mouse_write_cmd(CLKS_PS2_CMD_WRITE_CFG) == CLKS_FALSE ||
-        clks_mouse_write_data(config) == CLKS_FALSE) {
+    if (clks_mouse_write_cmd(CLKS_PS2_CMD_WRITE_CFG) == CLKS_FALSE || clks_mouse_write_data(config) == CLKS_FALSE) {
         clks_log(CLKS_LOG_WARN, "MOUSE", "PS2 WRITE CFG FAILED");
         return;
     }
@@ -214,8 +212,7 @@ void clks_mouse_init(void) {
         return;
     }
 
-    if (clks_mouse_send_device_cmd(CLKS_PS2_MOUSE_CMD_ENABLE_STREAM, &ack) == CLKS_FALSE ||
-        ack != CLKS_PS2_MOUSE_ACK) {
+    if (clks_mouse_send_device_cmd(CLKS_PS2_MOUSE_CMD_ENABLE_STREAM, &ack) == CLKS_FALSE || ack != CLKS_PS2_MOUSE_ACK) {
         clks_log(CLKS_LOG_WARN, "MOUSE", "PS2 ENABLE STREAM FAILED");
         return;
     }

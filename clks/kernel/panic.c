@@ -9,10 +9,10 @@
 #define CLKS_PANIC_BG 0x00200000U
 #define CLKS_PANIC_FG 0x00FFE0E0U
 
-#define CLKS_PANIC_BACKTRACE_MAX        20U
-#define CLKS_PANIC_STACK_WINDOW_BYTES   (128ULL * 1024ULL)
-#define CLKS_PANIC_SYMBOL_FILE          "/system/kernel.sym"
-#define CLKS_PANIC_KERNEL_ADDR_BASE     0xFFFF800000000000ULL
+#define CLKS_PANIC_BACKTRACE_MAX 20U
+#define CLKS_PANIC_STACK_WINDOW_BYTES (128ULL * 1024ULL)
+#define CLKS_PANIC_SYMBOL_FILE "/system/kernel.sym"
+#define CLKS_PANIC_KERNEL_ADDR_BASE 0xFFFF800000000000ULL
 
 struct clks_panic_console {
     u32 cols;
@@ -225,13 +225,8 @@ static u8 clks_panic_hex_value(char ch) {
     return (u8)(10 + (ch - 'A'));
 }
 
-static clks_bool clks_panic_parse_symbol_line(const char *line,
-                                              usize len,
-                                              u64 *out_addr,
-                                              const char **out_name,
-                                              usize *out_name_len,
-                                              const char **out_source,
-                                              usize *out_source_len) {
+static clks_bool clks_panic_parse_symbol_line(const char *line, usize len, u64 *out_addr, const char **out_name,
+                                              usize *out_name_len, const char **out_source, usize *out_source_len) {
     usize i = 0U;
     u64 addr = 0ULL;
     u32 digits = 0U;
@@ -328,12 +323,8 @@ static clks_bool clks_panic_symbols_ready(void) {
     return CLKS_TRUE;
 }
 
-static clks_bool clks_panic_lookup_symbol(u64 addr,
-                                          const char **out_name,
-                                          usize *out_name_len,
-                                          u64 *out_base,
-                                          const char **out_source,
-                                          usize *out_source_len) {
+static clks_bool clks_panic_lookup_symbol(u64 addr, const char **out_name, usize *out_name_len, u64 *out_base,
+                                          const char **out_source, usize *out_source_len) {
     const char *data;
     const char *end;
     const char *line;
@@ -381,12 +372,7 @@ static clks_bool clks_panic_lookup_symbol(u64 addr,
             data++;
         }
 
-        if (clks_panic_parse_symbol_line(line,
-                                         line_len,
-                                         &line_addr,
-                                         &line_name,
-                                         &line_name_len,
-                                         &line_source,
+        if (clks_panic_parse_symbol_line(line, line_len, &line_addr, &line_name, &line_name_len, &line_source,
                                          &line_source_len) == CLKS_FALSE) {
             continue;
         }
@@ -632,12 +618,7 @@ CLKS_NORETURN void clks_panic(const char *reason) {
     clks_panic_halt_loop();
 }
 
-CLKS_NORETURN void clks_panic_exception(const char *name,
-                                        u64 vector,
-                                        u64 error_code,
-                                        u64 rip,
-                                        u64 rbp,
-                                        u64 rsp) {
+CLKS_NORETURN void clks_panic_exception(const char *name, u64 vector, u64 error_code, u64 rip, u64 rbp, u64 rsp) {
     struct clks_panic_console console;
     char hex_buf[19];
 

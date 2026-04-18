@@ -203,7 +203,6 @@ static int ush_cmd_grep(const ush_state *sh, const char *arg) {
     return 1;
 }
 
-
 int cleonos_app_main(void) {
     ush_cmd_ctx ctx;
     ush_cmd_ret ret;
@@ -247,4 +246,3 @@ int cleonos_app_main(void) {
 
     return (success != 0) ? 0 : 1;
 }
-

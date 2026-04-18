@@ -3,8 +3,8 @@
 
 #include <clks/types.h>
 
-#define CLKS_MOUSE_BTN_LEFT   0x01U
-#define CLKS_MOUSE_BTN_RIGHT  0x02U
+#define CLKS_MOUSE_BTN_LEFT 0x01U
+#define CLKS_MOUSE_BTN_RIGHT 0x02U
 #define CLKS_MOUSE_BTN_MIDDLE 0x04U
 
 struct clks_mouse_state {

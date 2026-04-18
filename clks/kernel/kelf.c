@@ -69,10 +69,7 @@ static void clks_kelf_copy_name(char *dst, usize dst_size, const char *src) {
     dst[i] = '\0';
 }
 
-static clks_bool clks_kelf_load_runtime_image(const void *image,
-                                              u64 size,
-                                              void **out_runtime,
-                                              u64 *out_runtime_size,
+static clks_bool clks_kelf_load_runtime_image(const void *image, u64 size, void **out_runtime, u64 *out_runtime_size,
                                               clks_kelf_entry_fn *out_entry) {
     const struct clks_elf64_ehdr *eh;
     u64 min_vaddr = 0xffffffffffffffffULL;
@@ -143,9 +140,7 @@ static clks_bool clks_kelf_load_runtime_image(const void *image,
             continue;
         }
 
-        clks_memcpy(runtime + (usize)(ph->p_vaddr - min_vaddr),
-                    (const u8 *)image + ph->p_offset,
-                    (usize)ph->p_filesz);
+        clks_memcpy(runtime + (usize)(ph->p_vaddr - min_vaddr), (const u8 *)image + ph->p_offset, (usize)ph->p_filesz);
     }
 
     if (eh->e_entry < min_vaddr || eh->e_entry >= max_vaddr) {
@@ -253,4 +248,3 @@ u64 clks_kelf_count(void) {
 u64 clks_kelf_total_runs(void) {
     return clks_kelf_total_runs_count;
 }
-

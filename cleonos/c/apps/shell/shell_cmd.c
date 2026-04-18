@@ -1,10 +1,10 @@
 #include "shell_internal.h"
 
-#define USH_DMESG_DEFAULT   64ULL
+#define USH_DMESG_DEFAULT 64ULL
 #define USH_DMESG_LINE_MAX 256ULL
-#define USH_COPY_MAX      65536U
+#define USH_COPY_MAX 65536U
 #define USH_PIPELINE_MAX_STAGES 8ULL
-#define USH_PIPE_CAPTURE_MAX   USH_COPY_MAX
+#define USH_PIPE_CAPTURE_MAX USH_COPY_MAX
 #define USH_PIPE_TMP_A "/temp/.ush_pipe_a.bin"
 #define USH_PIPE_TMP_B "/temp/.ush_pipe_b.bin"
 #define USH_SORT_MAX_LINES 4096ULL
@@ -21,7 +21,6 @@ static const char *ush_pipeline_stdin_text = (const char *)0;
 static u64 ush_pipeline_stdin_len = 0ULL;
 static char ush_pipeline_capture_a[USH_PIPE_CAPTURE_MAX + 1U];
 static char ush_pipeline_capture_b[USH_PIPE_CAPTURE_MAX + 1U];
-
 
 static int ush_path_is_under_temp(const char *path) {
     if (path == (const char *)0) {
@@ -71,17 +70,13 @@ static int ush_split_first_and_rest(const char *arg, char *out_first, u64 out_fi
     return 1;
 }
 
-static int ush_split_two_args(const char *arg,
-                              char *out_first,
-                              u64 out_first_size,
-                              char *out_second,
+static int ush_split_two_args(const char *arg, char *out_first, u64 out_first_size, char *out_second,
                               u64 out_second_size) {
     u64 i = 0ULL;
     u64 p = 0ULL;
 
-    if (arg == (const char *)0 ||
-        out_first == (char *)0 || out_first_size == 0ULL ||
-        out_second == (char *)0 || out_second_size == 0ULL) {
+    if (arg == (const char *)0 || out_first == (char *)0 || out_first_size == 0ULL || out_second == (char *)0 ||
+        out_second_size == 0ULL) {
         return 0;
     }
 
@@ -278,19 +273,13 @@ static void ush_ls_print_one(const char *name, u64 type, u64 size, int long_mode
     ush_write_char('\n');
 }
 
-static int ush_ls_parse_args(const char *arg,
-                             int *out_long_mode,
-                             int *out_recursive,
-                             char *out_target,
+static int ush_ls_parse_args(const char *arg, int *out_long_mode, int *out_recursive, char *out_target,
                              u64 out_target_size) {
     char token[USH_PATH_MAX];
     u64 i = 0ULL;
     int path_set = 0;
 
-    if (out_long_mode == (int *)0 ||
-        out_recursive == (int *)0 ||
-        out_target == (char *)0 ||
-        out_target_size == 0ULL) {
+    if (out_long_mode == (int *)0 || out_recursive == (int *)0 || out_target == (char *)0 || out_target_size == 0ULL) {
         return 0;
     }
 
@@ -349,11 +338,7 @@ static int ush_ls_parse_args(const char *arg,
     return 1;
 }
 
-static int ush_ls_dir(const char *path,
-                      int long_mode,
-                      int recursive,
-                      int print_header,
-                      u64 depth) {
+static int ush_ls_dir(const char *path, int long_mode, int recursive, int print_header, u64 depth) {
     u64 count;
     u64 i;
 
@@ -756,19 +741,14 @@ static int ush_text_parse_optional_file(const char *arg, char *out_file, u64 out
     return 1;
 }
 
-static int ush_text_load_input(const ush_state *sh,
-                               const char *cmd,
-                               const char *file_arg,
-                               const char **out_input,
+static int ush_text_load_input(const ush_state *sh, const char *cmd, const char *file_arg, const char **out_input,
                                u64 *out_input_len) {
     static char file_buf[USH_COPY_MAX + 1U];
     char path[USH_PATH_MAX];
     u64 size;
     u64 got;
 
-    if (sh == (const ush_state *)0 ||
-        cmd == (const char *)0 ||
-        out_input == (const char **)0 ||
+    if (sh == (const ush_state *)0 || cmd == (const char *)0 || out_input == (const char **)0 ||
         out_input_len == (u64 *)0) {
         return 0;
     }
@@ -1126,11 +1106,7 @@ static int ush_cut_parse_delim(const char *token, char *out_delim) {
     return 1;
 }
 
-static int ush_cut_parse_args(const char *arg,
-                              char *out_delim,
-                              u64 *out_field,
-                              char *out_file,
-                              u64 out_file_size) {
+static int ush_cut_parse_args(const char *arg, char *out_delim, u64 *out_field, char *out_file, u64 out_file_size) {
     char token[USH_PATH_MAX];
     char value[USH_PATH_MAX];
     const char *cursor = arg;
@@ -1711,8 +1687,10 @@ static int ush_cmd_ansi(void) {
     ush_writeln("\x1B[1;36mansi color demo\x1B[0m");
     ush_writeln("  \x1B[30mblack\x1B[0m \x1B[31mred\x1B[0m \x1B[32mgreen\x1B[0m \x1B[33myellow\x1B[0m");
     ush_writeln("  \x1B[34mblue\x1B[0m \x1B[35mmagenta\x1B[0m \x1B[36mcyan\x1B[0m \x1B[37mwhite\x1B[0m");
-    ush_writeln("  \x1B[90mbright-black\x1B[0m \x1B[91mbright-red\x1B[0m \x1B[92mbright-green\x1B[0m \x1B[93mbright-yellow\x1B[0m");
-    ush_writeln("  \x1B[94mbright-blue\x1B[0m \x1B[95mbright-magenta\x1B[0m \x1B[96mbright-cyan\x1B[0m \x1B[97mbright-white\x1B[0m");
+    ush_writeln("  \x1B[90mbright-black\x1B[0m \x1B[91mbright-red\x1B[0m \x1B[92mbright-green\x1B[0m "
+                "\x1B[93mbright-yellow\x1B[0m");
+    ush_writeln("  \x1B[94mbright-blue\x1B[0m \x1B[95mbright-magenta\x1B[0m \x1B[96mbright-cyan\x1B[0m "
+                "\x1B[97mbright-white\x1B[0m");
     return 1;
 }
 
@@ -1815,7 +1793,8 @@ static int ush_cmd_ansitest(void) {
     ush_write_char('\n');
 
     ush_writeln("truecolor demo:");
-    ush_writeln("  \x1B[38;2;255;64;64mRGB(255,64,64)\x1B[0m  \x1B[38;2;64;255;64mRGB(64,255,64)\x1B[0m  \x1B[38;2;64;128;255mRGB(64,128,255)\x1B[0m");
+    ush_writeln("  \x1B[38;2;255;64;64mRGB(255,64,64)\x1B[0m  \x1B[38;2;64;255;64mRGB(64,255,64)\x1B[0m  "
+                "\x1B[38;2;64;128;255mRGB(64,128,255)\x1B[0m");
 
     ush_writeln("cursor control demo:");
     ush_write("  0123456789");
@@ -2456,12 +2435,8 @@ static void ush_report_external_not_found(const char *cmd) {
     ush_writeln(cmd);
 }
 
-static int ush_execute_single_command(ush_state *sh,
-                                      const char *cmd,
-                                      const char *arg,
-                                      int allow_external,
-                                      int *out_known,
-                                      int *out_success) {
+static int ush_execute_single_command(ush_state *sh, const char *cmd, const char *arg, int allow_external,
+                                      int *out_known, int *out_success) {
     int known = 1;
     int success = 0;
 
@@ -2708,16 +2683,14 @@ static int ush_pipeline_parse_stage(ush_pipeline_stage *stage, const char *segme
     return 1;
 }
 
-static int ush_pipeline_parse(const char *line,
-                              ush_pipeline_stage *stages,
-                              u64 max_stages,
-                              u64 *out_stage_count) {
+static int ush_pipeline_parse(const char *line, ush_pipeline_stage *stages, u64 max_stages, u64 *out_stage_count) {
     char segment[USH_LINE_MAX];
     u64 i = 0ULL;
     u64 seg_pos = 0ULL;
     u64 stage_count = 0ULL;
 
-    if (line == (const char *)0 || stages == (ush_pipeline_stage *)0 || max_stages == 0ULL || out_stage_count == (u64 *)0) {
+    if (line == (const char *)0 || stages == (ush_pipeline_stage *)0 || max_stages == 0ULL ||
+        out_stage_count == (u64 *)0) {
         return 0;
     }
 
@@ -2888,10 +2861,7 @@ static int ush_pipeline_open_redirect_fd(const ush_state *sh, const ush_pipeline
     return 1;
 }
 
-static int ush_execute_pipeline(ush_state *sh,
-                                const char *line,
-                                int *out_known,
-                                int *out_success) {
+static int ush_execute_pipeline(ush_state *sh, const char *line, int *out_known, int *out_success) {
     ush_pipeline_stage stages[USH_PIPELINE_MAX_STAGES];
     u64 stage_count = 0ULL;
     u64 i;
@@ -2950,8 +2920,7 @@ static int ush_execute_pipeline(ush_state *sh,
             if (i + 1ULL < stage_count) {
                 stage_pipe_out = (pipe_output_toggle_external == 0) ? USH_PIPE_TMP_A : USH_PIPE_TMP_B;
 
-                if (ush_pipeline_open_write_fd(stage_pipe_out,
-                                               CLEONOS_O_WRONLY | CLEONOS_O_CREAT | CLEONOS_O_TRUNC,
+                if (ush_pipeline_open_write_fd(stage_pipe_out, CLEONOS_O_WRONLY | CLEONOS_O_CREAT | CLEONOS_O_TRUNC,
                                                &opened_out_fd) == 0) {
                     ush_writeln("pipe: failed to open temp stream");
 
@@ -2977,13 +2946,8 @@ static int ush_execute_pipeline(ush_state *sh,
                 stage_stdout_fd = opened_out_fd;
             }
 
-            stage_known = ush_try_exec_external_with_fds(sh,
-                                                         stages[i].cmd,
-                                                         stages[i].arg,
-                                                         stage_stdin_fd,
-                                                         stage_stdout_fd,
-                                                         CLEONOS_FD_INHERIT,
-                                                         &stage_success);
+            stage_known = ush_try_exec_external_with_fds(sh, stages[i].cmd, stages[i].arg, stage_stdin_fd,
+                                                         stage_stdout_fd, CLEONOS_FD_INHERIT, &stage_success);
 
             if (opened_in_fd != (u64)-1) {
                 (void)cleonos_sys_fd_close(opened_in_fd);
@@ -3040,9 +3004,7 @@ static int ush_execute_pipeline(ush_state *sh,
         }
 
         if (pipe_input_path != (const char *)0) {
-            if (ush_pipeline_read_path_into_buffer(pipe_input_path,
-                                                   pipe_input_buffer,
-                                                   (u64)USH_PIPE_CAPTURE_MAX + 1ULL,
+            if (ush_pipeline_read_path_into_buffer(pipe_input_path, pipe_input_buffer, (u64)USH_PIPE_CAPTURE_MAX + 1ULL,
                                                    &pipe_input_len) == 0) {
                 ush_writeln("pipe: failed to read stage input");
                 success = 0;
@@ -3057,8 +3019,7 @@ static int ush_execute_pipeline(ush_state *sh,
         if (i + 1ULL < stage_count) {
             stage_pipe_out = (pipe_output_toggle == 0) ? USH_PIPE_TMP_A : USH_PIPE_TMP_B;
 
-            if (ush_pipeline_open_write_fd(stage_pipe_out,
-                                           CLEONOS_O_WRONLY | CLEONOS_O_CREAT | CLEONOS_O_TRUNC,
+            if (ush_pipeline_open_write_fd(stage_pipe_out, CLEONOS_O_WRONLY | CLEONOS_O_CREAT | CLEONOS_O_TRUNC,
                                            &stage_fd) == 0) {
                 ush_writeln("pipe: failed to open temp stream");
                 success = 0;
@@ -3097,8 +3058,8 @@ static int ush_execute_pipeline(ush_state *sh,
 
         if (i + 1ULL < stage_count) {
             pipe_input_path = stage_pipe_out;
-            pipe_input_buffer = (pipe_input_buffer == ush_pipeline_capture_a) ? ush_pipeline_capture_b
-                                                                               : ush_pipeline_capture_a;
+            pipe_input_buffer =
+                (pipe_input_buffer == ush_pipeline_capture_a) ? ush_pipeline_capture_b : ush_pipeline_capture_a;
             pipe_output_toggle = (pipe_output_toggle == 0) ? 1 : 0;
         }
     }
@@ -3165,6 +3126,3 @@ void ush_execute_line(ush_state *sh, const char *line) {
         sh->cmd_unknown++;
     }
 }
-
-
-

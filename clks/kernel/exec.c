@@ -14,28 +14,28 @@
 typedef u64 (*clks_exec_entry_fn)(void);
 
 #define CLKS_EXEC_RUN_STACK_BYTES (64ULL * 1024ULL)
-#define CLKS_EXEC_MAX_PROCS       64U
-#define CLKS_EXEC_MAX_DEPTH       16U
-#define CLKS_EXEC_PATH_MAX        192U
-#define CLKS_EXEC_ARG_LINE_MAX    256U
-#define CLKS_EXEC_ENV_LINE_MAX    512U
-#define CLKS_EXEC_FD_MAX           32U
-#define CLKS_EXEC_MAX_ARGS         24U
-#define CLKS_EXEC_MAX_ENVS         24U
-#define CLKS_EXEC_ITEM_MAX        128U
+#define CLKS_EXEC_MAX_PROCS 64U
+#define CLKS_EXEC_MAX_DEPTH 16U
+#define CLKS_EXEC_PATH_MAX 192U
+#define CLKS_EXEC_ARG_LINE_MAX 256U
+#define CLKS_EXEC_ENV_LINE_MAX 512U
+#define CLKS_EXEC_FD_MAX 32U
+#define CLKS_EXEC_MAX_ARGS 24U
+#define CLKS_EXEC_MAX_ENVS 24U
+#define CLKS_EXEC_ITEM_MAX 128U
 #define CLKS_EXEC_STATUS_SIGNAL_FLAG (1ULL << 63)
 #define CLKS_EXEC_DEFAULT_KILL_SIGNAL CLKS_EXEC_SIGNAL_TERM
 #define CLKS_EXEC_KERNEL_ADDR_BASE 0xFFFF800000000000ULL
 #define CLKS_EXEC_UNWIND_CTX_BYTES 56ULL
 #define CLKS_EXEC_FD_ACCESS_MASK 0x3ULL
-#define CLKS_EXEC_O_RDONLY       0x0000ULL
-#define CLKS_EXEC_O_WRONLY       0x0001ULL
-#define CLKS_EXEC_O_RDWR         0x0002ULL
-#define CLKS_EXEC_O_CREAT        0x0040ULL
-#define CLKS_EXEC_O_TRUNC        0x0200ULL
-#define CLKS_EXEC_O_APPEND       0x0400ULL
-#define CLKS_EXEC_FD_INHERIT     ((u64)-1)
-#define CLKS_EXEC_DYNLIB_MAX       32U
+#define CLKS_EXEC_O_RDONLY 0x0000ULL
+#define CLKS_EXEC_O_WRONLY 0x0001ULL
+#define CLKS_EXEC_O_RDWR 0x0002ULL
+#define CLKS_EXEC_O_CREAT 0x0040ULL
+#define CLKS_EXEC_O_TRUNC 0x0200ULL
+#define CLKS_EXEC_O_APPEND 0x0400ULL
+#define CLKS_EXEC_FD_INHERIT ((u64) - 1)
+#define CLKS_EXEC_DYNLIB_MAX 32U
 
 #ifndef CLKS_CFG_EXEC_SERIAL_LOG
 #define CLKS_CFG_EXEC_SERIAL_LOG 1
@@ -53,7 +53,7 @@ typedef u64 (*clks_exec_entry_fn)(void);
 #define CLKS_EXEC_ELF64_SHT_DYNSYM 11U
 #define CLKS_EXEC_ELF64_SHN_UNDEF 0U
 #define CLKS_EXEC_ELF64_STT_NOTYPE 0U
-#define CLKS_EXEC_ELF64_STT_FUNC   2U
+#define CLKS_EXEC_ELF64_STT_FUNC 2U
 
 enum clks_exec_fd_kind {
     CLKS_EXEC_FD_KIND_NONE = 0,
@@ -446,8 +446,7 @@ static void clks_exec_dynlib_release_owner(u64 owner_pid) {
     }
 
     for (i = 0U; i < CLKS_EXEC_DYNLIB_MAX; i++) {
-        if (clks_exec_dynlib_table[i].used == CLKS_TRUE &&
-            clks_exec_dynlib_table[i].owner_pid == owner_pid) {
+        if (clks_exec_dynlib_table[i].used == CLKS_TRUE && clks_exec_dynlib_table[i].owner_pid == owner_pid) {
             clks_exec_dynlib_slot_reset(&clks_exec_dynlib_table[i]);
         }
     }
@@ -458,10 +457,8 @@ static clks_bool clks_exec_dynlib_elf_header_ok(const struct clks_exec_elf64_ehd
         return CLKS_FALSE;
     }
 
-    if (eh->e_ident[0] != CLKS_EXEC_ELF64_MAGIC_0 ||
-        eh->e_ident[1] != CLKS_EXEC_ELF64_MAGIC_1 ||
-        eh->e_ident[2] != CLKS_EXEC_ELF64_MAGIC_2 ||
-        eh->e_ident[3] != CLKS_EXEC_ELF64_MAGIC_3) {
+    if (eh->e_ident[0] != CLKS_EXEC_ELF64_MAGIC_0 || eh->e_ident[1] != CLKS_EXEC_ELF64_MAGIC_1 ||
+        eh->e_ident[2] != CLKS_EXEC_ELF64_MAGIC_2 || eh->e_ident[3] != CLKS_EXEC_ELF64_MAGIC_3) {
         return CLKS_FALSE;
     }
 
@@ -480,9 +477,7 @@ static clks_bool clks_exec_dynlib_elf_header_ok(const struct clks_exec_elf64_ehd
     return CLKS_TRUE;
 }
 
-static clks_bool clks_exec_dynlib_symbol_name_ptr(const char *strtab,
-                                                  u64 strtab_size,
-                                                  u32 st_name,
+static clks_bool clks_exec_dynlib_symbol_name_ptr(const char *strtab, u64 strtab_size, u32 st_name,
                                                   const char **out_name) {
     u64 i;
 
@@ -504,8 +499,7 @@ static clks_bool clks_exec_dynlib_symbol_name_ptr(const char *strtab,
     return CLKS_FALSE;
 }
 
-static clks_bool clks_exec_dynlib_resolve_symbol(const struct clks_exec_dynlib_slot *slot,
-                                                 const char *symbol,
+static clks_bool clks_exec_dynlib_resolve_symbol(const struct clks_exec_dynlib_slot *slot, const char *symbol,
                                                  u64 *out_addr) {
     const struct clks_exec_elf64_ehdr *eh;
     const struct clks_exec_elf64_shdr *shdrs;
@@ -619,9 +613,7 @@ static void clks_exec_clear_items(char items[][CLKS_EXEC_ITEM_MAX], u32 max_coun
     }
 }
 
-static u32 clks_exec_parse_whitespace_items(const char *line,
-                                            char items[][CLKS_EXEC_ITEM_MAX],
-                                            u32 max_count) {
+static u32 clks_exec_parse_whitespace_items(const char *line, char items[][CLKS_EXEC_ITEM_MAX], u32 max_count) {
     u32 count = 0U;
     usize i = 0U;
 
@@ -644,11 +636,7 @@ static u32 clks_exec_parse_whitespace_items(const char *line,
             break;
         }
 
-        while (line[i] != '\0' &&
-               line[i] != ' ' &&
-               line[i] != '\t' &&
-               line[i] != '\r' &&
-               line[i] != '\n') {
+        while (line[i] != '\0' && line[i] != ' ' && line[i] != '\t' && line[i] != '\r' && line[i] != '\n') {
             if (p + 1U < CLKS_EXEC_ITEM_MAX) {
                 items[count][p++] = line[i];
             }
@@ -663,9 +651,7 @@ static u32 clks_exec_parse_whitespace_items(const char *line,
     return count;
 }
 
-static u32 clks_exec_parse_env_items(const char *line,
-                                     char items[][CLKS_EXEC_ITEM_MAX],
-                                     u32 max_count) {
+static u32 clks_exec_parse_env_items(const char *line, char items[][CLKS_EXEC_ITEM_MAX], u32 max_count) {
     u32 count = 0U;
     usize i = 0U;
 
@@ -713,30 +699,28 @@ static u32 clks_exec_parse_env_items(const char *line,
 
 static u64 clks_exec_signal_from_vector(u64 vector) {
     switch (vector) {
-        case 0ULL:
-        case 16ULL:
-        case 19ULL:
-            return 8ULL;
-        case 6ULL:
-            return 4ULL;
-        case 3ULL:
-            return 5ULL;
-        case 14ULL:
-        case 13ULL:
-        case 12ULL:
-        case 11ULL:
-        case 10ULL:
-        case 17ULL:
-            return 11ULL;
-        default:
-            return 6ULL;
+    case 0ULL:
+    case 16ULL:
+    case 19ULL:
+        return 8ULL;
+    case 6ULL:
+        return 4ULL;
+    case 3ULL:
+        return 5ULL;
+    case 14ULL:
+    case 13ULL:
+    case 12ULL:
+    case 11ULL:
+    case 10ULL:
+    case 17ULL:
+        return 11ULL;
+    default:
+        return 6ULL;
     }
 }
 
 static u64 clks_exec_encode_signal_status(u64 signal, u64 vector, u64 error_code) {
-    return CLKS_EXEC_STATUS_SIGNAL_FLAG |
-           (signal & 0xFFULL) |
-           ((vector & 0xFFULL) << 8) |
+    return CLKS_EXEC_STATUS_SIGNAL_FLAG | (signal & 0xFFULL) | ((vector & 0xFFULL) << 8) |
            ((error_code & 0xFFFFULL) << 16);
 }
 
@@ -802,7 +786,7 @@ static u64 clks_exec_alloc_pid(void) {
 static clks_bool clks_exec_fd_access_mode_valid(u64 flags) {
     u64 mode = flags & CLKS_EXEC_FD_ACCESS_MASK;
     return (mode == CLKS_EXEC_O_RDONLY || mode == CLKS_EXEC_O_WRONLY || mode == CLKS_EXEC_O_RDWR) ? CLKS_TRUE
-                                                                                                    : CLKS_FALSE;
+                                                                                                  : CLKS_FALSE;
 }
 
 static clks_bool clks_exec_fd_can_read(u64 flags) {
@@ -877,11 +861,8 @@ static void clks_exec_fd_init_defaults(struct clks_exec_proc_record *proc) {
 }
 
 static clks_bool clks_exec_fd_copy_from_parent(struct clks_exec_proc_record *child,
-                                                const struct clks_exec_proc_record *parent,
-                                                u64 parent_fd,
-                                                u64 child_fd,
-                                                clks_bool require_read,
-                                                clks_bool require_write) {
+                                               const struct clks_exec_proc_record *parent, u64 parent_fd, u64 child_fd,
+                                               clks_bool require_read, clks_bool require_write) {
     const struct clks_exec_fd_entry *src;
 
     if (child == CLKS_NULL || parent == CLKS_NULL || parent_fd >= CLKS_EXEC_FD_MAX || child_fd >= CLKS_EXEC_FD_MAX) {
@@ -907,10 +888,8 @@ static clks_bool clks_exec_fd_copy_from_parent(struct clks_exec_proc_record *chi
 }
 
 static clks_bool clks_exec_fd_apply_stdio_overrides(struct clks_exec_proc_record *child,
-                                                    const struct clks_exec_proc_record *parent,
-                                                    u64 stdin_fd,
-                                                    u64 stdout_fd,
-                                                    u64 stderr_fd) {
+                                                    const struct clks_exec_proc_record *parent, u64 stdin_fd,
+                                                    u64 stdout_fd, u64 stderr_fd) {
     if (child == CLKS_NULL) {
         return CLKS_FALSE;
     }
@@ -1069,12 +1048,9 @@ static u64 clks_exec_fd_file_write(struct clks_exec_fd_entry *entry, const void 
     return size;
 }
 
-static struct clks_exec_proc_record *clks_exec_prepare_proc_record(i32 slot,
-                                                                    u64 pid,
-                                                                    const char *path,
-                                                                    const char *argv_line,
-                                                                    const char *env_line,
-                                                                    enum clks_exec_proc_state state) {
+static struct clks_exec_proc_record *clks_exec_prepare_proc_record(i32 slot, u64 pid, const char *path,
+                                                                   const char *argv_line, const char *env_line,
+                                                                   enum clks_exec_proc_state state) {
     struct clks_exec_proc_record *proc;
 
     if (slot < 0 || path == CLKS_NULL) {
@@ -1114,8 +1090,7 @@ static struct clks_exec_proc_record *clks_exec_prepare_proc_record(i32 slot,
     }
 
     if (proc->argv_line[0] != '\0' && proc->argc < CLKS_EXEC_MAX_ARGS) {
-        proc->argc += clks_exec_parse_whitespace_items(proc->argv_line,
-                                                       &proc->argv_items[proc->argc],
+        proc->argc += clks_exec_parse_whitespace_items(proc->argv_line, &proc->argv_items[proc->argc],
                                                        (u32)(CLKS_EXEC_MAX_ARGS - proc->argc));
     }
 
@@ -1421,8 +1396,7 @@ static clks_bool clks_exec_dispatch_pending_once(void) {
     }
 
     for (i = 0U; i < CLKS_EXEC_MAX_PROCS; i++) {
-        if (clks_exec_proc_table[i].used == CLKS_TRUE &&
-            clks_exec_proc_table[i].state == CLKS_EXEC_PROC_PENDING) {
+        if (clks_exec_proc_table[i].used == CLKS_TRUE && clks_exec_proc_table[i].state == CLKS_EXEC_PROC_PENDING) {
             u64 ignored_status = (u64)-1;
 
             clks_exec_pending_dispatch_active = CLKS_TRUE;
@@ -1435,13 +1409,8 @@ static clks_bool clks_exec_dispatch_pending_once(void) {
     return CLKS_FALSE;
 }
 
-static clks_bool clks_exec_run_path_internal(const char *path,
-                                             const char *argv_line,
-                                             const char *env_line,
-                                             u64 stdin_fd,
-                                             u64 stdout_fd,
-                                             u64 stderr_fd,
-                                             u64 *out_status,
+static clks_bool clks_exec_run_path_internal(const char *path, const char *argv_line, const char *env_line,
+                                             u64 stdin_fd, u64 stdout_fd, u64 stderr_fd, u64 *out_status,
                                              u64 *out_pid) {
     i32 slot;
     u64 pid;
@@ -1522,35 +1491,19 @@ void clks_exec_init(void) {
 }
 
 clks_bool clks_exec_run_path(const char *path, u64 *out_status) {
-    return clks_exec_run_path_internal(path,
-                                       CLKS_NULL,
-                                       CLKS_NULL,
-                                       CLKS_EXEC_FD_INHERIT,
-                                       CLKS_EXEC_FD_INHERIT,
-                                       CLKS_EXEC_FD_INHERIT,
-                                       out_status,
-                                       CLKS_NULL);
+    return clks_exec_run_path_internal(path, CLKS_NULL, CLKS_NULL, CLKS_EXEC_FD_INHERIT, CLKS_EXEC_FD_INHERIT,
+                                       CLKS_EXEC_FD_INHERIT, out_status, CLKS_NULL);
 }
 
 clks_bool clks_exec_run_pathv(const char *path, const char *argv_line, const char *env_line, u64 *out_status) {
-    return clks_exec_run_path_internal(path,
-                                       argv_line,
-                                       env_line,
-                                       CLKS_EXEC_FD_INHERIT,
-                                       CLKS_EXEC_FD_INHERIT,
-                                       CLKS_EXEC_FD_INHERIT,
-                                       out_status,
-                                       CLKS_NULL);
+    return clks_exec_run_path_internal(path, argv_line, env_line, CLKS_EXEC_FD_INHERIT, CLKS_EXEC_FD_INHERIT,
+                                       CLKS_EXEC_FD_INHERIT, out_status, CLKS_NULL);
 }
 
-clks_bool clks_exec_run_pathv_io(const char *path,
-                                 const char *argv_line,
-                                 const char *env_line,
-                                 u64 stdin_fd,
-                                 u64 stdout_fd,
-                                 u64 stderr_fd,
-                                 u64 *out_status) {
-    return clks_exec_run_path_internal(path, argv_line, env_line, stdin_fd, stdout_fd, stderr_fd, out_status, CLKS_NULL);
+clks_bool clks_exec_run_pathv_io(const char *path, const char *argv_line, const char *env_line, u64 stdin_fd,
+                                 u64 stdout_fd, u64 stderr_fd, u64 *out_status) {
+    return clks_exec_run_path_internal(path, argv_line, env_line, stdin_fd, stdout_fd, stderr_fd, out_status,
+                                       CLKS_NULL);
 }
 
 clks_bool clks_exec_spawn_pathv(const char *path, const char *argv_line, const char *env_line, u64 *out_pid) {
@@ -1622,8 +1575,7 @@ u64 clks_exec_wait_pid(u64 pid, u64 *out_status) {
         clks_exec_pending_dispatch_active = CLKS_FALSE;
     }
 
-    if (proc->state == CLKS_EXEC_PROC_PENDING ||
-        proc->state == CLKS_EXEC_PROC_RUNNING ||
+    if (proc->state == CLKS_EXEC_PROC_PENDING || proc->state == CLKS_EXEC_PROC_RUNNING ||
         proc->state == CLKS_EXEC_PROC_STOPPED) {
         return 0ULL;
     }
@@ -1695,8 +1647,7 @@ u64 clks_exec_fd_open(const char *path, u64 flags, u64 mode) {
         return (u64)fd_slot;
     }
 
-    if (clks_exec_path_is_dev_null(path) == CLKS_TRUE ||
-        clks_exec_path_is_dev_zero(path) == CLKS_TRUE ||
+    if (clks_exec_path_is_dev_null(path) == CLKS_TRUE || clks_exec_path_is_dev_zero(path) == CLKS_TRUE ||
         clks_exec_path_is_dev_random(path) == CLKS_TRUE) {
         struct clks_exec_fd_entry *entry = &proc->fds[(u32)fd_slot];
 
@@ -1849,8 +1800,7 @@ u64 clks_exec_fd_write(u64 fd, const void *buffer, u64 size) {
         return size;
     }
 
-    if (entry->kind == CLKS_EXEC_FD_KIND_DEV_NULL ||
-        entry->kind == CLKS_EXEC_FD_KIND_DEV_ZERO ||
+    if (entry->kind == CLKS_EXEC_FD_KIND_DEV_NULL || entry->kind == CLKS_EXEC_FD_KIND_DEV_ZERO ||
         entry->kind == CLKS_EXEC_FD_KIND_DEV_RANDOM) {
         entry->offset += size;
         return size;
@@ -2159,9 +2109,7 @@ static u64 clks_exec_proc_runtime_ticks(const struct clks_exec_proc_record *proc
 
     runtime = proc->runtime_ticks_accum;
 
-    if (proc->state == CLKS_EXEC_PROC_RUNNING &&
-        proc->run_started_tick != 0ULL &&
-        now_tick > proc->run_started_tick) {
+    if (proc->state == CLKS_EXEC_PROC_RUNNING && proc->run_started_tick != 0ULL && now_tick > proc->run_started_tick) {
         runtime += (now_tick - proc->run_started_tick);
     }
 
@@ -2374,9 +2322,7 @@ u64 clks_exec_force_stop_tty_running_process(u32 tty_index, u64 *out_pid) {
         if (slot >= 0) {
             const struct clks_exec_proc_record *proc = &clks_exec_proc_table[(u32)slot];
 
-            if (proc->used == CLKS_TRUE &&
-                proc->state == CLKS_EXEC_PROC_RUNNING &&
-                proc->tty_index == tty_index &&
+            if (proc->used == CLKS_TRUE && proc->state == CLKS_EXEC_PROC_RUNNING && proc->tty_index == tty_index &&
                 clks_exec_path_is_user_program(proc->path) == CLKS_TRUE) {
                 u64 ret = clks_exec_proc_kill(current_pid, CLKS_EXEC_SIGNAL_STOP);
 
@@ -2392,8 +2338,7 @@ u64 clks_exec_force_stop_tty_running_process(u32 tty_index, u64 *out_pid) {
     for (i = 0U; i < CLKS_EXEC_MAX_PROCS; i++) {
         u64 ret;
 
-        if (clks_exec_proc_table[i].used != CLKS_TRUE ||
-            clks_exec_proc_table[i].state != CLKS_EXEC_PROC_RUNNING ||
+        if (clks_exec_proc_table[i].used != CLKS_TRUE || clks_exec_proc_table[i].state != CLKS_EXEC_PROC_RUNNING ||
             clks_exec_proc_table[i].tty_index != tty_index ||
             clks_exec_path_is_user_program(clks_exec_proc_table[i].path) == CLKS_FALSE) {
             continue;
@@ -2413,10 +2358,7 @@ u64 clks_exec_force_stop_tty_running_process(u32 tty_index, u64 *out_pid) {
     return 0ULL;
 }
 
-clks_bool clks_exec_try_unwind_signaled_process(u64 interrupted_rip,
-                                                u64 *io_rip,
-                                                u64 *io_rdi,
-                                                u64 *io_rsi) {
+clks_bool clks_exec_try_unwind_signaled_process(u64 interrupted_rip, u64 *io_rip, u64 *io_rdi, u64 *io_rsi) {
     i32 depth_index;
 
     if (io_rip == CLKS_NULL || io_rdi == CLKS_NULL || io_rsi == CLKS_NULL) {
@@ -2456,12 +2398,7 @@ clks_bool clks_exec_try_unwind_signaled_process(u64 interrupted_rip,
 #endif
 }
 
-clks_bool clks_exec_handle_exception(u64 vector,
-                                     u64 error_code,
-                                     u64 rip,
-                                     u64 *io_rip,
-                                     u64 *io_rdi,
-                                     u64 *io_rsi) {
+clks_bool clks_exec_handle_exception(u64 vector, u64 error_code, u64 rip, u64 *io_rip, u64 *io_rdi, u64 *io_rsi) {
     i32 depth_index;
     struct clks_exec_proc_record *proc;
     u64 signal;
@@ -2589,4 +2526,3 @@ clks_bool clks_exec_current_path_is_user(void) {
     proc = &clks_exec_proc_table[(u32)slot];
     return clks_exec_path_is_user_program(proc->path);
 }
-

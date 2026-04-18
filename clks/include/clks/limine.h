@@ -6,56 +6,36 @@
 #define LIMINE_COMMON_MAGIC 0xc7b1dd30df4c8b88ULL
 #define LIMINE_REQUEST_MAGIC 0x0a82e883a194f07bULL
 
-#define LIMINE_REQUESTS_START_MARKER \
+#define LIMINE_REQUESTS_START_MARKER                                                                                   \
     { 0xf6b8f4b39de7d1aeULL, 0xfab91a6940fcb9cfULL }
 
-#define LIMINE_REQUESTS_END_MARKER \
+#define LIMINE_REQUESTS_END_MARKER                                                                                     \
     { 0xadc0e0531bb10d03ULL, 0x9572709f31764c62ULL }
 
-#define LIMINE_BASE_REVISION(N) \
+#define LIMINE_BASE_REVISION(N)                                                                                        \
     { 0xf9562b2d5c95a6c8ULL, 0x6a7b384944536bdcULL, (N) }
 
-#define LIMINE_FRAMEBUFFER_REQUEST \
-    { \
-        LIMINE_COMMON_MAGIC, \
-        LIMINE_REQUEST_MAGIC, \
-        0x9d5827dcd881dd75ULL, \
-        0xa3148604f6fab11bULL \
-    }
+#define LIMINE_FRAMEBUFFER_REQUEST                                                                                     \
+    { LIMINE_COMMON_MAGIC, LIMINE_REQUEST_MAGIC, 0x9d5827dcd881dd75ULL, 0xa3148604f6fab11bULL }
 
-#define LIMINE_MEMMAP_REQUEST \
-    { \
-        LIMINE_COMMON_MAGIC, \
-        LIMINE_REQUEST_MAGIC, \
-        0x67cf3d9d378a806fULL, \
-        0xe304acdfc50c3c62ULL \
-    }
+#define LIMINE_MEMMAP_REQUEST                                                                                          \
+    { LIMINE_COMMON_MAGIC, LIMINE_REQUEST_MAGIC, 0x67cf3d9d378a806fULL, 0xe304acdfc50c3c62ULL }
 
-#define LIMINE_EXECUTABLE_FILE_REQUEST \
-    { \
-        LIMINE_COMMON_MAGIC, \
-        LIMINE_REQUEST_MAGIC, \
-        0xad97e90e83f1ed67ULL, \
-        0x31eb5d1c5ff23b69ULL \
-    }
+#define LIMINE_EXECUTABLE_FILE_REQUEST                                                                                 \
+    { LIMINE_COMMON_MAGIC, LIMINE_REQUEST_MAGIC, 0xad97e90e83f1ed67ULL, 0x31eb5d1c5ff23b69ULL }
 
-#define LIMINE_MODULE_REQUEST \
-    { \
-        LIMINE_COMMON_MAGIC, \
-        LIMINE_REQUEST_MAGIC, \
-        0x3e7e279702be32afULL, \
-        0xca1c4f3bd1280ceeULL \
-    }
+#define LIMINE_MODULE_REQUEST                                                                                          \
+    { LIMINE_COMMON_MAGIC, LIMINE_REQUEST_MAGIC, 0x3e7e279702be32afULL, 0xca1c4f3bd1280ceeULL }
 
-#define LIMINE_MEMMAP_USABLE                 0ULL
-#define LIMINE_MEMMAP_RESERVED               1ULL
-#define LIMINE_MEMMAP_ACPI_RECLAIMABLE       2ULL
-#define LIMINE_MEMMAP_ACPI_NVS               3ULL
-#define LIMINE_MEMMAP_BAD_MEMORY             4ULL
+#define LIMINE_MEMMAP_USABLE 0ULL
+#define LIMINE_MEMMAP_RESERVED 1ULL
+#define LIMINE_MEMMAP_ACPI_RECLAIMABLE 2ULL
+#define LIMINE_MEMMAP_ACPI_NVS 3ULL
+#define LIMINE_MEMMAP_BAD_MEMORY 4ULL
 #define LIMINE_MEMMAP_BOOTLOADER_RECLAIMABLE 5ULL
 #define LIMINE_MEMMAP_EXECUTABLE_AND_MODULES 6ULL
-#define LIMINE_MEMMAP_FRAMEBUFFER            7ULL
-#define LIMINE_MEMMAP_RESERVED_MAPPED        8ULL
+#define LIMINE_MEMMAP_FRAMEBUFFER 7ULL
+#define LIMINE_MEMMAP_RESERVED_MAPPED 8ULL
 
 struct limine_uuid {
     u32 a;

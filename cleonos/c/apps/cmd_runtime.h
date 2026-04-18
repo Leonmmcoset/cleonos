@@ -9,21 +9,21 @@
 
 typedef long long i64;
 
-#define USH_CMD_MAX          32ULL
-#define USH_ARG_MAX         160ULL
-#define USH_LINE_MAX        192ULL
-#define USH_PATH_MAX        192ULL
-#define USH_CAT_MAX         512ULL
-#define USH_SCRIPT_MAX     1024ULL
-#define USH_CLEAR_LINES      56ULL
-#define USH_HISTORY_MAX      16ULL
-#define USH_DMESG_DEFAULT    64ULL
-#define USH_DMESG_LINE_MAX  256ULL
-#define USH_COPY_MAX      65536U
+#define USH_CMD_MAX 32ULL
+#define USH_ARG_MAX 160ULL
+#define USH_LINE_MAX 192ULL
+#define USH_PATH_MAX 192ULL
+#define USH_CAT_MAX 512ULL
+#define USH_SCRIPT_MAX 1024ULL
+#define USH_CLEAR_LINES 56ULL
+#define USH_HISTORY_MAX 16ULL
+#define USH_DMESG_DEFAULT 64ULL
+#define USH_DMESG_LINE_MAX 256ULL
+#define USH_COPY_MAX 65536U
 
 #define USH_CMD_CTX_PATH "/temp/.ush_cmd_ctx.bin"
 #define USH_CMD_RET_PATH "/temp/.ush_cmd_ret.bin"
-#define USH_CMD_RET_FLAG_CWD  0x1ULL
+#define USH_CMD_RET_FLAG_CWD 0x1ULL
 #define USH_CMD_RET_FLAG_EXIT 0x2ULL
 
 typedef struct ush_state {
@@ -90,11 +90,7 @@ int ush_path_is_under_system(const char *path);
 int ush_path_is_under_temp(const char *path);
 
 int ush_split_first_and_rest(const char *arg, char *out_first, u64 out_first_size, const char **out_rest);
-int ush_split_two_args(const char *arg,
-                       char *out_first,
-                       u64 out_first_size,
-                       char *out_second,
-                       u64 out_second_size);
+int ush_split_two_args(const char *arg, char *out_first, u64 out_first_size, char *out_second, u64 out_second_size);
 
 int ush_command_ctx_read(ush_cmd_ctx *out_ctx);
 int ush_command_ret_write(const ush_cmd_ret *ret);

@@ -12,79 +12,152 @@ typedef struct ush_sysstat_entry {
 
 static const char *ush_sysstat_name_for_id(u64 id) {
     switch (id) {
-        case CLEONOS_SYSCALL_LOG_WRITE: return "LOG_WRITE";
-        case CLEONOS_SYSCALL_TIMER_TICKS: return "TIMER_TICKS";
-        case CLEONOS_SYSCALL_TASK_COUNT: return "TASK_COUNT";
-        case CLEONOS_SYSCALL_CUR_TASK: return "CUR_TASK";
-        case CLEONOS_SYSCALL_SERVICE_COUNT: return "SERVICE_COUNT";
-        case CLEONOS_SYSCALL_SERVICE_READY_COUNT: return "SERVICE_READY";
-        case CLEONOS_SYSCALL_CONTEXT_SWITCHES: return "CONTEXT_SWITCH";
-        case CLEONOS_SYSCALL_KELF_COUNT: return "KELF_COUNT";
-        case CLEONOS_SYSCALL_KELF_RUNS: return "KELF_RUNS";
-        case CLEONOS_SYSCALL_FS_NODE_COUNT: return "FS_NODE_COUNT";
-        case CLEONOS_SYSCALL_FS_CHILD_COUNT: return "FS_CHILD_COUNT";
-        case CLEONOS_SYSCALL_FS_GET_CHILD_NAME: return "FS_CHILD_NAME";
-        case CLEONOS_SYSCALL_FS_READ: return "FS_READ";
-        case CLEONOS_SYSCALL_EXEC_PATH: return "EXEC_PATH";
-        case CLEONOS_SYSCALL_EXEC_REQUESTS: return "EXEC_REQUESTS";
-        case CLEONOS_SYSCALL_EXEC_SUCCESS: return "EXEC_SUCCESS";
-        case CLEONOS_SYSCALL_USER_SHELL_READY: return "USER_SHELL_READY";
-        case CLEONOS_SYSCALL_USER_EXEC_REQUESTED: return "USER_EXEC_REQ";
-        case CLEONOS_SYSCALL_USER_LAUNCH_TRIES: return "USER_LAUNCH_TRY";
-        case CLEONOS_SYSCALL_USER_LAUNCH_OK: return "USER_LAUNCH_OK";
-        case CLEONOS_SYSCALL_USER_LAUNCH_FAIL: return "USER_LAUNCH_FAIL";
-        case CLEONOS_SYSCALL_TTY_COUNT: return "TTY_COUNT";
-        case CLEONOS_SYSCALL_TTY_ACTIVE: return "TTY_ACTIVE";
-        case CLEONOS_SYSCALL_TTY_SWITCH: return "TTY_SWITCH";
-        case CLEONOS_SYSCALL_TTY_WRITE: return "TTY_WRITE";
-        case CLEONOS_SYSCALL_TTY_WRITE_CHAR: return "TTY_WRITE_CHAR";
-        case CLEONOS_SYSCALL_KBD_GET_CHAR: return "KBD_GET_CHAR";
-        case CLEONOS_SYSCALL_FS_STAT_TYPE: return "FS_STAT_TYPE";
-        case CLEONOS_SYSCALL_FS_STAT_SIZE: return "FS_STAT_SIZE";
-        case CLEONOS_SYSCALL_FS_MKDIR: return "FS_MKDIR";
-        case CLEONOS_SYSCALL_FS_WRITE: return "FS_WRITE";
-        case CLEONOS_SYSCALL_FS_APPEND: return "FS_APPEND";
-        case CLEONOS_SYSCALL_FS_REMOVE: return "FS_REMOVE";
-        case CLEONOS_SYSCALL_LOG_JOURNAL_COUNT: return "LOG_JCOUNT";
-        case CLEONOS_SYSCALL_LOG_JOURNAL_READ: return "LOG_JREAD";
-        case CLEONOS_SYSCALL_KBD_BUFFERED: return "KBD_BUFFERED";
-        case CLEONOS_SYSCALL_KBD_PUSHED: return "KBD_PUSHED";
-        case CLEONOS_SYSCALL_KBD_POPPED: return "KBD_POPPED";
-        case CLEONOS_SYSCALL_KBD_DROPPED: return "KBD_DROPPED";
-        case CLEONOS_SYSCALL_KBD_HOTKEY_SWITCHES: return "KBD_HOTKEYS";
-        case CLEONOS_SYSCALL_GETPID: return "GETPID";
-        case CLEONOS_SYSCALL_SPAWN_PATH: return "SPAWN_PATH";
-        case CLEONOS_SYSCALL_WAITPID: return "WAITPID";
-        case CLEONOS_SYSCALL_EXIT: return "EXIT";
-        case CLEONOS_SYSCALL_SLEEP_TICKS: return "SLEEP_TICKS";
-        case CLEONOS_SYSCALL_YIELD: return "YIELD";
-        case CLEONOS_SYSCALL_SHUTDOWN: return "SHUTDOWN";
-        case CLEONOS_SYSCALL_RESTART: return "RESTART";
-        case CLEONOS_SYSCALL_AUDIO_AVAILABLE: return "AUDIO_AVAIL";
-        case CLEONOS_SYSCALL_AUDIO_PLAY_TONE: return "AUDIO_TONE";
-        case CLEONOS_SYSCALL_AUDIO_STOP: return "AUDIO_STOP";
-        case CLEONOS_SYSCALL_EXEC_PATHV: return "EXEC_PATHV";
-        case CLEONOS_SYSCALL_SPAWN_PATHV: return "SPAWN_PATHV";
-        case CLEONOS_SYSCALL_PROC_ARGC: return "PROC_ARGC";
-        case CLEONOS_SYSCALL_PROC_ARGV: return "PROC_ARGV";
-        case CLEONOS_SYSCALL_PROC_ENVC: return "PROC_ENVC";
-        case CLEONOS_SYSCALL_PROC_ENV: return "PROC_ENV";
-        case CLEONOS_SYSCALL_PROC_LAST_SIGNAL: return "PROC_LAST_SIG";
-        case CLEONOS_SYSCALL_PROC_FAULT_VECTOR: return "PROC_FAULT_VEC";
-        case CLEONOS_SYSCALL_PROC_FAULT_ERROR: return "PROC_FAULT_ERR";
-        case CLEONOS_SYSCALL_PROC_FAULT_RIP: return "PROC_FAULT_RIP";
-        case CLEONOS_SYSCALL_PROC_COUNT: return "PROC_COUNT";
-        case CLEONOS_SYSCALL_PROC_PID_AT: return "PROC_PID_AT";
-        case CLEONOS_SYSCALL_PROC_SNAPSHOT: return "PROC_SNAPSHOT";
-        case CLEONOS_SYSCALL_PROC_KILL: return "PROC_KILL";
-        case CLEONOS_SYSCALL_KDBG_SYM: return "KDBG_SYM";
-        case CLEONOS_SYSCALL_KDBG_BT: return "KDBG_BT";
-        case CLEONOS_SYSCALL_KDBG_REGS: return "KDBG_REGS";
-        case CLEONOS_SYSCALL_STATS_TOTAL: return "STATS_TOTAL";
-        case CLEONOS_SYSCALL_STATS_ID_COUNT: return "STATS_ID_COUNT";
-        case CLEONOS_SYSCALL_STATS_RECENT_WINDOW: return "STATS_RECENT_WIN";
-        case CLEONOS_SYSCALL_STATS_RECENT_ID: return "STATS_RECENT_ID";
-        default: return "UNKNOWN";
+    case CLEONOS_SYSCALL_LOG_WRITE:
+        return "LOG_WRITE";
+    case CLEONOS_SYSCALL_TIMER_TICKS:
+        return "TIMER_TICKS";
+    case CLEONOS_SYSCALL_TASK_COUNT:
+        return "TASK_COUNT";
+    case CLEONOS_SYSCALL_CUR_TASK:
+        return "CUR_TASK";
+    case CLEONOS_SYSCALL_SERVICE_COUNT:
+        return "SERVICE_COUNT";
+    case CLEONOS_SYSCALL_SERVICE_READY_COUNT:
+        return "SERVICE_READY";
+    case CLEONOS_SYSCALL_CONTEXT_SWITCHES:
+        return "CONTEXT_SWITCH";
+    case CLEONOS_SYSCALL_KELF_COUNT:
+        return "KELF_COUNT";
+    case CLEONOS_SYSCALL_KELF_RUNS:
+        return "KELF_RUNS";
+    case CLEONOS_SYSCALL_FS_NODE_COUNT:
+        return "FS_NODE_COUNT";
+    case CLEONOS_SYSCALL_FS_CHILD_COUNT:
+        return "FS_CHILD_COUNT";
+    case CLEONOS_SYSCALL_FS_GET_CHILD_NAME:
+        return "FS_CHILD_NAME";
+    case CLEONOS_SYSCALL_FS_READ:
+        return "FS_READ";
+    case CLEONOS_SYSCALL_EXEC_PATH:
+        return "EXEC_PATH";
+    case CLEONOS_SYSCALL_EXEC_REQUESTS:
+        return "EXEC_REQUESTS";
+    case CLEONOS_SYSCALL_EXEC_SUCCESS:
+        return "EXEC_SUCCESS";
+    case CLEONOS_SYSCALL_USER_SHELL_READY:
+        return "USER_SHELL_READY";
+    case CLEONOS_SYSCALL_USER_EXEC_REQUESTED:
+        return "USER_EXEC_REQ";
+    case CLEONOS_SYSCALL_USER_LAUNCH_TRIES:
+        return "USER_LAUNCH_TRY";
+    case CLEONOS_SYSCALL_USER_LAUNCH_OK:
+        return "USER_LAUNCH_OK";
+    case CLEONOS_SYSCALL_USER_LAUNCH_FAIL:
+        return "USER_LAUNCH_FAIL";
+    case CLEONOS_SYSCALL_TTY_COUNT:
+        return "TTY_COUNT";
+    case CLEONOS_SYSCALL_TTY_ACTIVE:
+        return "TTY_ACTIVE";
+    case CLEONOS_SYSCALL_TTY_SWITCH:
+        return "TTY_SWITCH";
+    case CLEONOS_SYSCALL_TTY_WRITE:
+        return "TTY_WRITE";
+    case CLEONOS_SYSCALL_TTY_WRITE_CHAR:
+        return "TTY_WRITE_CHAR";
+    case CLEONOS_SYSCALL_KBD_GET_CHAR:
+        return "KBD_GET_CHAR";
+    case CLEONOS_SYSCALL_FS_STAT_TYPE:
+        return "FS_STAT_TYPE";
+    case CLEONOS_SYSCALL_FS_STAT_SIZE:
+        return "FS_STAT_SIZE";
+    case CLEONOS_SYSCALL_FS_MKDIR:
+        return "FS_MKDIR";
+    case CLEONOS_SYSCALL_FS_WRITE:
+        return "FS_WRITE";
+    case CLEONOS_SYSCALL_FS_APPEND:
+        return "FS_APPEND";
+    case CLEONOS_SYSCALL_FS_REMOVE:
+        return "FS_REMOVE";
+    case CLEONOS_SYSCALL_LOG_JOURNAL_COUNT:
+        return "LOG_JCOUNT";
+    case CLEONOS_SYSCALL_LOG_JOURNAL_READ:
+        return "LOG_JREAD";
+    case CLEONOS_SYSCALL_KBD_BUFFERED:
+        return "KBD_BUFFERED";
+    case CLEONOS_SYSCALL_KBD_PUSHED:
+        return "KBD_PUSHED";
+    case CLEONOS_SYSCALL_KBD_POPPED:
+        return "KBD_POPPED";
+    case CLEONOS_SYSCALL_KBD_DROPPED:
+        return "KBD_DROPPED";
+    case CLEONOS_SYSCALL_KBD_HOTKEY_SWITCHES:
+        return "KBD_HOTKEYS";
+    case CLEONOS_SYSCALL_GETPID:
+        return "GETPID";
+    case CLEONOS_SYSCALL_SPAWN_PATH:
+        return "SPAWN_PATH";
+    case CLEONOS_SYSCALL_WAITPID:
+        return "WAITPID";
+    case CLEONOS_SYSCALL_EXIT:
+        return "EXIT";
+    case CLEONOS_SYSCALL_SLEEP_TICKS:
+        return "SLEEP_TICKS";
+    case CLEONOS_SYSCALL_YIELD:
+        return "YIELD";
+    case CLEONOS_SYSCALL_SHUTDOWN:
+        return "SHUTDOWN";
+    case CLEONOS_SYSCALL_RESTART:
+        return "RESTART";
+    case CLEONOS_SYSCALL_AUDIO_AVAILABLE:
+        return "AUDIO_AVAIL";
+    case CLEONOS_SYSCALL_AUDIO_PLAY_TONE:
+        return "AUDIO_TONE";
+    case CLEONOS_SYSCALL_AUDIO_STOP:
+        return "AUDIO_STOP";
+    case CLEONOS_SYSCALL_EXEC_PATHV:
+        return "EXEC_PATHV";
+    case CLEONOS_SYSCALL_SPAWN_PATHV:
+        return "SPAWN_PATHV";
+    case CLEONOS_SYSCALL_PROC_ARGC:
+        return "PROC_ARGC";
+    case CLEONOS_SYSCALL_PROC_ARGV:
+        return "PROC_ARGV";
+    case CLEONOS_SYSCALL_PROC_ENVC:
+        return "PROC_ENVC";
+    case CLEONOS_SYSCALL_PROC_ENV:
+        return "PROC_ENV";
+    case CLEONOS_SYSCALL_PROC_LAST_SIGNAL:
+        return "PROC_LAST_SIG";
+    case CLEONOS_SYSCALL_PROC_FAULT_VECTOR:
+        return "PROC_FAULT_VEC";
+    case CLEONOS_SYSCALL_PROC_FAULT_ERROR:
+        return "PROC_FAULT_ERR";
+    case CLEONOS_SYSCALL_PROC_FAULT_RIP:
+        return "PROC_FAULT_RIP";
+    case CLEONOS_SYSCALL_PROC_COUNT:
+        return "PROC_COUNT";
+    case CLEONOS_SYSCALL_PROC_PID_AT:
+        return "PROC_PID_AT";
+    case CLEONOS_SYSCALL_PROC_SNAPSHOT:
+        return "PROC_SNAPSHOT";
+    case CLEONOS_SYSCALL_PROC_KILL:
+        return "PROC_KILL";
+    case CLEONOS_SYSCALL_KDBG_SYM:
+        return "KDBG_SYM";
+    case CLEONOS_SYSCALL_KDBG_BT:
+        return "KDBG_BT";
+    case CLEONOS_SYSCALL_KDBG_REGS:
+        return "KDBG_REGS";
+    case CLEONOS_SYSCALL_STATS_TOTAL:
+        return "STATS_TOTAL";
+    case CLEONOS_SYSCALL_STATS_ID_COUNT:
+        return "STATS_ID_COUNT";
+    case CLEONOS_SYSCALL_STATS_RECENT_WINDOW:
+        return "STATS_RECENT_WIN";
+    case CLEONOS_SYSCALL_STATS_RECENT_ID:
+        return "STATS_RECENT_ID";
+    default:
+        return "UNKNOWN";
     }
 }
 
@@ -141,7 +214,8 @@ static int ush_sysstat_parse_args(const char *arg, int *out_show_all, u64 *out_l
         }
 
         if (ush_streq(token, "-n") != 0 || ush_streq(token, "--top") != 0) {
-            if (ush_sysstat_next_token(&cursor, token, (u64)sizeof(token)) == 0 || ush_parse_u64_dec(token, &limit) == 0) {
+            if (ush_sysstat_next_token(&cursor, token, (u64)sizeof(token)) == 0 ||
+                ush_parse_u64_dec(token, &limit) == 0) {
                 return 0;
             }
             continue;

@@ -142,18 +142,18 @@ static void clks_task_kworker(u64 tick) {
     clks_service_heartbeat(CLKS_SERVICE_SCHED, tick);
 
     switch (phase) {
-        case 0U:
-            clks_service_heartbeat(CLKS_SERVICE_MEM, tick);
-            break;
-        case 1U:
-            clks_service_heartbeat(CLKS_SERVICE_FS, tick);
-            break;
-        case 2U:
-            clks_service_heartbeat(CLKS_SERVICE_DRIVER, tick);
-            break;
-        default:
-            clks_service_heartbeat(CLKS_SERVICE_LOG, tick);
-            break;
+    case 0U:
+        clks_service_heartbeat(CLKS_SERVICE_MEM, tick);
+        break;
+    case 1U:
+        clks_service_heartbeat(CLKS_SERVICE_FS, tick);
+        break;
+    case 2U:
+        clks_service_heartbeat(CLKS_SERVICE_DRIVER, tick);
+        break;
+    default:
+        clks_service_heartbeat(CLKS_SERVICE_LOG, tick);
+        break;
     }
 
     phase = (phase + 1U) & 3U;

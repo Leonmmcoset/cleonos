@@ -36,12 +36,11 @@ void clks_serial_write_char(char ch) {
 #elif defined(CLKS_ARCH_AARCH64)
 
 #define CLKS_PL011_BASE 0x09000000ULL
-#define CLKS_PL011_DR   (*(volatile u32 *)(CLKS_PL011_BASE + 0x00))
-#define CLKS_PL011_FR   (*(volatile u32 *)(CLKS_PL011_BASE + 0x18))
+#define CLKS_PL011_DR (*(volatile u32 *)(CLKS_PL011_BASE + 0x00))
+#define CLKS_PL011_FR (*(volatile u32 *)(CLKS_PL011_BASE + 0x18))
 #define CLKS_PL011_TXFF (1U << 5)
 
-void clks_serial_init(void) {
-}
+void clks_serial_init(void) {}
 
 void clks_serial_write_char(char ch) {
     while ((CLKS_PL011_FR & CLKS_PL011_TXFF) != 0) {

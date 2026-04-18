@@ -167,8 +167,7 @@ static int ush_cmd_kdbg(const char *arg) {
 
     if (ush_streq(subcmd, "bt") != 0) {
         if (ush_kdbg_next_token(&cursor, tok0, (u64)sizeof(tok0)) == 0 ||
-            ush_kdbg_next_token(&cursor, tok1, (u64)sizeof(tok1)) == 0 ||
-            ush_kdbg_has_more_tokens(cursor) != 0) {
+            ush_kdbg_next_token(&cursor, tok1, (u64)sizeof(tok1)) == 0 || ush_kdbg_has_more_tokens(cursor) != 0) {
             ush_kdbg_usage();
             return 0;
         }

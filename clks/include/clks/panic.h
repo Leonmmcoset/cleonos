@@ -5,11 +5,6 @@
 #include <clks/types.h>
 
 CLKS_NORETURN void clks_panic(const char *reason);
-CLKS_NORETURN void clks_panic_exception(const char *name,
-                                        u64 vector,
-                                        u64 error_code,
-                                        u64 rip,
-                                        u64 rbp,
-                                        u64 rsp);
+CLKS_NORETURN void clks_panic_exception(const char *name, u64 vector, u64 error_code, u64 rip, u64 rbp, u64 rsp);
 
 #endif

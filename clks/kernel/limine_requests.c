@@ -1,42 +1,42 @@
 #include <clks/boot.h>
 #include <clks/compiler.h>
 
-CLKS_USED static volatile u64 limine_requests_start[]
-    __attribute__((section(".limine_requests_start"))) = LIMINE_REQUESTS_START_MARKER;
+CLKS_USED static volatile u64 limine_requests_start[] __attribute__((section(".limine_requests_start"))) =
+    LIMINE_REQUESTS_START_MARKER;
 
-CLKS_USED static volatile u64 limine_base_revision[]
-    __attribute__((section(".limine_requests"))) = LIMINE_BASE_REVISION(3);
+CLKS_USED static volatile u64 limine_base_revision[] __attribute__((section(".limine_requests"))) =
+    LIMINE_BASE_REVISION(3);
 
 CLKS_USED static volatile struct limine_framebuffer_request limine_framebuffer_request
     __attribute__((section(".limine_requests"))) = {
         .id = LIMINE_FRAMEBUFFER_REQUEST,
         .revision = 0,
         .response = CLKS_NULL,
-    };
+};
 
 CLKS_USED static volatile struct limine_memmap_request limine_memmap_request
     __attribute__((section(".limine_requests"))) = {
         .id = LIMINE_MEMMAP_REQUEST,
         .revision = 0,
         .response = CLKS_NULL,
-    };
+};
 
 CLKS_USED static volatile struct limine_executable_file_request limine_executable_file_request
     __attribute__((section(".limine_requests"))) = {
         .id = LIMINE_EXECUTABLE_FILE_REQUEST,
         .revision = 0,
         .response = CLKS_NULL,
-    };
+};
 
 CLKS_USED static volatile struct limine_module_request limine_module_request
     __attribute__((section(".limine_requests"))) = {
         .id = LIMINE_MODULE_REQUEST,
         .revision = 0,
         .response = CLKS_NULL,
-    };
+};
 
-CLKS_USED static volatile u64 limine_requests_end[]
-    __attribute__((section(".limine_requests_end"))) = LIMINE_REQUESTS_END_MARKER;
+CLKS_USED static volatile u64 limine_requests_end[] __attribute__((section(".limine_requests_end"))) =
+    LIMINE_REQUESTS_END_MARKER;
 
 clks_bool clks_boot_base_revision_supported(void) {
     return (limine_base_revision[2] == 0) ? CLKS_TRUE : CLKS_FALSE;

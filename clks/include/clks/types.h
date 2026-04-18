@@ -13,10 +13,7 @@ typedef signed long long i64;
 
 typedef u64 usize;
 
-typedef enum clks_bool {
-    CLKS_FALSE = 0,
-    CLKS_TRUE = 1
-} clks_bool;
+typedef enum clks_bool { CLKS_FALSE = 0, CLKS_TRUE = 1 } clks_bool;
 
 #define CLKS_NULL ((void *)0)
 
